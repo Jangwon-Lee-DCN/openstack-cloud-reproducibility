@@ -1,9 +1,11 @@
 # Patched Helm Packages
 
-This directory is intentionally empty of chart archives today because the
-telemetry corrections are implemented as values and external manifests; the
-clean upstream chart sources remain byte-for-byte unchanged.
+These packages are the chart-source variants actually used by the PoC:
 
-If a chart source patch becomes necessary, make it in a dedicated Git commit,
-package the resulting chart here, update a `SHA256SUMS` file, and reference the
-corresponding ISSUE/FIX documents.
+- `ironic-2026.1.0.tgz`: toleration indentation correction
+- `nova-2026.1.0.tgz`: explicit Ceph replication-size confirmation
+- `ovn-2026.1.0.tgz`: control-plane tolerations and pod-local OVSDB sockets
+
+`SHA256SUMS` is authoritative. Every patch is a dedicated Git commit above the
+clean upstream source and has a component ISSUE/FIX record. All other releases
+use packages from `helm/packages/upstream`.

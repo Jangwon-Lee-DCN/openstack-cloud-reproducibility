@@ -21,8 +21,10 @@ FIX, RECONCILE, and VERIFY record and a separate commit.
 - `deploy`: values, manifests, encrypted secrets, and reconciliation scripts
 - `docs`: repository policy and provenance
 
-The initial scope is Gnocchi, Ceilometer, and Aodh. Additional OpenStack
-components should follow the same history and documentation model.
+The repository now contains every OpenStack-Helm chart used by the accepted
+PoC, all final release values snapshots, the three deployed chart patches, and
+the custom Gnocchi/Ceilometer/Aodh images and manifests. It is the immutable
+artifact source consumed by `openstack-cloud-services`.
 
 ## Inspect and run
 
@@ -31,13 +33,13 @@ components should follow the same history and documentation model.
 git diff 4c3a128..HEAD
 
 # Rebuild images only when the pinned artifacts are unavailable.
-BUILD_IMAGES=1 ./deploy/scripts/reconcile.sh
+BUILD_IMAGES=1 ./deploy/scripts/reconcile-full-stack.sh
 
 # Reuse already-pinned images and reconcile the stack.
-./deploy/scripts/reconcile.sh
+./deploy/scripts/reconcile-full-stack.sh
 
 # Repeat non-mutating health checks.
-./deploy/scripts/verify.sh
+./deploy/scripts/verify-full-stack.sh
 ```
 
 Read each component's `ISSUE.md`, `FIX.md`, `RECONCILE.md`, and `VERIFY.md`
