@@ -51,19 +51,26 @@ spec:
     package: helm/packages/upstream/heat-2026.1.0.tgz
     sha256: 95dbd84e4befcb7ad2fdf7a781b4282102a7b0fecf57e6819963c84ce81e25be
     valuesSnapshot: deploy/releases/heat.values.sops.yaml
+  - name: octavia
+    chart: octavia
+    chartVersion: 2026.1.0
+    appVersion: 18.0.0
+    package: helm/packages/patched/octavia-2026.1.0.tgz
+    sha256: b3ef67f4ae2fcb53b217bf1b271ce32c31f9cda1ea33583ddd5a473e32380036
+    valuesSnapshot: deploy/releases/octavia.values.sops.yaml
   - name: horizon
     chart: horizon
     chartVersion: 2026.1.0
     appVersion: 25.7.1
     package: helm/packages/patched/horizon-2026.1.0.tgz
-    sha256: 13facf9cbef2b90bb1968949d59b680cfe778d368ba009bbc6841e409c70962d
+    sha256: fd95aaefd7d70cde344dea3b4f880355339a735d0b4b8e5b00c10a43e0c5ae59
     valuesSnapshot: deploy/releases/horizon.values.sops.yaml
   - name: skyline
     chart: skyline
     chartVersion: 2026.1.0
     appVersion: 8.0.0
     package: helm/packages/patched/skyline-2026.1.0.tgz
-    sha256: 3ad49f838e85ae2657ec099437cc09695340c24d3e12f6ea238e3beb5eace424
+    sha256: 435f2f5d404749ec68149b588c6032686e19d212569b2d3b8a5a8bdd061a897d
     valuesSnapshot: deploy/releases/skyline.values.sops.yaml
   - name: ironic
     chart: ironic

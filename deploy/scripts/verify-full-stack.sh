@@ -22,6 +22,19 @@ done
 
 kubectl get pods -n "$NAMESPACE" --no-headers   | awk '$3 !~ /Running|Completed/ {print; bad=1} END {exit bad}'
 
+for workload in octavia-api octavia-driver-agent octavia-housekeeping; do
+  [[ "$(kubectl get deployment -n "$NAMESPACE" "$workload" -o jsonpath='{.status.readyReplicas}')" == "2" ]] || {
+    echo "$workload does not have two ready replicas" >&2; exit 1;
+  }
+  [[ "$(kubectl get pods -n "$NAMESPACE" -l "application=octavia" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2 ]] || {
+    echo "Octavia replicas are not spread across two nodes" >&2; exit 1;
+  }
+done
+
+[[ "$(curl -ksS -o /dev/null -w '%{http_code}' https://cloud.dcn.ssu.ac.kr/load-balancer/v2/lbaas/providers)" == "401" ]] || {
+  echo "public Octavia route did not enforce Keystone authentication" >&2; exit 1;
+}
+
 for dashboard in skyline horizon; do
   component=skyline
   [[ "$dashboard" == horizon ]] && component=server

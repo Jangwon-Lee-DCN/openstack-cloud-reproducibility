@@ -35,6 +35,10 @@ wait_release() {
 }
 
 install_release() {
+  if [[ "$1" == "octavia" ]]; then
+    "$REPO_ROOT/deploy/scripts/reconcile-octavia.sh"
+    return
+  fi
   local release=$1 package snapshot expected actual values
   package=$(release_field "$release" package)
   snapshot=$(release_field "$release" valuesSnapshot)
@@ -61,7 +65,7 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
 fi
 
 # Dependency order of the accepted PoC deployment.
-for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder   openvswitch ovn neutron   libvirt nova   heat horizon skyline ironic   prometheus-openstack-exporter; do
+for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder   openvswitch ovn neutron   libvirt nova   heat octavia horizon skyline ironic   prometheus-openstack-exporter; do
   install_release "$release"
 done
 

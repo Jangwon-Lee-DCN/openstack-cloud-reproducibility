@@ -1,5 +1,11 @@
 # HA Horizon dashboard at the cloud root URL.
+images:
+  tags:
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:4a62e1d1060eb54e5fb891bf15f11177f5210dc5196206a544fc6c048b00d2ff
 pod:
+  image_pull_secrets:
+    horizon:
+      - name: telemetry-harbor-push
   tolerations:
     horizon:
       enabled: true

@@ -22,10 +22,11 @@ FIX, RECONCILE, and VERIFY record and a separate commit.
 - `docs`: repository policy and provenance
 
 The repository now contains every OpenStack-Helm chart used by the accepted
-PoC, all final release values snapshots, the five deployed chart patches, and
-the custom Gnocchi/Ceilometer/Aodh images and manifests. Skyline is the default
-user dashboard and Horizon is preserved as the `/horizon/` administrator and
-compatibility fallback. It is the immutable
+PoC, all final release values snapshots, the deployed chart patches, and the
+custom Gnocchi/Ceilometer/Aodh/Octavia/Horizon images and manifests. Octavia
+uses the OVN provider and has a recorded public-LB E2E test. Skyline is the
+default user dashboard and Horizon is preserved as the `/horizon/`
+administrator and compatibility fallback. It is the immutable
 artifact source consumed by `openstack-cloud-services`.
 
 ## Inspect and run

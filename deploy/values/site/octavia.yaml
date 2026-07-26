@@ -1,0 +1,117 @@
+# Octavia API with the OVN provider for the two-controller PoC.
+#
+# OVN is the default provider because the cloud networking backend is OVN.
+# Amphora-only worker, health-manager, management-network, and certificate
+# resources are deliberately disabled. An Amphora provider can be added later
+# when features absent from OVN (for example LB statistics or flavors) are
+# required.
+images:
+  tags:
+    bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+    ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    octavia_db_sync: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+    octavia_housekeeping: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+  pull_policy: IfNotPresent
+
+conf:
+  octavia:
+    api_settings:
+      api_handler: queue_producer
+      default_provider_driver: ovn
+      enabled_provider_drivers: "ovn:OVN provider"
+    driver_agent:
+      enabled_provider_agents: ovn
+    neutron:
+      valid_interfaces: internal
+    ovn:
+      ovn_nb_connection: tcp:10.200.1.69:6641,tcp:10.200.1.175:6641,tcp:10.200.0.45:6641
+      ovn_sb_connection: tcp:10.200.1.251:6642,tcp:10.200.1.132:6642,tcp:10.200.0.200:6642
+    service_auth:
+      endpoint_type: internalURL
+    task_flow:
+      jobboard_enabled: false
+
+pod:
+  image_pull_secrets:
+    default:
+      - name: telemetry-harbor-push
+  mounts:
+    octavia_api:
+      octavia_api:
+        volumeMounts:
+          - name: pod-tmp
+            mountPath: /tmp
+          - name: run-openvswitch
+            mountPath: /var/run/ovn
+          - name: octavia-driver-agents
+            mountPath: /var/run/octavia
+        volumes:
+          - name: pod-tmp
+            emptyDir: {}
+          - name: run-openvswitch
+            hostPath:
+              path: /run/openvswitch
+              type: DirectoryOrCreate
+          - name: octavia-driver-agents
+            hostPath:
+              path: /var/lib/octavia/run
+              type: Directory
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  probes:
+    api:
+      octavia-api:
+        liveness:
+          params:
+            initialDelaySeconds: 180
+            timeoutSeconds: 10
+        readiness:
+          params:
+            initialDelaySeconds: 60
+            timeoutSeconds: 10
+  replicas:
+    api: 2
+    driver_agent: 2
+    housekeeping: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  load_balancer:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /load-balancer
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+manifests:
+  daemonset_health_manager: false
+  daemonset_worker: false
+  ingress_api: false
+  job_image_repo_sync: false
+  secret_credential_keys: false
+  secret_ingress_tls: false
+  service_ingress_api: false

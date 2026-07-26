@@ -1,0 +1,64 @@
+# HA user dashboard. Horizon remains available at /horizon/ as an
+# administrator and compatibility fallback.
+pod:
+  replicas:
+    skyline: 2
+  tolerations:
+    skyline:
+      enabled: true
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  resources:
+    enabled: true
+
+conf:
+  skyline:
+    default:
+      debug: false
+    openstack:
+      interface_type: internal
+      default_region: RegionOne
+      extension_mapping:
+        load-balancer: octavia
+      service_mapping:
+        load-balancer: octavia
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+      skyline:
+        region_name: RegionOne
+        project_name: admin
+  skyline:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+manifests:
+  ingress: false
+  service_ingress: false
+
+extraObjects:
+  - apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      name: skyline
+      namespace: openstack
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          application: skyline
+          component: skyline
