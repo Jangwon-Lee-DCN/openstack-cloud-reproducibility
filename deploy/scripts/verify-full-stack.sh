@@ -21,4 +21,20 @@ for release in $(helm list -n "$NAMESPACE" -q); do
 done
 
 kubectl get pods -n "$NAMESPACE" --no-headers   | awk '$3 !~ /Running|Completed/ {print; bad=1} END {exit bad}'
+
+for dashboard in skyline horizon; do
+  component=skyline
+  [[ "$dashboard" == horizon ]] && component=server
+  [[ "$(kubectl get deployment -n "$NAMESPACE" "$dashboard" -o jsonpath='{.status.readyReplicas}')" == "2" ]] || {
+    echo "$dashboard does not have two ready replicas" >&2; exit 1;
+  }
+  [[ "$(kubectl get pods -n "$NAMESPACE" -l "application=$dashboard,component=$component" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2 ]] || {
+    echo "$dashboard replicas are not spread across two nodes" >&2; exit 1;
+  }
+done
+
+kubectl get pdb -n "$NAMESPACE" skyline >/dev/null
+kubectl get httproute -n "$NAMESPACE" openstack-public-services \
+  -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}' | grep -qx True
+
 "$REPO_ROOT/deploy/scripts/verify.sh"

@@ -6,10 +6,10 @@ not maintain an independent chart fork.
 
 ## Locked inputs
 
-- `release-lock.yaml`: all 19 installed Helm releases, exact package path,
+- `release-lock.yaml`: all 20 installed Helm releases, exact package path,
   SHA-256, chart/app versions, and encrypted final values snapshot
 - `helm/packages/upstream`: unmodified packages
-- `helm/packages/patched`: Ironic, Nova, and OVN packages used by the cluster
+- `helm/packages/patched`: Ironic, Nova, OVN, Skyline, and Horizon packages used by the cluster
 - `deploy/releases`: SOPS-encrypted snapshots from `helm get values`
 - `deploy/values/site`: human-maintained non-secret layers
 - `deploy/secrets`: human-maintained SOPS profiles
@@ -35,3 +35,8 @@ The chart packages and fixes remain identical across profiles.
 
 Helm hooks in these charts can deadlock with Helm `--wait`. The script installs
 without `--wait`, then waits for hook Jobs and workloads explicitly.
+
+Skyline is reconciled after Horizon. The final HTTPRoute assigns `/` to
+Skyline and `/horizon/` to Horizon. Both dashboards run two replicas spread
+across the controllers; component-specific compatibility details are recorded
+under `components/skyline/`.

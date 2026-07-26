@@ -92,7 +92,7 @@ spec:
           readinessProbe:
             httpGet:
               scheme: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.keystone_endpoint_scheme_lookup" | upper }}
-              path: /
+              path: /auth/login/
               port: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -100,7 +100,7 @@ spec:
           livenessProbe:
             httpGet:
               scheme: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.keystone_endpoint_scheme_lookup" | upper }}
-              path: /
+              path: /auth/login/
               port: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
             initialDelaySeconds: 180
             periodSeconds: 60

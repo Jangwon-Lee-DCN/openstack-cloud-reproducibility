@@ -61,7 +61,7 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
 fi
 
 # Dependency order of the accepted PoC deployment.
-for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder   openvswitch ovn neutron   libvirt nova   heat horizon ironic   prometheus-openstack-exporter; do
+for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder   openvswitch ovn neutron   libvirt nova   heat horizon skyline ironic   prometheus-openstack-exporter; do
   install_release "$release"
 done
 

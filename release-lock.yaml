@@ -55,9 +55,16 @@ spec:
     chart: horizon
     chartVersion: 2026.1.0
     appVersion: 25.7.1
-    package: helm/packages/upstream/horizon-2026.1.0.tgz
-    sha256: 760f447de17b78172b29d2c4a91d86952a30258d2a85fc6821b82d611895adcf
+    package: helm/packages/patched/horizon-2026.1.0.tgz
+    sha256: 13facf9cbef2b90bb1968949d59b680cfe778d368ba009bbc6841e409c70962d
     valuesSnapshot: deploy/releases/horizon.values.sops.yaml
+  - name: skyline
+    chart: skyline
+    chartVersion: 2026.1.0
+    appVersion: 8.0.0
+    package: helm/packages/patched/skyline-2026.1.0.tgz
+    sha256: 3ad49f838e85ae2657ec099437cc09695340c24d3e12f6ea238e3beb5eace424
+    valuesSnapshot: deploy/releases/skyline.values.sops.yaml
   - name: ironic
     chart: ironic
     chartVersion: 2026.1.0
