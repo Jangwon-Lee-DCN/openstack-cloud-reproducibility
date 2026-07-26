@@ -13,6 +13,16 @@ conf:
   horizon:
     local_settings:
       config:
+        auth:
+          sso:
+            enabled: true
+            initial_choice: credentials
+            websso_keystone_url: https://cloud.dcn.ssu.ac.kr/identity/v3
+          idp_mapping:
+            - name: keycloak_dcn
+              label: DCN Keycloak SSO
+              idp: keycloak-dcn
+              protocol: openid
         use_ssl: "True"
         endpoint_type: internalURL
         csrf_cookie_secure: "True"
