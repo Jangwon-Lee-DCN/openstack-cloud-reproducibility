@@ -1,0 +1,55 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openstack-platform
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: openstack
+spec:
+  groups:
+    - name: openstack.availability
+      rules:
+        - alert: OpenStackExporterDown
+          expr: up{service="openstack-metrics"} == 0
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: OpenStack exporter is unavailable
+        - alert: OpenStackPublicAPIProbeFailed
+          expr: probe_success{job="openstack-public-api"} == 0
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: OpenStack public API probe failed
+            description: "Target {{ $labels.instance }} has failed for five minutes."
+        - alert: OpenStackFloatingIPProbeFailed
+          expr: probe_success{job="openstack-acceptance-floating-ip"} == 0
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: Acceptance-test floating IP is unreachable
+        - alert: OpenStackRabbitMQMetricsDown
+          expr: min(up{job="rabbitmq"}) == 0 or absent(rabbitmq_identity_info)
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: RabbitMQ member metrics report down
+        - alert: OpenStackMariaDBExporterDown
+          expr: mysql_up == 0
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: MariaDB exporter cannot query Galera
+        - alert: OpenStackSyntheticTestFailed
+          expr: max(openstack_synthetic_success) < 1
+          for: 15m
+          labels: {severity: critical}
+          annotations:
+            summary: Scheduled OpenStack resource lifecycle test failed
+        - alert: OpenStackSyntheticTestStale
+          expr: time() - max(openstack_synthetic_last_run_timestamp_seconds) > 28800
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: No successful synthetic test report in eight hours
+

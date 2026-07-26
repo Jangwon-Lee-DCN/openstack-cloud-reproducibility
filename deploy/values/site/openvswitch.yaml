@@ -1,0 +1,16 @@
+# Run host-networked OVS on every provider-connected controller/compute node.
+pod:
+  tolerations:
+    openvswitch:
+      enabled: true
+conf:
+  openvswitch_db_server:
+    ptcp_port: "6640:127.0.0.1"
+  # CRI-O/libcap-ng on this PoC rejects ovs-vswitchd's internal UID switch.
+  # The chart already runs this container privileged; retain root at runtime.
+  ovs_user_name: null
+  poststart:
+    # OVN still drops to UID 42424 and needs the OpenFlow management sockets.
+    extraCommand: >-
+      sh -c 'while true; do find /run/openvswitch -maxdepth 1 -type s
+      -name "*.mgmt" -exec chown 42424:42424 {} +; sleep 2; done' &

@@ -1,0 +1,67 @@
+replicas: 2
+
+podDisruptionBudget:
+  minAvailable: 1
+
+nodeSelector:
+  openstack-control-plane: enabled
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: prometheus-blackbox-exporter
+        topologyKey: kubernetes.io/hostname
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+config:
+  modules:
+    http_openstack:
+      prober: http
+      timeout: 10s
+      http:
+        valid_status_codes: [200, 203, 300, 301, 302, 401, 403]
+        preferred_ip_protocol: ip4
+        follow_redirects: true
+        headers:
+          Host: cloud.dcn.ssu.ac.kr
+        tls_config:
+          server_name: cloud.dcn.ssu.ac.kr
+          insecure_skip_verify: true
+    tcp_ipv4:
+      prober: tcp
+      timeout: 5s
+      tcp:
+        preferred_ip_protocol: ip4
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+    add: ["NET_RAW"]
+
+
+dnsPolicy: ClusterFirstWithHostNet
+
+hostNetwork: true
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0

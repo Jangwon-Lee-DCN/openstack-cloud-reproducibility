@@ -1,0 +1,73 @@
+# Control-only Ironic PoC. No PXE, HTTP boot, cleaning network, or image bootstrap.
+images:
+  tags:
+    ironic_manage_cleaning_network: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ironic_retrive_swift_config: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ironic_db_sync: quay.io/airshipit/ironic:2026.1-ubuntu_noble
+    ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+    ironic_api: quay.io/airshipit/ironic:2026.1-ubuntu_noble
+    ironic_conductor: quay.io/airshipit/ironic:2026.1-ubuntu_noble
+    ironic_pxe: quay.io/airshipit/ironic:2026.1-ubuntu_noble
+    ironic_pxe_init: quay.io/airshipit/ironic:2026.1-ubuntu_noble
+conf:
+  ironic:
+    api:
+      workers: 4
+conductor:
+  pxe:
+    enabled: false
+  http:
+    enabled: false
+bootstrap:
+  image:
+    enabled: false
+  object_store:
+    enabled: false
+dependencies:
+  static:
+    api:
+      jobs: [ironic-db-sync, ironic-ks-user, ironic-ks-endpoints, ironic-rabbit-init]
+    conductor:
+      jobs: [ironic-db-sync, ironic-ks-user, ironic-ks-endpoints, ironic-rabbit-init]
+pod:
+  tolerations:
+    ironic:
+      enabled: true
+  replicas:
+    api: 2
+    conductor: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+network:
+  pxe:
+    device: eno1
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  baremetal:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /baremetal
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  ingress_api: false
+  service_ingress_api: false
+  job_manage_cleaning_network: false
+  job_bootstrap: false

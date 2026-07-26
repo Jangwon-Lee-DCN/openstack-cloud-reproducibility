@@ -1,0 +1,31 @@
+# Site override for the pinned OpenStack-Helm Placement chart.
+pod:
+  tolerations:
+    placement:
+      enabled: true
+  replicas:
+    api: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  placement:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /placement
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  ingress_api: false
+  service_ingress_api: false

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-openstack-overview
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  openstack-overview.json: |
+    {
+      "annotations":{"list":[]},
+      "editable":true,
+      "panels":[
+        {"type":"stat","title":"Public API targets up","targets":[{"expr":"sum(probe_success{job=\"openstack-public-api\"})","refId":"A"}],"gridPos":{"h":7,"w":6,"x":0,"y":0}},
+        {"type":"stat","title":"Floating IP reachable","targets":[{"expr":"max(probe_success{job=\"openstack-acceptance-floating-ip\"})","refId":"A"}],"gridPos":{"h":7,"w":6,"x":6,"y":0}},
+        {"type":"stat","title":"MariaDB reachable","targets":[{"expr":"max(mysql_up)","refId":"A"}],"gridPos":{"h":7,"w":6,"x":12,"y":0}},
+        {"type":"stat","title":"Synthetic lifecycle","targets":[{"expr":"max(openstack_synthetic_success)","refId":"A"}],"gridPos":{"h":7,"w":6,"x":18,"y":0}},
+        {"type":"timeseries","title":"API probe latency","targets":[{"expr":"probe_duration_seconds{job=\"openstack-public-api\"}","legendFormat":"{{instance}}","refId":"A"}],"gridPos":{"h":9,"w":12,"x":0,"y":7}},
+        {"type":"timeseries","title":"OpenStack resource counts","targets":[{"expr":"{__name__=~\"openstack_.*_total\"}","legendFormat":"{{__name__}}","refId":"A"}],"gridPos":{"h":9,"w":12,"x":12,"y":7}}
+      ],
+      "schemaVersion":41,
+      "tags":["OpenStack","PoC"],
+      "templating":{"list":[]},
+      "time":{"from":"now-6h","to":"now"},
+      "title":"OpenStack Platform Overview",
+      "uid":"openstack-platform-overview",
+      "version":1
+    }
+

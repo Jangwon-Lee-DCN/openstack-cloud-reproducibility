@@ -1,0 +1,49 @@
+replicaCount: 2
+nodeSelector:
+  openstack-control-plane: enabled
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: prometheus-mysql-exporter
+        topologyKey: kubernetes.io/hostname
+podDisruptionBudget:
+  minAvailable: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 10s
+  additionalLabels:
+    observability.openstack.org/component: mariadb
+mysql:
+  host: mariadb.openstack.svc.cluster.local
+  port: 3306
+  user: prometheus
+  existingPasswordSecret:
+    name: openstack-mariadb-exporter
+    key: password
+collectors:
+  global_status: true
+  global_variables: true
+  info_schema.innodb_metrics: true
+  info_schema.processlist: true
+  info_schema.tables: true
+  perf_schema.eventsstatements: true
+securityContext:
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534

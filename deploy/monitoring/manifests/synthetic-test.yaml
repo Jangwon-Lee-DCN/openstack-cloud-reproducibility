@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openstack-synthetic-test
+  namespace: openstack
+data:
+  run.sh: |
+    #!/usr/bin/env bash
+    set -uo pipefail
+    name="monitoring-synthetic-$(date +%s)"
+    network_id=""
+    volume_id=""
+    success=0
+    cleanup() {
+      [[ -z "${volume_id}" ]] || openstack volume delete "${volume_id}" >/dev/null 2>&1 || true
+      [[ -z "${network_id}" ]] || openstack network delete "${network_id}" >/dev/null 2>&1 || true
+      now="$(date +%s)"
+      body="# TYPE openstack_synthetic_success gauge
+    openstack_synthetic_success ${success}
+    # TYPE openstack_synthetic_last_run_timestamp_seconds gauge
+    openstack_synthetic_last_run_timestamp_seconds ${now}
+    "
+      curl --fail --silent --show-error --data-binary "${body}" \
+        http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-synthetic/site/poc
+    }
+    trap cleanup EXIT
+    openstack token issue >/dev/null || exit 1
+    network_id="$(openstack network create -f value -c id "${name}")" || exit 1
+    volume_id="$(openstack volume create --size 1 -f value -c id "${name}")" || exit 1
+    openstack volume show "${volume_id}" >/dev/null || exit 1
+    success=1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openstack-synthetic-test
+  namespace: openstack
+spec:
+  schedule: "17 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1200
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            openstack-control-plane: enabled
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          containers:
+            - name: test
+              image: quay.io/airshipit/openstack-client:2025.1-ubuntu_noble
+              command: ["/bin/bash", "/opt/synthetic/run.sh"]
+              envFrom:
+                - secretRef:
+                    name: keystone-keystone-admin
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/synthetic
+                  readOnly: true
+              resources:
+                requests: {cpu: 100m, memory: 128Mi}
+                limits: {memory: 512Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+          volumes:
+            - name: script
+              configMap:
+                name: openstack-synthetic-test
+                defaultMode: 0555
+

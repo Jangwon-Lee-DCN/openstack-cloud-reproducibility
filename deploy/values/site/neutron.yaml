@@ -1,0 +1,58 @@
+# Neutron ML2/OVN with Geneve tenant overlays and the eno2-backed flat
+# provider network. OVN metadata agents run beside both OVN controllers.
+pod:
+  tolerations:
+    neutron:
+      enabled: true
+  replicas:
+    server: 2
+  lifecycle:
+    disruption_budget:
+      server:
+        min_available: 1
+images:
+  tags:
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+conf:
+  neutron:
+    DEFAULT:
+      global_physnet_mtu: 1500
+      router_distributed: true
+      service_plugins: ovn-router
+  plugins:
+    ml2_conf:
+      ml2:
+        type_drivers: flat,geneve
+        tenant_network_types: geneve
+        mechanism_drivers: ovn
+        extension_drivers: port_security
+      ml2_type_flat:
+        flat_networks: external
+      ml2_type_geneve:
+        vni_ranges: 1:65536
+        max_header_size: 38
+      ovn:
+        ovn_l3_scheduler: leastloaded
+        neutron_sync_mode: repair
+        enable_distributed_floating_ip: true
+        dns_servers: 192.168.21.10,8.8.8.8,1.1.1.1
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  network:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /network
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  ingress_server: false
+  service_ingress_server: false

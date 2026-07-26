@@ -1,0 +1,75 @@
+# HA Nova control services with a single PoC compute daemon on controller-0.
+# Ephemeral instance disks use the dedicated nova.vms RBD pool.
+pod:
+  tolerations:
+    nova:
+      enabled: true
+  replicas:
+    api_metadata: 2
+    osapi: 2
+    conductor: 2
+    scheduler: 2
+    novncproxy: 2
+  lifecycle:
+    disruption_budget:
+      metadata:
+        min_available: 1
+      osapi:
+        min_available: 1
+images:
+  tags:
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+rbd_pool:
+  app_name: rbd
+  replication: 1
+conf:
+  nova:
+    libvirt:
+      images_type: rbd
+      images_rbd_pool: nova.vms
+      images_rbd_ceph_conf: /etc/ceph/ceph.conf
+      rbd_user: cinder
+      rbd_secret_uuid: 457eb676-33da-42ec-9a8c-9293d545c337
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  compute:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /compute/v2.1/
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+  compute_novnc_proxy:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /novnc/vnc_auto.html
+    scheme:
+      public: https
+    port:
+      novnc_proxy:
+        public: 443
+manifests:
+  ingress_metadata: false
+  ingress_novncproxy: false
+  ingress_serialproxy: false
+  ingress_spiceproxy: false
+  ingress_osapi: false
+  service_ingress_metadata: false
+  service_ingress_novncproxy: false
+  service_ingress_serialproxy: false
+  service_ingress_spiceproxy: false
+  service_ingress_osapi: false
+  deployment_serialproxy: false
+  deployment_spiceproxy: false
+  service_serialproxy: false
+  service_spiceproxy: false

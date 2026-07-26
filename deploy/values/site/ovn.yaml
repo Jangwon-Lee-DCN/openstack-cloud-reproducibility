@@ -1,0 +1,50 @@
+# Two-node PoC OVN topology. Three Raft members are used for each database;
+# preferred anti-affinity spreads them as far as the two-node topology permits.
+volume:
+  ovn_ovsdb_nb:
+    enabled: true
+    class_name: rook-ceph-block
+    size: 5Gi
+  ovn_ovsdb_sb:
+    enabled: true
+    class_name: rook-ceph-block
+    size: 5Gi
+network:
+  interface:
+    tunnel: eno1
+    tunnel_network_cidr: 192.168.21.0/24
+conf:
+  ovn_encap_type: geneve
+  ovn_bridge_mappings: external:br-ex
+  auto_bridge_add:
+    br-ex: eno2
+pod:
+  tolerations:
+    ovn_ovsdb_nb:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+    ovn_ovsdb_sb:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+    ovn_northd:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+    ovn_controller:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+  replicas:
+    ovn_ovsdb_nb: 3
+    ovn_ovsdb_sb: 3
+    ovn_northd: 2

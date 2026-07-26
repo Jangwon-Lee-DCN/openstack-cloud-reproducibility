@@ -1,0 +1,40 @@
+# This file is the authoritative service-to-Ceph mapping. It is not passed
+# directly to Helm. Generate chart-specific overrides only after the pinned
+# OpenStack-Helm release schema has been validated.
+cephCluster:
+  namespace: rook-ceph
+  adapterChart: ceph-adapter-rook
+
+services:
+  cinder:
+    driver: cinder.volume.drivers.rbd.RBDDriver
+    user: cinder
+    pool: cinder.volumes
+    backup:
+      driver: cinder.backup.drivers.ceph.CephBackupDriver
+      user: cinderbackup
+      pool: cinder.backups
+  glance:
+    store: rbd
+    user: glance
+    pool: glance.images
+  nova:
+    imagesType: rbd
+    user: cinder
+    pool: nova.vms
+    flattenEphemeral: false
+  objectStorage:
+    recommendedApi: s3
+    implementation: ceph-rgw
+    rookObjectStore: openstack-object-store
+    bucketStorageClass: rook-ceph-bucket
+    swiftApi:
+      status: decision-required
+      options:
+        - native-openstack-swift
+        - experimental-rgw-keystone-swift-api
+
+security:
+  useSeparateCephUsers: true
+  createLeastPrivilegeCaps: true
+  commitKeyringsOrSecrets: false

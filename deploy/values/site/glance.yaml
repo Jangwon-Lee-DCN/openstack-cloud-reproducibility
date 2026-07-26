@@ -1,0 +1,44 @@
+# HA Glance API backed by the dedicated Rook-Ceph RBD image pool.
+storage: rbd
+conf:
+  software:
+    rbd:
+      rbd_store_pool_app_name: rbd
+  glance:
+    glance_store:
+      rbd_store_replication: 1
+    rbd:
+      rbd_store_replication: 1
+pod:
+  tolerations:
+    glance:
+      enabled: true
+  replicas:
+    api: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+images:
+  tags:
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  image:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /image
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  ingress_api: false
+  service_ingress_api: false

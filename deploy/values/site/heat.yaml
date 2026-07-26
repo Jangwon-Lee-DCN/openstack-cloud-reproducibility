@@ -1,0 +1,40 @@
+# HA Heat control services for the PoC.
+pod:
+  tolerations:
+    heat:
+      enabled: true
+  replicas:
+    api: 2
+    cfn: 2
+    engine: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+      cfn:
+        min_available: 1
+images:
+  tags:
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  orchestration:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /orchestration/v1/%(project_id)s
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  ingress_api: false
+  ingress_cfn: false
+  service_ingress_api: false
+  service_ingress_cfn: false

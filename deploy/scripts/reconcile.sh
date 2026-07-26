@@ -43,12 +43,12 @@ trap cleanup EXIT
 
 sops -d "$REPO_ROOT/deploy/secrets/ceilometer.values.sops.yaml"   > "$work_dir/ceilometer.yaml"
 kubectl delete job -n "$NAMESPACE" ceilometer-db-sync --ignore-not-found
-helm upgrade --install ceilometer "$REPO_ROOT/helm/openstack-helm/ceilometer"   --namespace "$NAMESPACE"   -f "$REPO_ROOT/deploy/values/ceilometer.yaml"   -f "$work_dir/ceilometer.yaml" --timeout 15m --wait
+helm upgrade --install ceilometer "$REPO_ROOT/helm/openstack-helm/ceilometer"   --namespace "$NAMESPACE"   -f "$REPO_ROOT/deploy/values/site/ceilometer.yaml"   -f "$work_dir/ceilometer.yaml" --timeout 15m --wait
 kubectl apply -f "$REPO_ROOT/deploy/manifests/ceilometer-pdb.yaml"
 
 sops -d "$REPO_ROOT/deploy/secrets/aodh.values.sops.yaml"   > "$work_dir/aodh.yaml"
 kubectl delete job -n "$NAMESPACE" aodh-db-sync --ignore-not-found
-helm upgrade --install aodh "$REPO_ROOT/helm/openstack-helm/aodh"   --namespace "$NAMESPACE"   -f "$REPO_ROOT/deploy/values/aodh.yaml"   -f "$work_dir/aodh.yaml" --timeout 15m --wait
+helm upgrade --install aodh "$REPO_ROOT/helm/openstack-helm/aodh"   --namespace "$NAMESPACE"   -f "$REPO_ROOT/deploy/values/site/aodh.yaml"   -f "$work_dir/aodh.yaml" --timeout 15m --wait
 
 kubectl apply -f "$REPO_ROOT/deploy/manifests/openstack-public-routes.yaml"
 "$REPO_ROOT/deploy/scripts/verify.sh"

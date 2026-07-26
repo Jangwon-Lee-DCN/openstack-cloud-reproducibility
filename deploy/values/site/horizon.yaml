@@ -1,0 +1,42 @@
+# HA Horizon dashboard at the cloud root URL.
+pod:
+  tolerations:
+    horizon:
+      enabled: true
+  replicas:
+    server: 2
+  lifecycle:
+    disruption_budget:
+      horizon:
+        min_available: 1
+conf:
+  horizon:
+    local_settings:
+      config:
+        use_ssl: "True"
+        endpoint_type: internalURL
+        csrf_cookie_secure: "True"
+        session_cookie_secure: "True"
+        secure_proxy_ssl_header: true
+        csrf_trusted_origins:
+          - https://cloud.dcn.ssu.ac.kr
+        allowed_hosts:
+          - cloud.dcn.ssu.ac.kr
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  dashboard:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    scheme:
+      public: https
+    port:
+      web:
+        public: 443
+manifests:
+  ingress_api: false
+  service_ingress: false

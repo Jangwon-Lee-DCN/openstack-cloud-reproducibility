@@ -1,0 +1,18 @@
+pod:
+  tolerations:
+    mariadb:
+      enabled: true
+  replicas:
+    server: 3
+volume:
+  enabled: true
+  class_name: rook-ceph-block
+  size: 10Gi
+  backup:
+    enabled: true
+    class_name: rook-ceph-block
+    size: 20Gi
+manifests:
+  cron_job_mariadb_backup: false
+  pvc_backup: false
+

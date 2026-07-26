@@ -1,0 +1,11 @@
+pod:
+  tolerations:
+    memcached:
+      enabled: true
+  affinity:
+    anti:
+      type:
+        default: preferredDuringSchedulingIgnoredDuringExecution
+  replicas:
+    server: 2
+

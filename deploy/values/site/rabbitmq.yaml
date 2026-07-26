@@ -1,0 +1,11 @@
+pod:
+  tolerations:
+    rabbitmq:
+      enabled: true
+  replicas:
+    server: 3
+volume:
+  enabled: true
+  class_name: rook-ceph-block
+  size: 5Gi
+

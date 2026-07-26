@@ -1,0 +1,28 @@
+pod:
+  tolerations:
+    keystone:
+      enabled: true
+  replicas:
+    api: 2
+images:
+  tags:
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /identity/v3
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  ingress_api: false
+  service_ingress_api: false

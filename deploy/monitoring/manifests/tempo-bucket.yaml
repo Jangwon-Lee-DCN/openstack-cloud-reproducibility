@@ -1,0 +1,9 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: tempo-traces
+  namespace: monitoring
+spec:
+  generateBucketName: tempo-traces
+  storageClassName: rook-ceph-bucket-retain
+

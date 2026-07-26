@@ -1,0 +1,25 @@
+conf:
+    openvswitch_db_server:
+        ptcp_port: ENC[AES256_GCM,data:2UWOawU2GLkiynHjQcI=,iv:l7iz1qVZp90zTy2E1X+gcP1f1mYh4oDv0M+wNLFr51g=,tag:LmmMBlFzm2hsW9i2I25A1w==,type:str]
+    ovs_user_name: null
+    poststart:
+        extraCommand: ENC[AES256_GCM,data:ShgOs54ErNeEfpWhQx5c8xU7zdK4MYK89H8qXJ6ZVTR+ajFs/HUDl2pliliP1r8//irz0oRiNFLFL44vdWHJJUnEx2ptDo9Bz36Jx2PT67rMoOnbrzqmdJoUbfwQ3CPUhZK9vSn1cgTDcAbOAVDScC54lVdZ+1qzPsZDQZw=,iv:Vp7+gbd0qqSH3dSsscj6IfiQqpiUhRqRZRwMwGUha80=,tag:j6qB3iHlXClFMy+CQM4Gcg==,type:str]
+pod:
+    tolerations:
+        openvswitch:
+            enabled: ENC[AES256_GCM,data:Y5jMBQ==,iv:7sV+qh8EJP30FKglw2ps/9s5AhC+bAvCZFx4wMUV7/0=,tag:wmuamyOuXBMHaOWWmADR9A==,type:bool]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOcndkWktQd2NmVUU3a0o3
+            US9JV1hVOW1rQXdSMndWRVhlU3RKelE5SVhnClBuSEYwbDE5Uzk2N0RqWDBIeFhz
+            WjlWaXdvbDVweGh2ZFlRdUViZXNSYm8KLS0tIDc5QzlndkxJVFNpMWJxc2tZaEI4
+            S0tQaGRnUkZrcXJXaFZlYTBaMkQwV1kKDCHTkQrzbhoiu4D0c5HIyXaXSlKpEvMJ
+            FXFmNp7Jfaez1KZTQtOon7nAn5OacaWHMLihq6trXcEElVoHvzPMbw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
+    lastmodified: "2026-07-26T10:29:38Z"
+    mac: ENC[AES256_GCM,data:RyxCnUoKG2uhARQ7C9gnayDxtnAkdDq73paMLIl4NMSushXEOeY7fOK/v3A1O61+6Bef29epYUap+F6T7TN/FBIDwqZvy/I4uJOKiXEoK7jeqTj9kDe1UCT5hEWv/x/0tPJzY7o9DQYZh9frUS8gkml+KTQQSdHublLmIie2Iyw=,iv:PTNKl1injYSGtyMn1bKrVWShPpI7MzJMsbMgLuELdJQ=,tag:K053Z0IwXa4G2rLhf4ZEaQ==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.13.3

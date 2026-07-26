@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openstack-rabbitmq
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: rabbitmq
+spec:
+  namespaceSelector:
+    matchNames: [openstack]
+  selector:
+    matchLabels:
+      application: rabbitmq
+      component: server
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openstack-exporter
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: openstack
+spec:
+  namespaceSelector:
+    matchNames: [openstack]
+  selector:
+    matchLabels:
+      application: prometheus-openstack-exporter
+      component: metrics
+  endpoints:
+    - port: http
+      interval: 60s
+      scrapeTimeout: 30s
+

@@ -1,0 +1,28 @@
+dependencies:
+    dynamic:
+        targeted:
+            openvswitch:
+                libvirt:
+                    pod: []
+images:
+    tags:
+        libvirt: ENC[AES256_GCM,data:Xp25PhckbGPpzBLYSoBoDW1aDyO4tBo/v/wykEI17h+J+4fJTxghYGxOIyMs,iv:Sm/9RF+bzzkD3ra0gUlESpHMyRucL2cv9/PjX1MNpcg=,tag:Us0an59o+P59nPrWMpOkTw==,type:str]
+pod:
+    tolerations:
+        libvirt:
+            enabled: ENC[AES256_GCM,data:iC1Yew==,iv:gPmtOGBXSmRmtrHUN7I5ABPk1v0eKpWZpyEl0vvkFmM=,tag:KEbdBba+grtRzmYx5uYMPw==,type:bool]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNQ3dvcWsvcDJRYm8wNU80
+            LzFaY2czVTdYV2s4eXBBYXh1Rlg1d0M5aFNZCk9jUWVza0hXV3hqWGxteUQyRjdY
+            U1d1SkNWUmxtdDN0S1FUbGpYUDFoY1EKLS0tIGVkdFUrSHdZN1gvRUU3Y0tEd00r
+            K1BCQTVERk84OFVMdDFuU3dtQy9UV00KJaafSt0qK0ycCuBI+r7XGdQj7TW/NaNo
+            hybppE5aCy5GejdNS9SDMFdzc79ALmHzVblhn/MiOsBVySA9sUXeBA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
+    lastmodified: "2026-07-26T10:29:37Z"
+    mac: ENC[AES256_GCM,data:/rCUs6T1tYsTuvEVuiu9fnOyP2O/6OFV3xpmNitZYPROF4dfpyRR8TKeXSIK1jotPi3Ecpqdo4sIvLi39cE5sp4mZ/LB8mY5saH4i/Q257NoWvahwv2B0uvn4rm2j7OmblsCOGyvJCAU3YgzbbsY2UPbMQ5LcloVSW7L2fAyFG4=,iv:vmC/8UALzBRhnS1XLvyrpkv+hpPONGM5ux6CcCrIp1c=,tag:KInAR1O7Cr3uYOjvCNvs2Q==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.13.3

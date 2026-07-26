@@ -1,0 +1,8 @@
+# Site placement override for the pinned OpenStack-Helm Swift chart.
+# Proxy/API components retain the upstream openstack-control-plane selector.
+# Swift storage daemons are restricted to cloud-controller-0.
+labels:
+  storage:
+    node_selector_key: openstack-object-storage
+    node_selector_value: enabled
+

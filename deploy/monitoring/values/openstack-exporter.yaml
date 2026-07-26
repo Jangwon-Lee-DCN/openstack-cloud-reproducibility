@@ -1,0 +1,59 @@
+images:
+  tags:
+    prometheus_openstack_exporter: ghcr.io/openstack-exporter/openstack-exporter:1.7.0
+pod:
+  replicas:
+    prometheus_openstack_exporter: 2
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+conf:
+  prometheus_openstack_exporter:
+    OS_POLLING_INTERVAL: 60
+    TIMEOUT_SECONDS: 30
+    OS_RETRIES: 2
+monitoring:
+  prometheus:
+    enabled: true
+    openstack_exporter:
+      scrape: true
+manifests:
+  certificates: false
+  configmap_bin: true
+  deployment: true
+  job_image_repo_sync: false
+  job_ks_user: true
+  network_policy: false
+  secret_keystone: true
+  secret_registry: false
+  service: true
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        username: admin
+        project_name: admin
+        user_domain_name: default
+        project_domain_name: default
+      user:
+        role: reader
+        region_name: RegionOne
+        username: prometheus-openstack-exporter
+        project_name: service
+        user_domain_name: default
+        project_domain_name: default
+    hosts:
+      default: keystone
+      internal: keystone-api
+    path:
+      default: /v3
+    scheme:
+      default: http
+    port:
+      api:
+        default: 80
+        internal: 5000

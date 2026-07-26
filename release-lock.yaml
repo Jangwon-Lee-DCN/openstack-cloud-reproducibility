@@ -1,0 +1,151 @@
+apiVersion: dcn.ssu.ac.kr/v1alpha1
+kind: OpenStackHelmReleaseLock
+metadata:
+  name: openstack-poc-2026-07-26
+spec:
+  upstream:
+    repository: https://opendev.org/openstack/openstack-helm.git
+    tag: 2026.1.0
+    commit: c665eed
+  namespace: openstack
+  releases:
+  - name: aodh
+    chart: aodh
+    chartVersion: 2026.1.0
+    appVersion: 22.0.0
+    package: helm/packages/upstream/aodh-2026.1.0.tgz
+    sha256: 8cd8cef5a1134343fdcfe3ce59222153abadff14f3f1068a1bb0771011d241d9
+    valuesSnapshot: deploy/releases/aodh.values.sops.yaml
+  - name: ceilometer
+    chart: ceilometer
+    chartVersion: 2026.1.0
+    appVersion: 26.0.0
+    package: helm/packages/upstream/ceilometer-2026.1.0.tgz
+    sha256: af7d7c710347ff2389b057dc18c9b504043e6c8a65d1d9114deff3bf0aff86f0
+    valuesSnapshot: deploy/releases/ceilometer.values.sops.yaml
+  - name: ceph-adapter-rook
+    chart: ceph-adapter-rook
+    chartVersion: 2026.1.0
+    appVersion: v20.2.1
+    package: helm/packages/upstream/ceph-adapter-rook-2026.1.0.tgz
+    sha256: b6338645fa713f43eee2e37a5c191bc0eff490f6ab9542d6c1ec88f9a63564c9
+    valuesSnapshot: deploy/releases/ceph-adapter-rook.values.sops.yaml
+  - name: cinder
+    chart: cinder
+    chartVersion: 2026.1.0
+    appVersion: 28.0.0
+    package: helm/packages/upstream/cinder-2026.1.0.tgz
+    sha256: 8d81d34640ab5af652bdf82178fc3caca302988590ddf27fa9013ebe003d76d3
+    valuesSnapshot: deploy/releases/cinder.values.sops.yaml
+  - name: glance
+    chart: glance
+    chartVersion: 2026.1.0
+    appVersion: 32.0.0
+    package: helm/packages/upstream/glance-2026.1.0.tgz
+    sha256: 28c503c82279f4215e778c1c2e922f49a54c36a22660a74c5fed7b89e805a80e
+    valuesSnapshot: deploy/releases/glance.values.sops.yaml
+  - name: heat
+    chart: heat
+    chartVersion: 2026.1.0
+    appVersion: 26.0.0
+    package: helm/packages/upstream/heat-2026.1.0.tgz
+    sha256: 95dbd84e4befcb7ad2fdf7a781b4282102a7b0fecf57e6819963c84ce81e25be
+    valuesSnapshot: deploy/releases/heat.values.sops.yaml
+  - name: horizon
+    chart: horizon
+    chartVersion: 2026.1.0
+    appVersion: 25.7.1
+    package: helm/packages/upstream/horizon-2026.1.0.tgz
+    sha256: 760f447de17b78172b29d2c4a91d86952a30258d2a85fc6821b82d611895adcf
+    valuesSnapshot: deploy/releases/horizon.values.sops.yaml
+  - name: ironic
+    chart: ironic
+    chartVersion: 2026.1.0
+    appVersion: 35.0.0
+    package: helm/packages/patched/ironic-2026.1.0.tgz
+    sha256: cf59a09f269465e9a32673742b6d93772a910e62f61782f0aa270ed06fa28d4b
+    valuesSnapshot: deploy/releases/ironic.values.sops.yaml
+  - name: keystone
+    chart: keystone
+    chartVersion: 2026.1.0
+    appVersion: 29.0.0
+    package: helm/packages/upstream/keystone-2026.1.0.tgz
+    sha256: a24039fedeef085425fba38b4e0394c0a09d43ededfd0254dbe0e6a808967955
+    valuesSnapshot: deploy/releases/keystone.values.sops.yaml
+  - name: libvirt
+    chart: libvirt
+    chartVersion: 2026.1.0
+    appVersion: v1.0.0
+    package: helm/packages/upstream/libvirt-2026.1.0.tgz
+    sha256: 66d311bcd2866ce3b7a428172b55edf74189499e78b848ed0c66a2a81b1c9cca
+    valuesSnapshot: deploy/releases/libvirt.values.sops.yaml
+  - name: mariadb
+    chart: mariadb
+    chartVersion: 2026.1.0
+    appVersion: v11.4.8
+    package: helm/packages/upstream/mariadb-2026.1.0.tgz
+    sha256: afb5e49687a432b92b57a15d0756f66849dfd9c5b4635de7400682f5fd71da54
+    valuesSnapshot: deploy/releases/mariadb.values.sops.yaml
+  - name: memcached
+    chart: memcached
+    chartVersion: 2026.1.0
+    appVersion: v1.6.32
+    package: helm/packages/upstream/memcached-2026.1.0.tgz
+    sha256: f7ddd5f68f7bd40a10e9b21aeda093c7aab8bc4f215e1c840e836e593239cb18
+    valuesSnapshot: deploy/releases/memcached.values.sops.yaml
+  - name: neutron
+    chart: neutron
+    chartVersion: 2026.1.0
+    appVersion: 28.0.0
+    package: helm/packages/upstream/neutron-2026.1.0.tgz
+    sha256: 76ef8c389ad7c6b31832fa3bc78df484b7c6e6a6eab0de5f669660cb525ef38a
+    valuesSnapshot: deploy/releases/neutron.values.sops.yaml
+  - name: nova
+    chart: nova
+    chartVersion: 2026.1.0
+    appVersion: 33.0.0
+    package: helm/packages/patched/nova-2026.1.0.tgz
+    sha256: e6d232a9bd67749defd32179e6dab69964e7bfd3bebb0e706528fe5acd7a6f2f
+    valuesSnapshot: deploy/releases/nova.values.sops.yaml
+  - name: openvswitch
+    chart: openvswitch
+    chartVersion: 2026.1.0
+    appVersion: v1.0.0
+    package: helm/packages/upstream/openvswitch-2026.1.0.tgz
+    sha256: a29716b5affdcf5fef64bbde9aa24f79669abbdbb079ef9dca3d3f685a0c6c85
+    valuesSnapshot: deploy/releases/openvswitch.values.sops.yaml
+  - name: ovn
+    chart: ovn
+    chartVersion: 2026.1.0
+    appVersion: v23.3.0
+    package: helm/packages/patched/ovn-2026.1.0.tgz
+    sha256: 35c66f5efcf1aa3d363d85d210f0fa382b64180664c78c7d71b8396e0b5082c3
+    valuesSnapshot: deploy/releases/ovn.values.sops.yaml
+  - name: placement
+    chart: placement
+    chartVersion: 2026.1.0
+    appVersion: 15.0.0
+    package: helm/packages/upstream/placement-2026.1.0.tgz
+    sha256: 27482884bc3d987b78265268d1be8dde7805cf949ae89c68f887e9416d935b6d
+    valuesSnapshot: deploy/releases/placement.values.sops.yaml
+  - name: prometheus-openstack-exporter
+    chart: prometheus-openstack-exporter
+    chartVersion: 2026.1.0
+    appVersion: v1.7.0
+    package: helm/packages/upstream/prometheus-openstack-exporter-2026.1.0.tgz
+    sha256: bbe45f9b5d3d2afa3b4408f990fecec234dc032209ff3c91fefd51b1f5ede629
+    valuesSnapshot: deploy/releases/prometheus-openstack-exporter.values.sops.yaml
+  - name: rabbitmq
+    chart: rabbitmq
+    chartVersion: 2026.1.0
+    appVersion: v3.10.18
+    package: helm/packages/upstream/rabbitmq-2026.1.0.tgz
+    sha256: ef3b9d443b00e1d6ab9ff7501246d32336e30d13752a32ceefb4a6af4d67f73e
+    valuesSnapshot: deploy/releases/rabbitmq.values.sops.yaml
+  customDeployments:
+  - name: gnocchi
+    source: deploy/manifests/gnocchi.yaml
+    imageBuild: deploy/manifests/gnocchi-image-build.yaml
+    valuesSecrets:
+    - deploy/secrets/gnocchi-runtime.secret.sops.yaml
+    - deploy/secrets/gnocchi-config.secret.sops.yaml

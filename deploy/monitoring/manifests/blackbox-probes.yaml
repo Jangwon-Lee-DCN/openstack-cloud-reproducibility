@@ -1,0 +1,48 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: openstack-public-api
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: blackbox
+    release: kube-prometheus-stack
+spec:
+  jobName: openstack-public-api
+  interval: 30s
+  module: http_openstack
+  prober:
+    url: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - https://192.168.21.6/identity/v3
+        - https://192.168.21.6/compute
+        - https://192.168.21.6/network
+        - https://192.168.21.6/image
+        - https://192.168.21.6/volume
+        - https://192.168.21.6/orchestration
+        - https://192.168.21.6/
+      labels:
+        scope: public
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: openstack-acceptance-floating-ip
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: blackbox
+    release: kube-prometheus-stack
+spec:
+  jobName: openstack-acceptance-floating-ip
+  interval: 30s
+  module: tcp_ipv4
+  prober:
+    url: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - 192.168.21.200:22
+      labels:
+        scope: tenant-fip
+
