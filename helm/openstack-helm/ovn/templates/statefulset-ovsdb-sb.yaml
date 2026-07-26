@@ -62,6 +62,10 @@ spec:
 {{- tuple $envAll "ovn" "ovn-ovsdb-sb" | include "helm-toolkit.snippets.kubernetes_pod_anti_affinity" | indent 8 }}
       nodeSelector:
         {{ .Values.labels.ovn_ovsdb_sb.node_selector_key }}: {{ .Values.labels.ovn_ovsdb_sb.node_selector_value }}
+{{- if .Values.pod.tolerations.ovn_ovsdb_sb.enabled }}
+      tolerations:
+{{ toYaml .Values.pod.tolerations.ovn_ovsdb_sb.tolerations | indent 8 }}
+{{- end }}
       initContainers:
 {{- tuple $envAll "ovn_ovsdb_sb" list | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
       containers:
@@ -95,9 +99,7 @@ spec:
               mountPath: {{ $envAll.Values.volume.ovn_ovsdb_sb.path }}
       volumes:
         - name: run-openvswitch
-          hostPath:
-            path: /run/openvswitch
-            type: DirectoryOrCreate
+          emptyDir: {}
 {{- if not .Values.volume.ovn_ovsdb_sb.enabled }}
         - name: data
           emptyDir: {}

@@ -60,6 +60,10 @@ spec:
       dnsPolicy: {{ .Values.pod.dns_policy }}
       nodeSelector:
         {{ .Values.labels.ovn_controller.node_selector_key }}: {{ .Values.labels.ovn_controller.node_selector_value }}
+{{- if .Values.pod.tolerations.ovn_controller.enabled }}
+      tolerations:
+{{ toYaml .Values.pod.tolerations.ovn_controller.tolerations | indent 8 }}
+{{- end }}
       initContainers:
 {{- tuple $envAll "ovn_controller" list | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
         - name: get-gw-enabled
@@ -247,4 +251,3 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 {{- end }}
-
