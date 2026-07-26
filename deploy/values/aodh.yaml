@@ -1,0 +1,104 @@
+# Provider-side alarming over Gnocchi metrics; no guest agent dependency.
+images:
+  tags:
+    aodh_db_sync: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    aodh_api: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    aodh_evaluator: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    aodh_listener: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    aodh_notifier: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    aodh_alarms_cleaner: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+conf:
+  wsgi_aodh: |
+    Listen 0.0.0.0:{{ tuple "alarming" "internal" "api" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+    LogFormat "%h %l %u %t \"%r\" %>s %b" combined
+    CustomLog /dev/stdout combined
+    <VirtualHost *:{{ tuple "alarming" "internal" "api" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}>
+        WSGIDaemonProcess aodh processes=2 threads=1 user=aodh group=aodh display-name=%{GROUP} python-path=/usr/local/lib/python3.12/site-packages
+        WSGIProcessGroup aodh
+        WSGIScriptAlias / /var/www/cgi-bin/aodh/aodh-api
+        WSGIApplicationGroup %{GLOBAL}
+        ErrorLog /dev/stdout
+        CustomLog /dev/stdout combined
+    </VirtualHost>
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+        user_domain_name: Default
+        project_domain_name: Default
+      aodh:
+        role: admin
+        region_name: RegionOne
+        username: aodh
+        project_name: service
+        user_domain_name: Default
+        project_domain_name: Default
+    hosts:
+      default: keystone
+      internal: keystone-api
+    path:
+      default: /v3
+    port:
+      api:
+        default: 80
+        internal: 5000
+  alarming:
+    hosts:
+      default: aodh-api
+      internal: aodh-api
+      public: cloud.dcn.ssu.ac.kr
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /alarming
+    scheme:
+      public: https
+    port:
+      api:
+        default: 8042
+        internal: 8042
+        public: 443
+  oslo_db:
+    hosts:
+      default: mariadb
+    port:
+      mysql:
+        default: 3306
+  oslo_messaging:
+    statefulset:
+      replicas: 2
+    hosts:
+      default: rabbitmq
+    path: /aodh
+pod:
+  tolerations:
+    aodh:
+      enabled: true
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    api: 2
+    evaluator: 2
+    listener: 2
+    notifier: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+manifests:
+  cron_job_alarms_cleaner: false
+  ingress_api: false
+  job_image_repo_sync: false
+  secret_ingress_tls: false
+  secret_registry: true
+  service_ingress_api: false
+  pod_aodh_test: false

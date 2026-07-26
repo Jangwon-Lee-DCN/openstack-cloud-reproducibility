@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gnocchi-keystone-bootstrap
+  namespace: openstack
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: bootstrap
+          image: quay.io/airshipit/openstack-client:2025.1-ubuntu_noble
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              service_project_id="$(
+                openstack project list --domain Default -f value -c ID -c Name |
+                  awk '$2 == "service" { print $1; exit }'
+              )"
+              if [ -z "${service_project_id}" ]; then
+                service_project_id="$(
+                  openstack project create --domain Default \
+                    -f value -c id service
+                )"
+              fi
+
+              service_role_id="$(
+                openstack role create --or-show -f value -c id service
+              )"
+              admin_role_id="$(
+                openstack role show -f value -c id admin
+              )"
+              gnocchi_user_id="$(
+                openstack user create --or-show --domain Default \
+                  -f value -c id gnocchi
+              )"
+              openstack user set --password "${SERVICE_PASSWORD}" \
+                "${gnocchi_user_id}"
+              openstack role add --project "${service_project_id}" \
+                --user "${gnocchi_user_id}" "${service_role_id}"
+              openstack role add --project "${service_project_id}" \
+                --user "${gnocchi_user_id}" "${admin_role_id}"
+
+              metric_service_id="$(
+                openstack service list -f value -c ID -c Type |
+                  awk '$2 == "metric" { print $1; exit }'
+              )"
+              if [ -z "${metric_service_id}" ]; then
+                metric_service_id="$(
+                  openstack service create -f value -c id \
+                    --name gnocchi metric
+                )"
+              fi
+              for interface in public internal admin; do
+                if [ "${interface}" = public ]; then
+                  url=https://cloud.dcn.ssu.ac.kr/metric
+                else
+                  url=http://gnocchi-api.openstack.svc.cluster.local:8041
+                fi
+                endpoint_id="$(
+                  openstack endpoint list --service "${metric_service_id}" \
+                    --region RegionOne --interface "${interface}" \
+                    -f value -c ID | head -n 1
+                )"
+                if [ -z "${endpoint_id}" ]; then
+                  openstack endpoint create --region RegionOne \
+                    "${metric_service_id}" "${interface}" "${url}" >/dev/null
+                else
+                  openstack endpoint set --url "${url}" "${endpoint_id}"
+                fi
+              done
+          envFrom:
+            - secretRef:
+                name: keystone-keystone-admin
+            - secretRef:
+                name: gnocchi-runtime
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 512Mi}
+

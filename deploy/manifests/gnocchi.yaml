@@ -1,0 +1,194 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gnocchi-api
+  namespace: openstack
+  labels: &apiLabels
+    application: gnocchi
+    component: api
+spec:
+  selector: *apiLabels
+  ports:
+    - name: http
+      port: 8041
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gnocchi-api
+  namespace: openstack
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  selector:
+    matchLabels: &apiLabels
+      application: gnocchi
+      component: api
+  template:
+    metadata:
+      labels: *apiLabels
+    spec:
+      imagePullSecrets:
+        - name: telemetry-harbor-push
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: *apiLabels
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: api
+          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:799bacb764b4837250ae66b9e763831bfedc4b07e83812693e9042ac8260f1f6
+          command: [uwsgi]
+          args:
+            - --http
+            - 0.0.0.0:8041
+            - --master
+            - --enable-threads
+            - --thunder-lock
+            - --die-on-term
+            - --processes
+            - "4"
+            - --threads
+            - "2"
+            - --lazy-apps
+            - --chdir
+            - /
+            - --wsgi
+            - gnocchi.rest.wsgi
+            - --pyargv
+            - --config-file /etc/gnocchi/gnocchi.conf
+          ports:
+            - {name: http, containerPort: 8041}
+          volumeMounts:
+            - {name: config, mountPath: /etc/gnocchi, readOnly: true}
+          readinessProbe:
+            httpGet: {path: /healthcheck, port: http}
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthcheck, port: http}
+            initialDelaySeconds: 30
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: config
+          secret:
+            secretName: gnocchi-config
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gnocchi-api
+  namespace: openstack
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      application: gnocchi
+      component: api
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gnocchi-metricd
+  namespace: openstack
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  selector:
+    matchLabels: &metricdLabels
+      application: gnocchi
+      component: metricd
+  template:
+    metadata:
+      labels: *metricdLabels
+    spec:
+      imagePullSecrets:
+        - name: telemetry-harbor-push
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: *metricdLabels
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: metricd
+          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:799bacb764b4837250ae66b9e763831bfedc4b07e83812693e9042ac8260f1f6
+          command: [gnocchi-metricd]
+          args: [--config-file, /etc/gnocchi/gnocchi.conf]
+          volumeMounts:
+            - {name: config, mountPath: /etc/gnocchi, readOnly: true}
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: config
+          secret:
+            secretName: gnocchi-config
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gnocchi-metricd
+  namespace: openstack
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      application: gnocchi
+      component: metricd
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gnocchi-upgrade
+  namespace: openstack
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: telemetry-harbor-push
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: upgrade
+          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:799bacb764b4837250ae66b9e763831bfedc4b07e83812693e9042ac8260f1f6
+          command: [gnocchi-upgrade]
+          args: [--config-file, /etc/gnocchi/gnocchi.conf]
+          volumeMounts:
+            - {name: config, mountPath: /etc/gnocchi, readOnly: true}
+      volumes:
+        - name: config
+          secret:
+            secretName: gnocchi-config
+

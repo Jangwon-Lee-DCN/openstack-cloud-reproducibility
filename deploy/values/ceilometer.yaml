@@ -1,0 +1,127 @@
+# Provider-side telemetry only. No software is injected into tenant guests.
+images:
+  tags:
+    ceilometer_central: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
+    ceilometer_compute: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
+    ceilometer_db_sync: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
+    ceilometer_ipmi: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
+    ceilometer_notification: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+conf:
+  ceilometer:
+    compute:
+      instance_discovery_method: libvirt_metadata
+      fetch_extra_metadata: false
+    service_credentials:
+      interface: internal
+  polling:
+    sources:
+      - name: provider_pollsters
+        interval: 300
+        meters:
+          - "*"
+          - "!perf.*"
+          - "!network.incoming.bytes.rate"
+          - "!network.outgoing.bytes.rate"
+          - "!dns.*"
+          - "!loadbalancer.*"
+          - "!manila.*"
+          - "!radosgw.*"
+          - "!storage.*"
+          - "!network.services.*"
+          - "!ip.floating"
+  pipeline:
+    sinks:
+      - name: gnocchi_meter_sink
+        publishers:
+          - gnocchi://
+    sources:
+      - name: provider_meters
+        meters:
+          - "*"
+        sinks:
+          - gnocchi_meter_sink
+  event_pipeline:
+    sinks:
+      - name: gnocchi_event_sink
+        publishers:
+          - gnocchi://
+    sources:
+      - name: provider_events
+        events:
+          - "*"
+        sinks:
+          - gnocchi_event_sink
+dependencies:
+  static:
+    central: &runtimeDependencies
+      jobs:
+        - ceilometer-db-sync
+        - ceilometer-rabbit-init
+        - ceilometer-ks-user
+      services:
+        - endpoint: internal
+          service: identity
+        - endpoint: internal
+          service: metric
+    compute: *runtimeDependencies
+    notification: *runtimeDependencies
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+        user_domain_name: Default
+        project_domain_name: Default
+      ceilometer:
+        role: admin
+        region_name: RegionOne
+        username: ceilometer
+        project_name: service
+        user_domain_name: Default
+        project_domain_name: Default
+    hosts:
+      default: keystone
+      internal: keystone-api
+    path:
+      default: /v3
+    port:
+      api:
+        default: 80
+        internal: 5000
+  metric:
+    hosts:
+      default: gnocchi-api
+      internal: gnocchi-api
+    port:
+      api:
+        default: 8041
+        internal: 8041
+  oslo_messaging:
+    statefulset:
+      replicas: 2
+    hosts:
+      default: rabbitmq
+    path: /ceilometer
+pod:
+  tolerations:
+    ceilometer:
+      enabled: true
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    central: 2
+    notification: 2
+manifests:
+  daemonset_compute: true
+  daemonset_ipmi: false
+  job_image_repo_sync: false
+  secret_registry: true
+  service_api: false
+  service_ingress_api: false

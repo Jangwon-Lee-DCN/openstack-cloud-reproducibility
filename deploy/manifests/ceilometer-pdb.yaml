@@ -1,0 +1,25 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ceilometer-central
+  namespace: openstack
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      application: ceilometer
+      component: central
+      release_group: ceilometer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ceilometer-notification
+  namespace: openstack
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      application: ceilometer
+      component: notification
+      release_group: ceilometer
