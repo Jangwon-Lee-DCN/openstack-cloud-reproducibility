@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly OSH_ROOT="${ROOT}/../../../openstack-helm"
+readonly REPO_ROOT="$(cd "${ROOT}/../../.." && pwd)"
 
 for command_name in kubectl helm sops jq curl; do
   command -v "${command_name}" >/dev/null
@@ -20,10 +20,8 @@ exporter_password="$(kubectl -n openstack get secret \
   prometheus-openstack-exporter-keystone-user \
   -o jsonpath='{.data.OS_PASSWORD}' | base64 -d)"
 
-helm dependency build \
-  "${OSH_ROOT}/vendor/openstack-helm/prometheus-openstack-exporter"
 helm upgrade --install prometheus-openstack-exporter \
-  "${OSH_ROOT}/vendor/openstack-helm/prometheus-openstack-exporter" \
+  "${REPO_ROOT}/helm/packages/upstream/prometheus-openstack-exporter-2026.1.0.tgz" \
   -n openstack -f "${ROOT}/values/openstack-exporter.yaml" \
   --set-string endpoints.identity.auth.admin.password="${admin_password}" \
   --set-string endpoints.identity.auth.user.password="${exporter_password}" \
