@@ -1,0 +1,4 @@
+*.decrypted.yaml
+*.plain.yaml
+/tmp/
+.DS_Store
