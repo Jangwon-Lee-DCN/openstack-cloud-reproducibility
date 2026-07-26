@@ -28,10 +28,69 @@ conf:
         csrf_cookie_secure: "True"
         session_cookie_secure: "True"
         secure_proxy_ssl_header: true
+        # The chart default (django.contrib.sessions.backends.cache, backed
+        # by memcached.openstack.svc.cluster.local:11211) breaks with 2
+        # Horizon replicas: that Service round-robins across two
+        # independent, non-clustered memcached-memcached-0/1 Pods (confirmed
+        # empirically -- each holds a different, large item count, so a
+        # session written via one Pod is simply absent when a later request
+        # lands on the other). Every login appeared to succeed (302 to
+        # /horizon/) but the very next request was bounced straight back to
+        # the login page with the sessionid cookie cleared. signed_cookies
+        # needs no server-side store at all -- the session is a signed
+        # cookie validated only against SECRET_KEY, which both replicas
+        # already share from the same horizon-etc Secret -- so it's correct
+        # with any replica count and doesn't touch the shared memcached
+        # tier other OpenStack services rely on.
+        session_engine: 'django.contrib.sessions.backends.signed_cookies'
         csrf_trusted_origins:
           - https://cloud.dcn.ssu.ac.kr
         allowed_hosts:
           - cloud.dcn.ssu.ac.kr
+        # FORCE_SCRIPT_NAME and explicit /horizon/-prefixed LOGIN_URL etc.
+        # are BOTH required, because they cover two different Django code
+        # paths that do not share prefixing logic:
+        #
+        # 1. Dynamically generated URLs (reverse()/{% url %} -- e.g. the
+        #    login form's own `action` attribute) are prefixed by
+        #    FORCE_SCRIPT_NAME automatically. Confirmed by removing it
+        #    once: the form action fell back to bare "/auth/login/",
+        #    submitting to the domain root (landing behind the "/"
+        #    catch-all route instead of Horizon) and 405'ing.
+        # 2. Horizon's HorizonMiddleware unauthenticated-access redirect
+        #    calls Django's redirect_to_login(), which calls
+        #    resolve_url(settings.LOGIN_URL) -- and resolve_url() returns
+        #    a plain path string (one not starting with "./" or "../" and
+        #    not a reversible URL name) COMPLETELY UNCHANGED (verified
+        #    against Django's actual source, django/shortcuts.py).
+        #    FORCE_SCRIPT_NAME is never consulted for this path. Confirmed
+        #    by setting LOGIN_URL to the bare "/auth/login/" once: visiting
+        #    /horizon/ while logged out redirected to
+        #    "https://cloud.dcn.ssu.ac.kr/auth/login/?next=/horizon/" --
+        #    no /horizon/ prefix at all, landing on the "/" catch-all
+        #    route (skyline-api) instead of Horizon.
+        #
+        # So LOGIN_URL/LOGOUT_URL/LOGIN_REDIRECT_URL/STATIC_URL must carry
+        # the explicit prefix (path (2) needs it and gets no help from
+        # FORCE_SCRIPT_NAME), while FORCE_SCRIPT_NAME must also stay set
+        # (path (1) needs it). This does NOT double-prefix: resolve_url()
+        # on an already-absolute path is a no-op, it doesn't add a second
+        # copy of FORCE_SCRIPT_NAME on top. (The earlier
+        # /horizon/horizon/auth/login/ double-prefix seen during
+        # investigation came from a different cause, not from this
+        # combination -- see docs/09-horizon-login-loop-incident.md.)
+        # Re-verify both code paths (the login form's rendered `action`
+        # attribute AND a fresh unauthenticated GET of /horizon/) after
+        # touching any of these four settings; each one only exercises
+        # one of the two paths, and both must be checked independently.
+        raw:
+          FORCE_SCRIPT_NAME: /horizon
+          WEBROOT: /horizon/
+          COMPRESS_OFFLINE: "False"
+          LOGIN_URL: /horizon/auth/login/
+          LOGOUT_URL: /horizon/auth/logout/
+          LOGIN_REDIRECT_URL: /horizon/
+          STATIC_URL: /horizon/static/
 endpoints:
   identity:
     auth:
