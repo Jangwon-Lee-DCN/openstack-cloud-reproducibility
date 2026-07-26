@@ -23,3 +23,22 @@ FIX, RECONCILE, and VERIFY record and a separate commit.
 
 The initial scope is Gnocchi, Ceilometer, and Aodh. Additional OpenStack
 components should follow the same history and documentation model.
+
+## Inspect and run
+
+```bash
+# Show every local change above the upstream baseline.
+git diff 4c3a128..HEAD
+
+# Rebuild images only when the pinned artifacts are unavailable.
+BUILD_IMAGES=1 ./deploy/scripts/reconcile.sh
+
+# Reuse already-pinned images and reconcile the stack.
+./deploy/scripts/reconcile.sh
+
+# Repeat non-mutating health checks.
+./deploy/scripts/verify.sh
+```
+
+Read each component's `ISSUE.md`, `FIX.md`, `RECONCILE.md`, and `VERIFY.md`
+before using the environment-specific encrypted profile on another cloud.

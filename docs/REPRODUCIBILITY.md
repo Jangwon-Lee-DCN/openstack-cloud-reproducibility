@@ -3,9 +3,9 @@
 ## Commit layers
 
 - `4c3a128`: untouched OpenStack-Helm 2026.1.0 source and packages
-- the next commit: deployment-specific image, values, manifest, and Secret
-  corrections
-- later commits: deterministic hardening and executable runbooks
+- `0f36024`: deployment-specific image, values, manifest, and encrypted
+  Secret corrections
+- `8b6ffc0`: deterministic base pins and executable reconciliation runbooks
 
 Use `git diff 4c3a128..HEAD` to inspect every local addition. The upstream
 chart trees should remain unchanged unless a chart source patch is necessary.
