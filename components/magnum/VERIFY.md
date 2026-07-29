@@ -13,3 +13,5 @@ acceptance, and an authentication-enforced HTTP 401 from the internal API.
 An authenticated `openstack coe cluster template list` must also complete.
 End-to-end workload-cluster creation is a separate acceptance gate requiring
 a supported Kubernetes image, flavors, tenant network, quotas, and Octavia.
+The 2026-07-29 PoC inventory contains only Cirros, so this gate remains
+explicitly pending rather than substituting an unsupported image.
