@@ -7,7 +7,8 @@ host cluster.
 Pinned components:
 
 - Cluster API core, kubeadm bootstrap and kubeadm control plane: `v1.13.4`
-- Cluster API Provider OpenStack: `v0.14.6`
+- Cluster API Provider OpenStack: `v0.14.6`, with the pinned Neutron
+  port-pagination compatibility image described below
 - OpenStack Resource Controller (required by CAPO): `v2.5.0`
 - Existing cert-manager: reused; the upstream manifests do not install another
   cert-manager release
@@ -22,6 +23,16 @@ Install:
 ```bash
 ./scripts/install.sh
 ```
+
+The installer copies the existing Harbor pull secret into `capo-system`
+without exposing its value and pins:
+
+`registry.dcn.ssu.ac.kr/openstack/capo-controller@sha256:91bfcbad65adfacd832ec6935011eee76790ac71b27e9d333d125a7d519f4cf8`
+
+`manifests/capo-image-build.yaml` records the reproducible build. It changes
+the unique-port lookup limit from one to two to avoid an incompatible Neutron
+pagination response. The unmodified source archive and standalone patch live
+in `openstack-cloud-reproducibility/sources`.
 
 The files under `vendor/` are unmodified upstream release assets. Site HA
 changes are isolated in `overlays/poc-ha`. `scripts/render.py` performs the

@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: capo-image-build
+  namespace: openstack
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+      initContainers:
+        - name: source
+          image: alpine/git:2.49.1
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              git clone --depth 1 --branch v0.14.6 \
+                https://github.com/kubernetes-sigs/cluster-api-provider-openstack.git \
+                /workspace
+              test "$(grep -c 'Limit: 1,' \
+                /workspace/pkg/cloud/services/networking/port.go)" -eq 1
+              sed -i 's/Limit: 1,/Limit: 2,/' \
+                /workspace/pkg/cloud/services/networking/port.go
+              grep -q 'Limit: 2,' \
+                /workspace/pkg/cloud/services/networking/port.go
+          volumeMounts:
+            - name: context
+              mountPath: /workspace
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+          args:
+            - --context=dir:///src
+            - --dockerfile=/src/Dockerfile
+            - --destination=registry.dcn.ssu.ac.kr/openstack/capo-controller:v0.14.6-poc1
+            - --digest-file=/dev/termination-log
+            - --skip-tls-verify
+            - --snapshot-mode=redo
+          volumeMounts:
+            - name: context
+              mountPath: /src
+              readOnly: true
+            - name: registry-auth
+              mountPath: /kaniko/.docker
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+      volumes:
+        - name: context
+          emptyDir: {}
+        - name: registry-auth
+          secret:
+            secretName: telemetry-harbor-push
+            items:
+              - key: .dockerconfigjson
+                path: config.json

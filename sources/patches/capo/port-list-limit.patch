@@ -1,0 +1,13 @@
+diff --git a/pkg/cloud/services/networking/port.go b/pkg/cloud/services/networking/port.go
+index 0eb720f..f497af8 100644
+--- a/pkg/cloud/services/networking/port.go
++++ b/pkg/cloud/services/networking/port.go
+@@ -55,7 +55,7 @@ func (s *Service) GetPortFromInstanceIP(instanceStatus *infrav1.Instance, ip str
+ 				IPAddress: ip,
+ 			},
+ 		},
+-		Limit: 1,
++		Limit: 2,
+ 	}
+ 	return s.client.ListPort(portOpts)
+ }
