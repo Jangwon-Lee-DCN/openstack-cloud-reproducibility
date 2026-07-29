@@ -9,6 +9,12 @@ pod:
     disruption_budget:
       api:
         min_available: 1
+conf:
+  # Resource-provider inventory is read-only.
+  policy:
+    "placement:resource_providers:list": "role:admin or role:monitoring"
+    "placement:resource_providers:inventories:list": "role:admin or role:monitoring"
+    "placement:resource_providers:usages": "role:admin or role:monitoring"
 endpoints:
   identity:
     auth:

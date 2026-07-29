@@ -15,6 +15,21 @@ conf:
     OS_POLLING_INTERVAL: 60
     TIMEOUT_SECONDS: 30
     OS_RETRIES: 2
+    # PoC public Gateway uses a cert-manager self-signed certificate.
+    verify: false
+    extra_args:
+      # Services not installed or not registered in this PoC.
+      - --disable-service.object-store
+      - --disable-service.container-infra
+      - --disable-service.dns
+      - --disable-service.database
+      # Unsupported/deprecated APIs and one operator-only Gnocchi endpoint.
+      - --disable-metric=nova-security_groups
+      - --disable-metric=nova-running_vms
+      # Cinder enforces an internal administrator context after API policy.
+      - --disable-metric=cinder-agent_state
+      - --disable-metric=cinder-pool_capacity_free_gb
+      - --disable-metric=gnocchi-status_metricd_processors
 monitoring:
   prometheus:
     enabled: true
@@ -40,7 +55,9 @@ endpoints:
         user_domain_name: default
         project_domain_name: default
       user:
-        role: reader
+        # openstack-exporter 1.7.0 authenticates with a project-scoped token.
+        # This dedicated role is granted only explicit read-only policy rules.
+        role: monitoring
         region_name: RegionOne
         username: prometheus-openstack-exporter
         project_name: service

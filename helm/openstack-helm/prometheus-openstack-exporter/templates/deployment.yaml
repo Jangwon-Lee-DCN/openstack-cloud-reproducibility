@@ -68,13 +68,19 @@ spec:
                     auth_url: "$OS_AUTH_URL"
                     username: "$OS_USERNAME"
                     password: "$OS_PASSWORD"
+                    {{- if .Values.endpoints.identity.auth.user.system_scope }}
+                    system_scope: "$OS_SYSTEM_SCOPE"
+                    {{- else }}
                     project_name: "$OS_PROJECT_NAME"
+                    {{- end }}
                     user_domain_name: "$OS_USER_DOMAIN_NAME"
                     project_domain_name: "$OS_PROJECT_DOMAIN_NAME"
                   region_name: "$OS_REGION_NAME"
                   interface: "$OS_INTERFACE"
                   identity_api_version: "$OS_IDENTITY_API_VERSION"
-                  {{- if .Values.manifests.certificates }}
+                  {{- if hasKey .Values.conf.prometheus_openstack_exporter "verify" }}
+                  verify: {{ .Values.conf.prometheus_openstack_exporter.verify }}
+                  {{- else if .Values.manifests.certificates }}
                   cacert: "/etc/ssl/certs/openstack-helm.crt"
                   {{- end }}
               EOF
@@ -121,6 +127,10 @@ spec:
                   name: {{ .Values.secrets.identity.user | quote }}
             - name: OS_IDENTITY_API_VERSION
               value: "3"
+            {{- if .Values.endpoints.identity.auth.user.system_scope }}
+            - name: OS_SYSTEM_SCOPE
+              value: {{ .Values.endpoints.identity.auth.user.system_scope | quote }}
+            {{- end }}
           volumeMounts:
             - name: clouds-yaml
               mountPath: /etc/openstack
@@ -139,6 +149,9 @@ spec:
           args:
             - --web.listen-address=:{{ tuple "prometheus_openstack_exporter" "internal" "exporter" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
             - --os-client-config=/etc/openstack/clouds.yaml
+            {{- range .Values.conf.prometheus_openstack_exporter.extra_args }}
+            - {{ . | quote }}
+            {{- end }}
             - default
           ports:
             - name: metrics

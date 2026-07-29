@@ -21,6 +21,9 @@ images:
   pull_policy: IfNotPresent
 
 conf:
+  # Amphora inventory is read-only. OVN CRUD remains governed by defaults.
+  policy:
+    "os_load-balancer_api:amphora:get_all": "role:admin or role:monitoring"
   octavia:
     api_settings:
       api_handler: queue_producer

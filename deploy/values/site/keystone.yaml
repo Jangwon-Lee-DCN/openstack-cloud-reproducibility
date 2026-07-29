@@ -7,6 +7,13 @@ pod:
 images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+conf:
+  # Project-scoped exporter 1.7.0 compatibility: read-only inventory only.
+  policy:
+    "identity:list_projects": "role:admin or role:monitoring"
+    "identity:list_users": "role:admin or role:monitoring"
+    "identity:list_groups": "role:admin or role:monitoring"
+    "identity:list_domains": "role:admin or role:monitoring"
 endpoints:
   identity:
     auth:

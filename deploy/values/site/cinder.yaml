@@ -25,6 +25,13 @@ images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
+  # Read-only cloud inventory and capacity access for the monitoring role.
+  policy:
+    "volume_extension:services:index": "role:admin or role:monitoring"
+    "scheduler_extension:scheduler_stats:get_pools": "role:admin or role:monitoring"
+    "volume_extension:quotas:show": "role:admin or role:monitoring"
+    "volume:get_all": "role:admin or role:monitoring"
+    "volume:get_all_snapshots": "role:admin or role:monitoring"
   ceph:
     pools:
       backup:
