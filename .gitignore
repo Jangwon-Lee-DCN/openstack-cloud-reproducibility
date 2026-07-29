@@ -2,3 +2,6 @@
 *.plain.yaml
 /tmp/
 .DS_Store
+
+# Keep operational incident evidence local to the deployment.
+docs/incidents/
