@@ -1,0 +1,27 @@
+$TTL 86400
+
+@   IN  SOA dns01.dcn.ssu.ac.kr. admin.dcn.ssu.ac.kr. (
+        2026072603 ; Serial
+        3600       ; Refresh
+        1800       ; Retry
+        604800     ; Expire
+        86400      ; Negative Cache TTL
+)
+
+@       IN  NS      dns01.dcn.ssu.ac.kr.
+@       IN  NS      dns02.dcn.ssu.ac.kr.
+
+dns01   IN  A       192.168.21.10
+dns02   IN  A       192.168.21.12
+cloud-controller-0 IN A       192.168.21.10
+cloud-controller-1 IN A       192.168.21.12
+k8s-api            IN A       192.168.21.8
+
+platform            IN A       192.168.21.5
+registry            IN A       192.168.21.4
+cloud               IN A       192.168.21.6
+auth.cloud          IN A       192.168.21.6
+api.internal.cloud  IN A       192.168.21.7
+
+dns     IN  CNAME   dns01
+gitea   IN  CNAME   git

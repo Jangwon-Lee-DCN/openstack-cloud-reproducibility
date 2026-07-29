@@ -1,0 +1,17 @@
+$TTL 86400
+
+@   IN  SOA dns01.dcn.ssu.ac.kr. admin.dcn.ssu.ac.kr. (
+        2026072603
+        3600
+        1800
+        604800
+        86400
+)
+
+@       IN  NS      dns01.dcn.ssu.ac.kr.
+
+7       IN  PTR     api.internal.cloud.dcn.ssu.ac.kr.
+8       IN  PTR     k8s-api.dcn.ssu.ac.kr.
+10      IN  PTR     dns01.dcn.ssu.ac.kr.
+10      IN  PTR     cloud-controller-0.dcn.ssu.ac.kr.
+12      IN  PTR     cloud-controller-1.dcn.ssu.ac.kr.
