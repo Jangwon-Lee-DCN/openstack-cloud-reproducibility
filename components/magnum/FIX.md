@@ -15,6 +15,16 @@
 - Configure two API and two conductor replicas, required cross-node
   anti-affinity, and PDB `minAvailable: 1`.
 - Override the Paste pipeline to omit the incompatible healthcheck filter.
+- Enable CCM-managed LoadBalancer security groups in the workload chart.
+- Preserve optional legacy cluster and Machine cloud selections so existing
+  clusters can roll to the split `openstack`/`openstack-capo` identity model.
+- Generate the repository index with
+  `http://magnum-chart-repository.openstack.svc.cluster.local`.
+- Set the PoC project quota to at least 50 security groups and 500 rules.
+- Reapply two replicas, required hostname anti-affinity, and a PDB after every
+  ORC upgrade.
+- Grant the Magnum conductor `deletecollection` in addition to `delete` for
+  the management resources covered by its CAPI ClusterRole.
 
 The deployed image is pinned as:
 

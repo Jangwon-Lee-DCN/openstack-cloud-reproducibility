@@ -18,3 +18,13 @@ in values.
 If a Nova server fails, correct the cloud/host cause and delete only its owning
 CAPI Machine so its controller performs a clean replacement. Do not directly
 remove Magnum database state while cluster-owned cloud resources remain.
+
+For a legacy identity migration, temporarily retain an `openstack` cloud entry
+matching the immutable old OpenStackCluster region until every replaced
+Machine is deleted. Then restore `openstack` to `RegionOne-VM`; new
+infrastructure resources use `openstack-capo`.
+
+Repackage `openstack-cluster`, regenerate the repository index with the
+current service URL, update `helm/packages/patched/SHA256SUMS`, and rerun the
+repository installer as one atomic reconciliation. Validate Neutron quota
+headroom before creating another cluster.

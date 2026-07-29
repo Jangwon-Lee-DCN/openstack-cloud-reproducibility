@@ -16,3 +16,16 @@ cannot directly run the selected CAPI Helm driver:
   additional chart settings.
 - OpenStack CCM did not tolerate the initial `NotReady` taint, creating a
   bootstrap ordering deadlock.
+- Legacy clusters pinned `openstack/RegionOne` in immutable infrastructure
+  identities. Reusing that cloud entry for `RegionOne-VM` prevented CAPO from
+  deleting old Machines during an in-place chart migration.
+- The internal repository index still advertised the retired
+  `magnum-workload-chart-repository.capi-system` URL even though Magnum used
+  the HA `magnum-chart-repository.openstack` service.
+- The project default quota of 10 security groups was exhausted by two
+  clusters and their Kubernetes LoadBalancer Services.
+- A direct ORC v2.6 upgrade reset the HA overlay and left one controller
+  replica.
+- Magnum cleanup uses a label-selected Kubernetes Secret collection delete.
+  Granting only the singular `delete` verb caused a hidden 403 and left
+  clusters in `DELETE_IN_PROGRESS` after all CAPI/cloud resources were gone.
