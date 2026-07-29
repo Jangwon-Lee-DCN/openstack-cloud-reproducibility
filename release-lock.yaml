@@ -37,6 +37,13 @@ spec:
     package: helm/packages/upstream/cinder-2026.1.0.tgz
     sha256: 8d81d34640ab5af652bdf82178fc3caca302988590ddf27fa9013ebe003d76d3
     valuesSnapshot: deploy/releases/cinder.values.sops.yaml
+  - name: barbican
+    chart: barbican
+    chartVersion: 2026.1.0
+    appVersion: 22.0.0
+    package: helm/packages/upstream/barbican-2026.1.0.tgz
+    sha256: da8904437a23edb32dfec6fa4f8385372cfafaad61e20c28bd79685609371c92
+    valuesSnapshot: deploy/releases/barbican.values.sops.yaml
   - name: glance
     chart: glance
     chartVersion: 2026.1.0

@@ -34,7 +34,7 @@ must retain that tag. Secrets are stored only in age/SOPS-encrypted values. The 
 
 The provider network `public` is ACTIVE with physical network `external`, CIDR `192.168.21.0/24`, gateway `192.168.21.1`, DHCP disabled, and the inclusive allocation pool `192.168.21.100-192.168.21.200`. The exposed `client.cinder` key was revoked and rotated on 2026-07-25; Cinder, Libvirt, and Nova compute were restarted and an RBD volume create/delete smoke test passed.
 
-Gateway API publishes Keystone, Placement, Glance, Cinder, Neutron, Nova, Heat, Ironic, and Horizon beneath `https://cloud.dcn.ssu.ac.kr`. The route is stored in `manifests/openstack-public-routes.yaml`. Ironic uses verified `2026.1-ubuntu_noble` Airship images. Its upstream chart toleration indentation and missing API worker default are site-patched; PXE, TFTP, HTTP boot, cleaning-network management, bootstrap image download, and object-store bootstrap are disabled.
+Gateway API publishes Keystone, Placement, Glance, Cinder, Barbican, Neutron, Nova, Heat, Ironic, and Horizon beneath `https://cloud.dcn.ssu.ac.kr`. The route is stored in `manifests/openstack-public-routes.yaml`. Barbican exposes `/key-manager` and uses a two-replica API with a PodDisruptionBudget. Ironic uses verified `2026.1-ubuntu_noble` Airship images. Its upstream chart toleration indentation and missing API worker default are site-patched; PXE, TFTP, HTTP boot, cleaning-network management, bootstrap image download, and object-store bootstrap are disabled.
 
 ## Phase A — Read-Only Inventory
 

@@ -47,6 +47,11 @@ for dashboard in skyline horizon; do
 done
 
 kubectl get pdb -n "$NAMESPACE" skyline >/dev/null
+[[ "$(kubectl get deployment -n "$NAMESPACE" barbican-api -o jsonpath='{.status.readyReplicas}')" == "2" ]]
+[[ "$(kubectl get pdb -n "$NAMESPACE" barbican-api -o jsonpath='{.spec.minAvailable}')" == "1" ]]
+[[ "$(curl -ksS -o /dev/null -w '%{http_code}' https://cloud.dcn.ssu.ac.kr/key-manager/v1/secrets)" == "401" ]] || {
+  echo "public Barbican route did not enforce Keystone authentication" >&2; exit 1;
+}
 kubectl get httproute -n "$NAMESPACE" openstack-public-services \
   -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}' | grep -qx True
 

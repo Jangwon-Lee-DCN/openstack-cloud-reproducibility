@@ -1,0 +1,65 @@
+# HA Barbican API and key-management endpoint configuration.
+images:
+  tags:
+    bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    scripted_test: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    barbican_db_sync: quay.io/airshipit/barbican:2026.1-ubuntu_noble
+    db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    barbican_api: quay.io/airshipit/barbican:2026.1-ubuntu_noble
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+
+pod:
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  tolerations:
+    barbican:
+      enabled: true
+  replicas:
+    api: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+  resources:
+    enabled: true
+
+conf:
+  barbican:
+    secretstore:
+      enabled_secretstore_plugins:
+        - store_crypto
+    crypto:
+      enabled_crypto_plugins:
+        - simple_crypto
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  key_manager:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /key-manager
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+manifests:
+  ingress_api: false
+  job_image_repo_sync: false
+  secret_ingress_tls: false
+  service_ingress_api: false

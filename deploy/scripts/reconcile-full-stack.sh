@@ -65,7 +65,7 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
 fi
 
 # Dependency order of the accepted PoC deployment.
-for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder   openvswitch ovn neutron   libvirt nova   heat octavia horizon skyline ironic   prometheus-openstack-exporter; do
+for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder barbican   openvswitch ovn neutron   libvirt nova   heat octavia horizon skyline ironic   prometheus-openstack-exporter; do
   install_release "$release"
 done
 
@@ -92,4 +92,5 @@ kubectl apply -f "$REPO_ROOT/deploy/manifests/ceilometer-pdb.yaml"
 install_release aodh
 kubectl apply -f "$REPO_ROOT/deploy/manifests/openstack-public-routes.yaml"
 
+"$REPO_ROOT/deploy/scripts/verify-barbican.sh"
 "$REPO_ROOT/deploy/scripts/verify-full-stack.sh"
