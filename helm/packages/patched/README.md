@@ -10,6 +10,8 @@ These packages are the chart-source variants actually used by the PoC:
 - `horizon-2026.1.0.tgz`: registry pull secret support for the Octavia-enabled
   Horizon image
 - `skyline-2026.1.0.tgz`: controller toleration and anti-affinity support
+- `magnum-2026.1.0.tgz`: projected-token CAPI kubeconfig, registry pull
+  secrets, and control-plane tolerations
 
 `SHA256SUMS` is authoritative. Every patch is a dedicated Git commit above the
 clean upstream source and has a component ISSUE/FIX record. All other releases

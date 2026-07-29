@@ -55,9 +55,11 @@ conf:
     enabled: false
     clusterName: cluster.local
     apiServer: https://localhost:6443
+    certificateAuthorityFile: null
     certificateAuthorityData: null
     contextName: default
     userName: clusterUse
+    tokenFile: null
     clientCertificateData: null
     clientKeyData: null
   paste:
@@ -496,6 +498,9 @@ endpoints:
         default: 24220
 
 pod:
+  tolerations:
+    magnum:
+      enabled: false
   user:
     magnum:
       uid: 42424

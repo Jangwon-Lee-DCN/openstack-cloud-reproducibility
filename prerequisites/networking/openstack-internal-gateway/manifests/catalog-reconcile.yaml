@@ -38,6 +38,7 @@ data:
     ensure_endpoint orchestration "${BASE}/orchestration/v1/%(project_id)s"
     ensure_endpoint load-balancer "${BASE}/load-balancer"
     ensure_endpoint key-manager "${BASE}/key-manager"
+    ensure_endpoint container-infra "${BASE}/container-infra/v1"
 
     echo "RegionOne-VM internal endpoint reconciliation completed."
 ---

@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: magnum-capi-image-build
+  namespace: openstack
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      hostAliases:
+        - ip: 192.168.21.4
+          hostnames: [registry.dcn.ssu.ac.kr]
+      nodeSelector:
+        openstack-control-plane: enabled
+        openstack-compute-node: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+          args:
+            - --context=dir:///workspace
+            - --dockerfile=/workspace/Dockerfile
+            - --destination=registry.dcn.ssu.ac.kr/openstack/magnum:22.0.1-capi-1.4.0-poc4
+            - --digest-file=/dev/termination-log
+            - --skip-tls-verify
+            - --snapshot-mode=redo
+          volumeMounts:
+            - {name: context, mountPath: /workspace, readOnly: true}
+            - {name: registry-auth, mountPath: /kaniko/.docker, readOnly: true}
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {memory: 2Gi}
+      volumes:
+        - name: context
+          configMap: {name: magnum-capi-image-build}
+        - name: registry-auth
+          secret:
+            secretName: telemetry-harbor-push
+            items:
+              - {key: .dockerconfigjson, path: config.json}

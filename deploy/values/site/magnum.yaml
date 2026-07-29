@@ -1,0 +1,138 @@
+# HA Magnum API/conductor with the CAPI Helm driver on the host cluster.
+images:
+  tags:
+    bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    magnum_db_sync: registry.dcn.ssu.ac.kr/openstack/magnum@sha256:77e12d055cc88349241addd39750233d14ba493717a44681f90015d91aa7b683
+    db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+    ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    magnum_api: registry.dcn.ssu.ac.kr/openstack/magnum@sha256:77e12d055cc88349241addd39750233d14ba493717a44681f90015d91aa7b683
+    magnum_conductor: registry.dcn.ssu.ac.kr/openstack/magnum@sha256:77e12d055cc88349241addd39750233d14ba493717a44681f90015d91aa7b683
+    dep_check: quay.io/airshipit/kubernetes-entrypoint:latest-ubuntu_noble
+
+pod:
+  image_pull_secrets:
+    default:
+      - name: telemetry-harbor-push
+  tolerations:
+    magnum:
+      enabled: true
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    api: 2
+    conductor: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+  mounts:
+    magnum_api:
+      magnum_api:
+        volumeMounts:
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: openstack-internal-ca
+            configMap:
+              name: openstack-internal-ca
+    magnum_conductor:
+      magnum_conductor:
+        volumeMounts:
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: openstack-internal-ca
+            configMap:
+              name: openstack-internal-ca
+
+conf:
+  paste:
+    pipeline:main:
+      # The Noble image's oslo.middleware requires HealthcheckMiddleware to
+      # be a PasteDeploy application, but the upstream chart declares it as
+      # a filter. Magnum's public root endpoint remains the readiness target.
+      pipeline: cors request_id authtoken api_v1
+  capi:
+    enabled: true
+    clusterName: host-management-cluster
+    apiServer: https://kubernetes.default.svc:443
+    certificateAuthorityFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    contextName: magnum
+    userName: magnum-conductor
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  magnum:
+    capi_helm:
+      kubeconfig_file: /etc/magnum/kubeconfig.conf
+      namespace_prefix: magnum
+      helm_chart_repo: https://azimuth-cloud.github.io/capi-helm-charts
+      helm_chart_name: openstack-cluster
+      default_helm_chart_version: 0.10.1
+      app_cred_interface_type: internal
+    cinder_client:
+      region_name: RegionOne-VM
+    drivers:
+      verify_ca: true
+      openstack_ca_file: /etc/ssl/certs/openstack-internal-ca.crt
+    certificates:
+      cert_manager_type: barbican
+  magnum_api_uwsgi:
+    uwsgi:
+      processes: 2
+      threads: 2
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+      magnum:
+        region_name: RegionOne
+        project_name: service
+        user_domain_name: default
+        project_domain_name: default
+      magnum_stack_user:
+        region_name: RegionOne
+        domain_name: magnum
+  container_infra:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /container-infra/v1
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+manifests:
+  ingress_api: false
+  job_image_repo_sync: false
+  secret_ingress_tls: false
+  service_ingress_api: false
+
+extraObjects:
+  - apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      name: magnum-conductor
+      namespace: openstack
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          application: magnum
+          component: conductor

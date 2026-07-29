@@ -35,3 +35,6 @@ spec:
     - matches: [{path: {type: PathPrefix, value: /key-manager}}]
       filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]
       backendRefs: [{name: barbican-api, port: 9311}]
+    - matches: [{path: {type: PathPrefix, value: /container-infra}}]
+      filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]
+      backendRefs: [{name: magnum-api, port: 9511}]

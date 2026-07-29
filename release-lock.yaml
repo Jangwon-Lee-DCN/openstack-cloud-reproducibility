@@ -107,6 +107,14 @@ spec:
     package: helm/packages/upstream/mariadb-2026.1.0.tgz
     sha256: afb5e49687a432b92b57a15d0756f66849dfd9c5b4635de7400682f5fd71da54
     valuesSnapshot: deploy/releases/mariadb.values.sops.yaml
+  - name: magnum
+    chart: magnum
+    chartVersion: 2026.1.0
+    appVersion: 22.0.0
+    package: helm/packages/patched/magnum-2026.1.0.tgz
+    sha256: 1b7b62ff731a9b98e6f798a8c0f6cda42d60aba59cd97a1cab2cf6f89c42ea88
+    valuesFile: deploy/values/site/magnum.yaml
+    secretsFile: deploy/secrets/magnum.values.sops.yaml
   - name: memcached
     chart: memcached
     chartVersion: 2026.1.0
