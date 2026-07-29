@@ -1,19 +1,20 @@
 # Kubernetes host tuning
 
-Apply `99-kubernetes-inotify.conf` to every Kubernetes node:
+Run the installer on every Kubernetes node:
 
 ```bash
-sudo install -o root -g root -m 0644 \
-  99-kubernetes-inotify.conf /etc/sysctl.d/99-kubernetes-inotify.conf
-sudo sysctl --system
+./install.sh
 ```
 
-## Why this is required
+It installs:
 
-On 2026-07-28, `cloud-controller-0` exhausted Ubuntu's default
-`fs.inotify.max_user_instances=128`. CRI-O could no longer create watches and
-kubelet failed to rotate container logs with `too many open files`. The
-process file-descriptor limits were not exhausted.
+- `99-kubernetes-inotify.conf`: raises conservative host-wide inotify ceilings
+  needed by a dense Kubernetes control plane.
+- `70-openstack-kvm.rules`: keeps `/dev/kvm` usable by QEMU after host reboots.
+  The OpenStack-Helm libvirt container and the Ubuntu host may assign different
+  numeric GIDs to their respective `kvm` groups, so group-only access is not
+  portable across this deployment.
 
-These values are conservative host-wide ceilings, not preallocated memory.
-Monitor actual consumption and raise them only when justified.
+The KVM rule is intended only for dedicated, trusted compute hosts. Do not use
+it on a multi-user host where local users must be prevented from accessing
+hardware virtualization.
