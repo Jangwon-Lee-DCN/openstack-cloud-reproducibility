@@ -7,11 +7,9 @@
 4. Build `images/magnum-capi` with `deploy/manifests/magnum-image-build.yaml`.
 5. Regenerate environment credentials with
    `deploy/scripts/generate-magnum-secrets.py`.
-6. Install `helm/packages/patched/magnum-2026.1.0.tgz` with
-   `deploy/values/site/magnum.yaml` and decrypted
-   `deploy/secrets/magnum.values.sops.yaml`.
-7. Apply public/internal Gateway routes and run the internal catalog
-   reconciler.
+6. Run `deploy/scripts/install-magnum.sh`. It installs the pinned package,
+   reconciles the chart's post-install jobs in dependency order, applies both
+   Gateway routes, reconciles the service catalog, and executes verification.
 
 Never materialize decrypted values in Git or place a static Kubernetes token
 in values.
