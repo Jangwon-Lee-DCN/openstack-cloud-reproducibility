@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: magnum-workload-smoke-test
+  namespace: openstack
+data:
+  run.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    image=ubuntu-jammy-kube-v1.34.4-260217-1530
+    common_labels="capi_helm_chart_version=0.26.0,octavia_provider=ovn,kube_dashboard_enabled=false,auto_healing_enabled=false,monitoring_enabled=false"
+
+    ensure_template() {
+      name="$1"
+      lb="$2"
+      if openstack coe cluster template show "${name}" >/dev/null 2>&1; then
+        return
+      fi
+      args=(
+        coe cluster template create "${name}"
+        --coe kubernetes
+        --image "${image}"
+        --external-network public
+        --dns-nameserver 192.168.21.10
+        --master-flavor m1.medium
+        --flavor m1.medium
+        --network-driver calico
+        --label "${common_labels}"
+        --public
+      )
+      if test "${lb}" = true; then
+        args+=(--master-lb-enabled)
+      fi
+      openstack "${args[@]}"
+    }
+
+    ensure_cluster() {
+      name="$1"
+      template="$2"
+      if openstack coe cluster show "${name}" >/dev/null 2>&1; then
+        current="$(openstack coe cluster show "${name}" -f value -c status)"
+        case "${current}" in
+          CREATE_FAILED|UPDATE_FAILED|DELETE_FAILED)
+            openstack coe cluster delete "${name}"
+            for attempt in $(seq 1 60); do
+              if ! openstack coe cluster show "${name}" >/dev/null 2>&1; then
+                break
+              fi
+              sleep 5
+            done
+            ;;
+        esac
+      fi
+      if ! openstack coe cluster show "${name}" >/dev/null 2>&1; then
+        openstack coe cluster create "${name}" \
+          --cluster-template "${template}" \
+          --master-count 1 \
+          --node-count 1
+      fi
+
+      for attempt in $(seq 1 180); do
+        status="$(openstack coe cluster show "${name}" -f value -c status)"
+        reason="$(openstack coe cluster show "${name}" \
+          -f value -c status_reason)"
+        echo "${name}: ${status} (${attempt}/180) ${reason}"
+        case "${status}" in
+          CREATE_COMPLETE|UPDATE_COMPLETE) return ;;
+          CREATE_FAILED|UPDATE_FAILED|DELETE_FAILED)
+            openstack coe cluster show "${name}"
+            return 1
+            ;;
+        esac
+        sleep 20
+      done
+      echo "${name}: timed out"
+      return 1
+    }
+
+    test "$(openstack image show "${image}" -f value -c status)" = active
+    ensure_template capi-k8s-v1.34-lb true
+    ensure_template capi-k8s-v1.34-no-lb false
+    ensure_cluster capi-smoke-lb capi-k8s-v1.34-lb
+    ensure_cluster capi-smoke-no-lb capi-k8s-v1.34-no-lb
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: magnum-workload-smoke-test
+  namespace: openstack
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        application: magnum
+        component: workload-smoke-test
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: test
+          image: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+          command: [bash, /opt/test/run.sh]
+          envFrom:
+            - secretRef:
+                name: keystone-keystone-admin
+          volumeMounts:
+            - name: script
+              mountPath: /opt/test
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: magnum-workload-smoke-test
+            defaultMode: 0555

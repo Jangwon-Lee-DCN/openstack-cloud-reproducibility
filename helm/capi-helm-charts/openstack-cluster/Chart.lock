@@ -1,0 +1,6 @@
+dependencies:
+- name: cluster-addons
+  repository: file://../cluster-addons
+  version: 0.26.0
+digest: sha256:e2ad0e1b9210f2a7819766235536f9b4841443549a2d359bc6ea054df67a5e84
+generated: "2026-06-12T16:23:37.175568057Z"

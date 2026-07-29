@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: 89ad40e
+description: Helm chart that deploys cluster addons for a CAPI cluster.
+name: cluster-addons
+type: application
+version: 0.26.0

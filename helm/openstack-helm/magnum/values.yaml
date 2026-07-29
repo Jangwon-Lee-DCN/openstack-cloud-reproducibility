@@ -110,6 +110,10 @@ conf:
       auth_version: v3
       memcache_security_strategy: ENCRYPT
       service_type: container-infra
+    # Used by conductor-side administrative clients, including the Barbican
+    # certificate backend. configmap-etc.yaml fills this from the Magnum
+    # service endpoint credentials.
+    keystone_auth: {}
     api:
       # NOTE(portdirect): the bind port should not be defined, and is manipulated
       # via the endpoints section.

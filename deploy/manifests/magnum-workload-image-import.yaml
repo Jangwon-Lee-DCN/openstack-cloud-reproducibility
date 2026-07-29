@@ -1,0 +1,78 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: magnum-workload-image-import
+  namespace: openstack
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        application: magnum
+        component: workload-image-import
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: import
+          image: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+          command:
+            - bash
+            - -ceu
+            - |
+              name=ubuntu-jammy-kube-v1.34.4-260217-1530
+              url=https://azimuth-images.stackhpc.cloud/${name}.qcow2
+              expected=b83a94e395221999a05101b9f529cb69ef68fff054f9ff18fd54517a98af3181
+              path=/work/${name}.qcow2
+              size=3957784576
+              parts=16
+              part_size=247361536
+
+              existing="$(openstack image list --name "${name}" \
+                --status active -f value -c ID | head -n1)"
+              if test -n "${existing}"; then
+                echo "Image ${name} already exists as ${existing}."
+                exit 0
+              fi
+
+              openstack image list --name "${name}" -f value -c ID |
+                xargs --no-run-if-empty openstack image delete
+
+              export url part_size size
+              seq 0 $((parts - 1)) | xargs -P8 -I{} bash -ceu '
+                index={}
+                start=$((index * part_size))
+                end=$((start + part_size - 1))
+                curl --fail --location --retry 5 --retry-delay 5 \
+                  --range "${start}-${end}" \
+                  --output "/work/part.$(printf "%02d" "${index}")" "${url}"
+              '
+              cat /work/part.* >"${path}"
+              test "$(stat -c %s "${path}")" = "${size}"
+              echo "${expected}  ${path}" | sha256sum --check -
+              openstack image create "${name}" \
+                --file "${path}" \
+                --disk-format qcow2 \
+                --container-format bare \
+                --property os_distro=ubuntu \
+                --property os_version=22.04 \
+                --property kube_version=v1.34.4 \
+                --public
+          envFrom:
+            - secretRef:
+                name: keystone-keystone-admin
+          volumeMounts:
+            - name: work
+              mountPath: /work
+      volumes:
+        - name: work
+          emptyDir:
+            sizeLimit: 8Gi

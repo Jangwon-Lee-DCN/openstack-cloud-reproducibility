@@ -5,8 +5,14 @@ cannot directly run the selected CAPI Helm driver:
 
 - the image has only the legacy Heat driver and no Helm client;
 - the CAPI driver expects a static kubeconfig token;
+- CAPO and workload CCM require different catalog regions but must emit the
+  same canonical Nova provider ID;
+- the upstream driver forces an API load balancer and cannot exercise the
+  explicitly experimental direct-floating-IP comparison;
 - the Airship image lacks the chart's `magnum-api-wsgi` path;
 - the chart's filter-style healthcheck is incompatible with the image's
   `oslo.middleware`;
 - private-registry pulls, control-plane taints, and two-node HA require
   additional chart settings.
+- OpenStack CCM did not tolerate the initial `NotReady` taint, creating a
+  bootstrap ordering deadlock.

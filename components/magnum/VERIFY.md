@@ -11,7 +11,13 @@ It verifies two ready API replicas, two ready conductor replicas, PDBs, the
 acceptance, and an authentication-enforced HTTP 401 from the internal API.
 
 An authenticated `openstack coe cluster template list` must also complete.
-End-to-end workload-cluster creation is a separate acceptance gate requiring
-a supported Kubernetes image, flavors, tenant network, quotas, and Octavia.
-The 2026-07-29 PoC inventory contains only Cirros, so this gate remains
-explicitly pending rather than substituting an unsupported image.
+
+The workload acceptance gate creates two minimal clusters:
+
+- one control-plane and one worker behind an OVN Octavia API load balancer;
+- one control-plane and one worker with a floating IP directly attached to the
+  control-plane port.
+
+For each cluster, verify two Ready nodes, all baseline Helm releases, DNS,
+ClusterIP traffic, and Internet egress. The LB must be ACTIVE/ONLINE with a
+TCP 6443 member. The no-LB cluster must have no matching Octavia load balancer.

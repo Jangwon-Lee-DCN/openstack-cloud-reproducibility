@@ -25,7 +25,7 @@ spec:
           args:
             - --context=dir:///workspace
             - --dockerfile=/workspace/Dockerfile
-            - --destination=registry.dcn.ssu.ac.kr/openstack/magnum:22.0.1-capi-1.4.0-poc4
+            - --destination=registry.dcn.ssu.ac.kr/openstack/magnum:22.0.1-capi-1.4.0-poc8
             - --digest-file=/dev/termination-log
             - --skip-tls-verify
             - --snapshot-mode=redo

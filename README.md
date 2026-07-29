@@ -29,6 +29,13 @@ default user dashboard and Horizon is preserved as the `/horizon/`
 administrator and compatibility fallback. It is the immutable
 artifact source consumed by `openstack-cloud-services`.
 
+The Magnum workload-cluster path is also pinned: CAPI/CAPO/ORC management
+manifests, the add-on provider, upstream and patched workload charts, the
+custom Magnum and CAPO build inputs, and an unmodified CAPO source archive
+with its separate local patch. Acceptance covers both a supported Octavia API
+LB topology and an explicitly experimental direct-floating-IP topology, each
+with one control-plane and one worker.
+
 ## Inspect and run
 
 ```bash

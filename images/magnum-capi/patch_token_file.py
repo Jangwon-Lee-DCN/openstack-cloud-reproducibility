@@ -36,14 +36,74 @@ path.write_text(source)
 app_creds = path.with_name("common") / "app_creds.py"
 source = app_creds.read_text()
 source = source.replace(
+    "import secrets\nimport yaml\n",
+    "import copy\nimport secrets\nimport yaml\n",
+)
+source = source.replace(
     '                        service_type="identity", interface="public"\n',
     '                        service_type="identity",\n'
     "                        interface=CONF.capi_helm.app_cred_interface_type,\n"
     "                        region_name=osc.cinder_region_name(),\n"
 )
+source = source.replace(
+    '    return {\n'
+    '        "clouds": {\n'
+    '            "openstack": {\n',
+    '    clouds_dict = {\n'
+    '        "clouds": {\n'
+    '            "openstack": {\n',
+    1,
+)
+source = source.replace(
+    "        },\n"
+    "    }\n"
+    "\n"
+    "\n"
+    "def get_app_cred_string_data(context, app_cred):\n",
+    "        },\n"
+    "    }\n"
+    '    clouds_dict["clouds"]["openstack-capo"] = copy.deepcopy(\n'
+    '        clouds_dict["clouds"]["openstack"]\n'
+    "    )\n"
+    '    clouds_dict["clouds"]["openstack-capo"]["region_name"] = (\n'
+    "        CONF.nova_client.region_name\n"
+    "    )\n"
+    "    return clouds_dict\n"
+    "\n"
+    "\n"
+    "def get_app_cred_string_data(context, app_cred):\n",
+    1,
+)
 if "region_name=osc.cinder_region_name()" not in source:
     raise SystemExit("internal identity endpoint patch did not apply")
+if '"openstack-capo"' not in source:
+    raise SystemExit("CAPO-specific cloud patch did not apply")
 app_creds.write_text(source)
+
+driver = path.with_name("driver.py")
+source = driver.read_text()
+source = source.replace(
+    '            "kubernetesVersion": kube_version,\n',
+    '            "kubernetesVersion": kube_version,\n'
+    "            # CAPO uses a second cloud entry without a region in the\n"
+    "            # identityRef, preserving standard providerID formatting.\n"
+    '            "infrastructureCloudName": "openstack-capo",\n',
+)
+source = source.replace(
+    '                "enableLoadBalancer": True,\n',
+    "                # The upstream driver intentionally forces an API load\n"
+    "                # balancer. Honour the Magnum ClusterTemplate field for\n"
+    "                # the explicit PoC comparison; a no-LB cluster retains\n"
+    "                # an API floating IP on its single control-plane node.\n"
+    '                "enableLoadBalancer": bool(\n'
+    "                    cluster.cluster_template.master_lb_enabled\n"
+    "                ),\n",
+)
+if "cluster.cluster_template.master_lb_enabled" not in source:
+    raise SystemExit("master_lb_enabled patch did not apply")
+if '"infrastructureCloudName": "openstack-capo"' not in source:
+    raise SystemExit("infrastructure cloud-name patch did not apply")
+driver.write_text(source)
 
 wsgi = Path("/var/lib/openstack/bin/magnum-api-wsgi")
 wsgi.write_text(

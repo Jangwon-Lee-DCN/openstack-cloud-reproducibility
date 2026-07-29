@@ -1,0 +1,83 @@
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: OpenStackCluster
+metadata:
+  name: {{ include "openstack-cluster.clusterName" . }}
+  labels: {{ include "openstack-cluster.labels" . | nindent 4 }}
+  annotations:
+    # We let Cluster API clean up this resource
+    # Deleting it ourselves, which CAPI is not expecting, can cause some nasty race conditions
+    helm.sh/resource-policy: keep
+spec:
+  identityRef:
+    name: {{ include "openstack-cluster.cloudCredentialsSecretName" . }}
+    cloudName: {{ .Values.infrastructureCloudName }}
+  {{- with .Values.controlPlaneEndpoint }}
+  controlPlaneEndpoint: {{ toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.clusterNetworking }}
+  {{- if .disableExternalNetwork }}
+  disableExternalNetwork: {{ .disableExternalNetwork }}
+  {{- end }}
+  {{- if .manageSecurityGroups }}
+  managedSecurityGroups:
+    allowAllInClusterTraffic: {{ .allowAllInClusterTraffic }}
+    {{- if or (eq $.Values.apiServer.loadBalancerProvider "ovn") .workerNodeSecurityGroupRules }}
+    workerNodeSecurityGroupRules: {{ include "openstack-cluster.workerNodesSecurityGroupRules" ( list . (eq $.Values.apiServer.loadBalancerProvider "ovn")) | nindent 6 }}
+    {{- end }}
+    {{- if .controlPlaneNodesSecurityGroupRules }}
+    controlPlaneNodesSecurityGroupRules: {{ .controlPlaneNodesSecurityGroupRules | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- with .externalNetworkId }}
+  externalNetwork:
+    id: {{ . }}
+  {{- end }}
+  {{- with .internalNetwork }}
+  {{- if or .networkFilter .subnetFilter }}
+  {{- with .networkFilter }}
+  network: {{ include "openstack-cluster.convert.neutronFilter" . | nindent 4 }}
+  {{- end }}
+  {{- with .subnetFilter }}
+  subnets:
+    - {{ include "openstack-cluster.convert.neutronFilter" . | nindent 6 }}
+  {{- end }}
+  {{- else }}
+  managedSubnets:
+    - cidr: {{ .nodeCidr }}
+      {{- with (default $.Values.clusterNetworking.dnsNameservers .dnsNameservers) }}
+      dnsNameservers: {{ toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- with .Values.apiServer }}
+  {{- if .enableLoadBalancer }}
+  apiServerLoadBalancer:
+    enabled: true
+    {{- if .loadBalancerProvider }}
+    provider: {{ .loadBalancerProvider }}
+    {{- end }}
+    {{- if .allowedCIDRs }}
+    allowedCIDRs:
+      {{- range .allowedCIDRs }}
+      - {{ . }}
+      {{- end}}
+    {{- end }}
+  {{- end }}
+  disableAPIServerFloatingIP: {{ not .associateFloatingIP }}
+  {{- with .floatingIP }}
+  apiServerFloatingIP: {{ . }}
+  {{- end }}
+  {{- with .fixedIP }}
+  apiServerFixedIP: {{ . }}
+  {{- end }}
+  apiServerPort: {{ .port }}
+  {{- end }}
+  {{- with .Values.controlPlane }}
+  {{- if .omitFailureDomain }}
+  controlPlaneOmitAvailabilityZone: true
+  {{- else if .failureDomains }}
+  controlPlaneAvailabilityZones: {{ toYaml .failureDomains | nindent 4 }}
+  {{- end }}
+  {{- end }}

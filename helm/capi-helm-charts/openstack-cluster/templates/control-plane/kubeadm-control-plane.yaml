@@ -1,0 +1,213 @@
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.nodeLabels" -}}
+{{- with .Values.controlPlane.nodeLabels }}
+initConfiguration: {{ include "openstack-cluster.nodeRegistration.nodeLabels" . | nindent 2 }}
+joinConfiguration: {{ include "openstack-cluster.nodeRegistration.nodeLabels" . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.kubeProxyConfiguration" -}}
+{{- $ctx := index . 0 }}
+{{- $osDistro := index . 1 }}
+{{- $kubeProxyConfigurationPath := eq $osDistro "flatcar" | ternary "/etc/kube-proxy-configuration.yaml" "/run/kubeadm/kube-proxy-configuration.yaml" }}
+{{- $kubeadmPath := eq $osDistro "flatcar" | ternary "/etc/kubeadm.yml" "/run/kubeadm/kubeadm.yaml" }}
+{{- with $ctx.kubeProxyConfiguration }}
+files:
+  - path: {{ $kubeProxyConfigurationPath }}
+    content: |
+      ---
+      apiVersion: kubeproxy.config.k8s.io/v1alpha1
+      kind: KubeProxyConfiguration
+      {{- toYaml . | nindent 6 }}
+    owner: root:root
+    permissions: "0644"
+preKubeadmCommands:
+  - cat {{ $kubeProxyConfigurationPath }} >> {{ $kubeadmPath }}
+{{- end }}
+{{- end }}
+
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.oidc" -}}
+{{- with .Values.oidc }}
+{{- if .issuerUrl }}
+clusterConfiguration:
+  apiServer:
+    extraArgs:
+      oidc-issuer-url: {{ quote .issuerUrl }}
+      oidc-client-id: {{ required "clientId is required for OIDC" .clientId | quote }}
+      oidc-username-claim: {{ quote .usernameClaim }}
+      oidc-username-prefix: {{ quote .usernamePrefix }}
+      oidc-groups-claim: {{ quote .groupsClaim }}
+      oidc-groups-prefix: {{ quote .groupsPrefix }}
+      oidc-signing-algs: {{ quote .signingAlgs }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.etcd" -}}
+clusterConfiguration:
+  etcd:
+    local:
+      dataDir: {{ .Values.etcd.dataDir }}
+      extraArgs: {{ toYaml .Values.etcd.extraArgs | nindent 8 }}
+{{- if .Values.etcd.blockDevice }}
+# Tell kubeadm to ignore the fact that the etcd datadir contains lost+found
+initConfiguration:
+  nodeRegistration:
+    ignorePreflightErrors:
+      - diravailable-{{ replace "/" "-" .Values.etcd.dataDir }}
+joinConfiguration:
+  nodeRegistration:
+    ignorePreflightErrors:
+      - diravailable-{{ replace "/" "-" .Values.etcd.dataDir }}
+diskSetup:
+  filesystems:
+    - device: /dev/disk/openstack/by-tag/etcd
+      filesystem: ext4
+      label: etcd_disk
+mounts:
+  - - LABEL=etcd_disk
+    - {{ .Values.etcd.dataDir }}
+{{- end }}
+{{- end }}
+
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.etcdEncryption" -}}
+{{- if .Values.etcd.encryption.enabled }}
+preKubeadmCommands:
+  - mkdir -p /etc/kubernetes/enc
+  - mkdir -p /etc/kubernetes/patches
+initConfiguration:
+  patches:
+    directory: /etc/kubernetes/patches
+joinConfiguration:
+  patches:
+    directory: /etc/kubernetes/patches
+clusterConfiguration:
+  apiServer:
+    extraArgs:
+      encryption-provider-config: /etc/kubernetes/enc/enc.yaml
+files:
+  - path: /etc/kubernetes/patches/kube-apiserver1+strategic.yaml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      spec:
+        containers:
+        - name: kube-apiserver
+          volumeMounts:
+          - mountPath: /etc/kubernetes/enc
+            name: kube-enc
+            readOnly: true
+        volumes:
+        - hostPath:
+            path: /etc/kubernetes/enc
+            type: DirectoryOrCreate
+          name: kube-enc
+  - path: /etc/kubernetes/enc/enc.yaml
+    content: |
+      apiVersion: apiserver.config.k8s.io/v1
+      kind: EncryptionConfiguration
+      resources:
+        - resources:
+            {{- .Values.etcd.encryption.resources | toYaml | nindent 10 }}
+          providers:
+            - {{ .Values.etcd.encryption.provider }}:
+                keys:
+                  - name: key1
+                    {{- $secret := (lookup "v1" "Secret" .Release.Namespace (print .Release.Name "-etcd-key")) -}}
+                    secret: {{ $secret.data.key }}
+            - identity: {} # fallback to allow reading unencrypted secrets e.g during initial migration
+    owner: root:root
+    permissions: "0644"
+{{- end }}
+{{- end -}}
+
+{{/*
+  NOTE(mkjpryor)
+  When Cilium is enabled with the kube-proxy replacement, we need to skip kube-proxy
+*/}}
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.cilium" -}}
+{{-
+  if and
+    .Values.addons.enabled
+    (dig "cni" "enabled" true .Values.addons)
+    (dig "cni" "type" "calico" .Values.addons | eq "cilium")
+    (dig "cni" "cilium" "release" "values" "kubeProxyReplacement" true .Values.addons)
+}}
+initConfiguration:
+  skipPhases:
+    - addon/kube-proxy
+{{- end }}
+{{- end }}
+
+{{- define "openstack-cluster.controlplane.kubeadmConfigSpec.admissionConfigFile" -}}
+files:
+  - path: /etc/kubernetes/admission/configuration.yaml
+    contentFrom:
+      secret:
+        name: {{ include "openstack-cluster.componentName" (list . "admission-configuration") }}
+        key: admission-configuration.yaml
+    owner: root:root
+    permissions: "0644"
+clusterConfiguration:
+  apiServer:
+    extraArgs:
+      admission-control-config-file: /etc/kubernetes/admission/configuration.yaml
+    extraVolumes:
+      - name: admission-configuration
+        hostPath: /etc/kubernetes/admission
+        mountPath: /etc/kubernetes/admission
+        readOnly: true
+        pathType: Directory
+{{- end }}
+
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: {{ include "openstack-cluster.componentName" (list . "control-plane") }}
+  labels: {{ include "openstack-cluster.componentLabels" (list . "control-plane") | nindent 4 }}
+  annotations:
+    # We let Cluster API clean up the control plane resource
+    # Deleting it ourselves, which CAPI is not expecting, can cause some nasty race conditions
+    helm.sh/resource-policy: keep
+spec:
+  version: v{{
+    .Values.controlPlane.kubernetesVersion |
+      default .Values.kubernetesVersion |
+      required "One of .Values.controlPlane.kubernetesVersion or .Values.kubernetesVersion is required" |
+      trimPrefix "v"
+  }}
+  replicas: {{ .Values.controlPlane.machineCount }}
+  remediationStrategy: {{ toYaml .Values.controlPlane.remediationStrategy | nindent 4 }}
+  rolloutStrategy: {{ toYaml .Values.controlPlane.rolloutStrategy | nindent 4 }}
+  machineTemplate:
+    metadata:
+      labels: {{ include "openstack-cluster.componentSelectorLabels" (list . "control-plane") | nindent 8 }}
+    infrastructureRef:
+      kind: OpenStackMachineTemplate
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      name: {{ include "openstack-cluster.controlplane.mt.name" . }}
+      namespace: {{ .Release.Namespace }}
+    nodeDrainTimeout: {{ .Values.controlPlane.nodeDrainTimeout }}
+    nodeVolumeDetachTimeout: {{ .Values.controlPlane.nodeVolumeDetachTimeout }}
+    nodeDeletionTimeout: {{ .Values.controlPlane.nodeDeletionTimeout }}
+  kubeadmConfigSpec: {{
+    omit
+      (
+        list
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.nodeLabels" . | fromYaml)
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.oidc" . | fromYaml)
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.etcd" . | fromYaml)
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.etcdEncryption" . | fromYaml)
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.cilium" . | fromYaml)
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.admissionConfigFile" . | fromYaml)
+          (include "openstack-cluster.kubeadmConfigSpec" (list . .Values.controlPlane.kubeadmConfigSpec) | fromYaml)
+          (include "openstack-cluster.osDistroKubeadmConfigSpec" (list . ) | fromYaml)
+          (include "openstack-cluster.patchConfigSpec"  (list .) | fromYaml)
+          (include "openstack-cluster.controlplane.kubeadmConfigSpec.kubeProxyConfiguration" (list .Values.controlPlane.kubeadmConfigSpec .Values.osDistro) | fromYaml) |
+        include "openstack-cluster.mergeConcatMany" |
+        fromYaml
+      )
+      "kubeProxyConfiguration" |
+    toYaml |
+    nindent 4
+  }}

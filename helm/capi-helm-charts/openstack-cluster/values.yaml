@@ -1,0 +1,576 @@
+---
+
+# The name of an existing secret containing a clouds.yaml and optional cacert
+cloudCredentialsSecretName:
+
+# Optional region used only by CAPO infrastructure reconciliation. This lets
+# the same clouds.yaml retain a VM-routable service-catalog region for CCM/CSI.
+infrastructureCloudName: openstack
+# OR
+# Content for the clouds.yaml file
+# Having this as a top-level item allows a clouds.yaml file from OpenStack to be used as a values file
+clouds:
+# The PEM-encoded CA certificate for the specified cloud
+cloudCACert:
+
+# The name of the cloud to use from the specified clouds.yaml
+cloudName: openstack
+
+# The Kubernetes version of the cluster
+# This should match the version of kubelet and kubeadm in the image
+kubernetesVersion:
+
+# The name of the image to use for cluster machines
+machineImage:
+# OR
+# The ID of the image to use for cluster machines
+machineImageId:
+
+# The name of the SSH key to inject into cluster machines
+machineSSHKeyName:
+
+# Global metadata items to add to each machine
+machineMetadata: {}
+
+# The prefix used for project labels and annotations
+projectPrefix: capi.stackhpc.com
+
+# Any extra annotations to add to the cluster
+clusterAnnotations: {}
+
+# Settings for connecting to the cluster using OpenID Connect (OIDC)
+# If not specified, OIDC authentication is not enabled
+oidc:
+  # The URL of the OIDC provider (i.e. the discovery URL with the well-known component removed)
+  # e.g. if the discovery URL is https://auth.example.com/.well-known/openid-configuration, the
+  #      given value should be https://auth.example.com
+  issuerUrl:
+  # The client ID that tokens are issued for
+  clientId:
+  # The claim to extract the username from
+  usernameClaim: sub
+  # The prefix to append to usernames from OIDC
+  # Used to prevent collisions with existing names, e.g. service accounts
+  # For example, if the claim specified in usernameClaim contains jbloggs and the prefix is set
+  # to oidc:, then in Kubernetes the user can be referred to as oidc:jbloggs
+  usernamePrefix: "oidc:"
+  # The claim to extract the user's groups from
+  groupsClaim: groups
+  # The prefix to append to groups from OIDC, similar to usernamePrefix
+  groupsPrefix: "oidc:"
+  # The signing algorithms that are accepted
+  signingAlgs: RS256
+
+# Values for the Kubernetes cluster network
+kubeNetwork:
+  # By default, use the private network range 172.16.0.0/12 for the cluster network
+  # We split it into two equally-sized blocks for pods and services
+  # This gives ~500,000 addresses in each block
+  pods:
+    cidrBlocks:
+      - 172.16.0.0/13
+  services:
+    cidrBlocks:
+      - 172.24.0.0/13
+  serviceDomain: cluster.local
+
+# Settings for the OpenStack networking for the cluster
+clusterNetworking:
+  # Custom nameservers to use for the hosts
+  # Deprecated; use `clusterNetworking.internalNetwork.dnsNameservers` instead.
+  # dnsNameservers: []
+  # Indicates whether or not to attempt to connect the cluster to an external
+  # network.
+  disableExternalNetwork: false
+  # Indicates if security groups should be managed by the cluster
+  manageSecurityGroups: true
+  # Indicates if the managed security groups should allow all in-cluster traffic
+  # The default CNI installed by the addons is Cilium, so this is true by default
+  allowAllInClusterTraffic: true
+  # Defines the rules that should be applied to worker nodes.
+  workerNodeSecurityGroupRules: []
+  # Defines the rules that should be applied to control plane nodes.
+  controlPlaneNodesSecurityGroupRules: []
+  # The ID of the external network to use
+  # If not given, the external network will be detected
+  externalNetworkId:
+  # Details of the internal network to use
+  internalNetwork:
+    # Filter to find an existing network for the cluster internal network
+    # see Cluster API documentation for details
+    networkFilter:
+      # id: e63ca1a0-f69d-4fbf-b306-310857b1afe5
+      # name: tenant-internal-net
+    # Filter to find an existing subnet for the cluster internal network
+    # See Cluster API documentation for details
+    subnetFilter:
+      # id: e63ca1a0-f69d-4fbf-b306-31089s1j38d8
+      # name: tenant-internal-subnet
+    # The CIDR to use if creating a cluster network
+    # This is only used if neither of networkFilter and subnetFilter are given
+    nodeCidr: 192.168.3.0/24
+    # List of nameserver IPs to use when creating a cluster network.
+    # This is only used if neither of networkFilter and subnetFilter are given
+    dnsNameservers:
+
+# Settings for registry mirrors
+# When a mirror is set, it will be tried for images but will fall back to the
+# upstream registry if the image pull fails
+# By default, use images mirrored to quay.io when possible
+registryMirrors:
+  # docker.io:
+  #   upstream: https://registry-1.docker.io
+  #   mirrors:
+  #     - url: https://registry.my.domain/v2/dockerhub-public
+  #       capabilities: ["pull", "resolve"]
+  docker.io:
+    - https://quay.io/v2/azimuth/docker.io
+  ghcr.io:
+    - https://quay.io/v2/azimuth/ghcr.io
+  nvcr.io:
+    - https://quay.io/v2/azimuth/nvcr.io
+  quay.io:
+    - https://quay.io/v2/azimuth/quay.io
+  registry.k8s.io:
+    - https://quay.io/v2/azimuth/registry.k8s.io
+
+# A map of trusted CAs to add to the system trust on cluster nodes
+trustedCAs: {}
+  # custom-ca: |
+  #   -----BEGIN CERTIFICATE-----
+  #   ...certificate data...
+  #   -----END CERTIFICATE-----
+
+# List of additional packages to install on cluster nodes
+additionalPackages: []
+  # - nfs-common
+
+# Settings for etcd
+etcd:
+  # The data directory to use for etcd
+  # When a block device is specified, it is mounted at the parent directory, e.g. /var/lib/etcd
+  # This is to avoid etcd complaining about the lost+found directory
+  dataDir: /var/lib/etcd
+  # Any extra command line arguments to pass to etcd
+  extraArgs:
+    # Set timeouts so that etcd tolerates 'slowness' (network + disks) better
+    # This is at the expense of taking longer to detect a leader failure
+    # https://etcd.io/docs/v3.5/tuning/#time-parameters
+    heartbeat-interval: "500"  # defaults to 100ms in etcd 3.5
+    election-timeout: "5000"   # defaults to 1000ms in etcd 3.5
+    # Set a slightly larger space quota than the default (default is 2GB)
+    quota-backend-bytes: "4294967296"
+    # Listen for metrics on 0.0.0.0 so Prometheus can collect them
+    listen-metrics-urls: http://0.0.0.0:2381
+  # At-rest encryption settings
+  encryption:
+    enabled: false
+    # K8s resources to encrypt
+    resources:
+      - secrets
+    # Encyption provider, see https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#providers
+    provider: secretbox
+  # The block device configuration for etcd
+  # If not specified, the root device is used
+  blockDevice:
+    # # The size of the block device
+    # size: 20
+    # # The type of the block device
+    # # If set to "Volume", which is the default, then a Cinder volume is used to back the block device
+    # # If set to "Local", local ephemeral storage is used to back the block device
+    # type: Volume
+    # # The volume type to use
+    # # If not specified, the default volume type is used
+    # volumeType:
+    # # The volume availability zone to use
+    # # If not specified, the machine availability zone is used
+    # availabilityZone:
+
+# Settings for the Kubernetes API server
+apiServer:
+  # Indicates whether to deploy a load balancer for the API server
+  enableLoadBalancer: true
+  # Indicates what loadbalancer provider to use. Default is amphora
+  loadBalancerProvider:
+  # Restrict loadbalancer access to select IPs
+  # allowedCIDRs
+  #  - 192.168.0.0/16  # needed for cluster to init
+  #  - 10.10.0.0/16  # IPv4 Internal Network
+  #  - 123.123.123.123 # some other IPs
+  # Indicates whether to associate a floating IP with the API server
+  associateFloatingIP: true
+  # The specific floating IP to associate with the API server
+  # If not given, a new IP will be allocated if required
+  floatingIP:
+  # The specific fixed IP to associate with the API server
+  # If enableLoadBalancer is true, this will become the VIP of the load balancer
+  # If enableLoadBalancer and associateFloatingIP are both false, this should be
+  # the IP of a pre-allocated port to be used as the VIP
+  fixedIP:
+  # The port to use for the API server
+  port: 6443
+  # Log level
+  # 0: Errors
+  # 1: Config info and correctable errors (e.g unhealthy node)
+  # 2: System state changes
+  # 3: Extended system state change info
+  # 4: Debug
+  # 5: Trace
+  logLevel: 2
+  # The configuration for the built-in admission controllers
+  # This should be a map of the controller name to the configuration for the controller
+  admissionConfiguration:
+    # PodSecurity:
+    #   apiVersion: pod-security.admission.config.k8s.io/v1
+    #   kind: PodSecurityConfiguration
+    #   defaults:
+    #     enforce: baseline
+    #     enforce-version: latest
+    #     audit: restricted
+    #     audit-version: latest
+    #     warn: restricted
+    #     warn-version: latest
+    #   exemptions:
+    #     usernames: []
+    #     runtimeClasses: []
+    #     namespaces:
+    #       - kube-system
+
+# Set osDistro used. ubuntu, flatcar, etc.
+osDistro: ubuntu
+#
+# API server authentication/authorization webhook. Set this to
+# integrate into KubeadmControlPlane and KubeadmConfigTemplate
+# possible values: none, k8s-keystone-auth, azimuth-authorization-webhook
+authWebhook: none
+
+azimuthAuthorizationWebhook:
+  server:  # required, e.g https://example.com/authorize
+  webhookVersion: v1
+  timeout: 10s
+  failurePolicy: Deny
+  additionalAuthorizers:
+    - type: Node
+      name: node
+    - type: RBAC
+      name: rbac
+  tls:
+    enabled: true
+    cert:  # required
+  # Should at least include the values provided to .Values.protectedNamespaces in
+  # https://github.com/azimuth-cloud/azimuth-authorization-webhook/blob/main/chart/values.yaml
+  filteredNamespaces:
+  - kube-system
+  - openstack-system
+  extraPreFilters: []
+
+# Settings for the control plane
+controlPlane:
+  # The failure domains to use for control plane nodes
+  # If given, should be a list of availability zones
+  # Only used when omitFailureDomain = false
+  failureDomains:
+  # Indicates whether the failure domain should be omitted from control plane nodes
+  omitFailureDomain: true
+  # The number of control plane machines to deploy
+  # For high-availability, this should be greater than 1
+  # For etcd quorum, it should be odd - usually 3, or 5 for very large clusters
+  machineCount: 3
+  # The kubernetes version for the control plane
+  kubernetesVersion:
+  # The image to use for control plane
+  machineImage:
+  # The ID of the image to use for the control plane
+  machineImageId:
+  # The flavor to use for control plane machines
+  machineFlavor:
+  # The ports for control plane nodes
+  # If no ports are given, the cluster internal network is used
+  # See https://github.com/kubernetes-sigs/cluster-api-provider-openstack/blob/master/docs/book/src/clusteropenstack/configuration.md#network-filters
+  machineNetworking:
+    ports:
+  # The root volume spec for control plane machines
+  machineRootVolume:
+    # The size of the disk to use
+    # If not given, the ephemeral root disk from the flavor is used
+    diskSize:
+    # The volume type to use
+    # If not specified, the default volume type is used
+    # volumeType:
+    # The volume availability zone to use
+    # If not specified, the machine availability zone is used
+    # availabilityZone:
+  # Specific metadata for control plane nodes
+  machineMetadata: {}
+  # The ID of the server group to use for control plane machines
+  serverGroupId:
+  # Labels to apply to the node objects in Kubernetes that correspond to control plane machines
+  nodeLabels:
+    # my.company.org/label: value
+  # Additional block devices for control plane machines
+  additionalBlockDevices: {}
+    # # The key is the name for the block device in the context of the machine
+    # # It is also used to tag the block device, so that the volume can be identified in instance metadata
+    # scratch:
+    #   # The size of the block device
+    #   size: 20
+    #   # The type of the block device
+    #   # If set to "Volume", which is the default, then a Cinder volume is used to back the block device
+    #   # If set to "Local", local ephemeral storage is used to back the block device
+    #   # In both cases, the lifecycle of the device is the same as the machine
+    #   type: Volume
+    #   # The volume type to use
+    #   # If not specified, the default volume type is used
+    #   volumeType:
+    #   # The volume availability zone to use
+    #   # If not specified, the machine availability zone is used
+    #   availabilityZone:
+  # Indicates whether control plane machines should use config drive or not
+  machineConfigDrive: false
+  # The time to wait for a node to finish draining before it can be removed
+  nodeDrainTimeout: 5m0s
+  # The time to wait for a node to detach all volumes before it can be removed
+  nodeVolumeDetachTimeout: 5m0s
+  # The time to wait for the node resource to be deleted in Kubernetes when a
+  # machine is marked for deletion
+  nodeDeletionTimeout: 5m0s
+  # The remediation strategy for the control plane nodes
+  # We set these so that we don't keep remediating an unhealthy control plane forever
+  remediationStrategy:
+    # The maximum number of times that a remediation will be retried
+    maxRetry: 3
+    # The amount of time that a node created as a remediation has to become healthy
+    # before the remediation is retried
+    retryPeriod: 20m
+    # The length of time that a node must be healthy before any future problems are
+    # considered unrelated to the previous ones (i.e. the retry count is reset)
+    minHealthyPeriod: 1h
+  # The rollout strategy to use for the control plane nodes
+  # By default, the strategy allows the control plane to begin provisioning new nodes
+  # without first tearing down old ones
+  rolloutStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # For the control plane, this can only be 0 or 1
+      maxSurge: 1
+  # The kubeadm config specification for the control plane
+  # By default, this uses a simple configuration that enables the external cloud provider
+  kubeadmConfigSpec:
+    initConfiguration:
+      nodeRegistration:
+        name: '{{ local_hostname }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+    # As well as enabling an external cloud provider, we set the bind addresses for the
+    # controller-manager, scheduler and kube-proxy to 0.0.0.0 so that Prometheus can reach
+    # them to collect metrics
+    clusterConfiguration:
+      controllerManager:
+        extraArgs:
+          cloud-provider: external
+          bind-address: 0.0.0.0
+      scheduler:
+        extraArgs:
+          bind-address: 0.0.0.0
+    joinConfiguration:
+      nodeRegistration:
+        name: '{{ local_hostname }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+    kubeProxyConfiguration:
+      metricsBindAddress: 0.0.0.0:10249
+  # The machine health check for auto-healing of the control plane
+  # See https://cluster-api.sigs.k8s.io/tasks/healthcheck.html
+  healthCheck:
+    # Indicates if the machine health check should be enabled
+    enabled: true
+    # The spec for the health check
+    spec:
+      # By default, don't remediate control plane nodes when more than one is unhealthy
+      maxUnhealthy: 1
+      # If a node takes longer than 30 mins to startup, remediate it
+      nodeStartupTimeout: 30m0s
+      # By default, consider a control plane node that has not been Ready
+      # for more than 5 mins unhealthy
+      unhealthyConditions:
+        - type: Ready
+          status: Unknown
+          timeout: 5m0s
+        - type: Ready
+          status: "False"
+          timeout: 5m0s
+
+# Defaults for node groups
+# Each of these can be overridden in the specification for an individual node group
+nodeGroupDefaults:
+  # Indicates if the node group should be autoscaled
+  autoscale: false
+  # The failure domain for the node group
+  failureDomain:
+  # The flavor to use for machines in the node group
+  machineFlavor:
+  # Default image id for nodeGroup hosts
+  machineImage:
+  # The ID of the image to use for nodeGroup machines
+  machineImageId:
+  # Kubernetes version for nodeGroup machines
+  kubernetesVersion:
+  # The default networks and ports for worker nodes
+  # If neither networks or ports are given, the cluster internal network is used
+  # The default ports for worker nodes
+  # If no ports are given, the cluster internal network is used
+  # See https://github.com/kubernetes-sigs/cluster-api-provider-openstack/blob/master/docs/book/src/clusteropenstack/configuration.md#network-filters
+  machineNetworking:
+    ports:
+  # The root volume spec for machines in the node group
+  machineRootVolume:
+    # The size of the disk to use
+    # If not given, the ephemeral root disk from the flavor is used
+    diskSize:
+    # The volume type to use
+    # If not specified, the default volume type is used
+    # volumeType:
+    # The volume availability zone to use
+    # If not specified, the machine availability zone is used
+    # availabilityZone:
+  # Specific metadata for worker nodes
+  # Can also be specified for each node group
+  machineMetadata: {}
+  # The ID of the server group to use for machines in the node group
+  serverGroupId:
+  # Labels to apply to the node objects in Kubernetes that correspond to machines in the node group
+  # By default, nodes get the label "capi.stackhpc.com/node-group=<node group name>"
+  nodeLabels:
+    # my.company.org/label: value
+  # Additional block devices for node groups machines
+  # Options are the same as for controlPlane.additionalBlockDevices above
+  additionalBlockDevices: {}
+  # Indicates whether control plane machines should use config drive or not
+  machineConfigDrive: false
+  # The time to wait for a node to finish draining before it can be removed
+  nodeDrainTimeout: 5m0s
+  # The time to wait for a node to detach all volumes before it can be removed
+  nodeVolumeDetachTimeout: 5m0s
+  # The time to wait for the node resource to be deleted in Kubernetes when a
+  # machine is marked for deletion
+  nodeDeletionTimeout: 5m0s
+  # The rollout strategy to use for the node group
+  # By default, this is set to do a rolling update within the existing resource envelope
+  # of the node group, even if that means the node group temporarily has zero nodes
+  rolloutStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The maximum number of node group machines that can be unavailable during the update
+      # Can be an absolute number or a percentage of the desired count
+      maxUnavailable: 1
+      # The maximum number of machines that can be scheduled above the desired count for
+      # the group during an update
+      # Can be an absolute number or a percentage of the desired count
+      maxSurge: 0
+      # One of Random, Newest, Oldest
+      deletePolicy: Random
+  # The default kubeadm config specification for worker nodes
+  # This will be merged with any configuration given for specific node groups
+  # By default, this uses a simple configuration that enables the external cloud provider
+  kubeadmConfigSpec:
+    joinConfiguration:
+      nodeRegistration:
+        name: '{{ local_hostname }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+  # The default machine health check for worker nodes
+  # See https://cluster-api.sigs.k8s.io/tasks/healthcheck.html
+  # Note that maxUnhealthy or unhealthRange are evaluated per node group
+  healthCheck:
+    # Indicates if the machine health check should be enabled
+    enabled: true
+    # The spec for the health check
+    spec:
+      # We have a control place feature gate enabled which blocks all worker node remediation if
+      # control plane is unhealthy, so should be safe to reset worker remediation threshold to
+      # 100% without the risk of runaway remediations.
+      maxUnhealthy: 100%
+      # If a node takes longer than 30 mins to startup, remediate it
+      nodeStartupTimeout: 30m0s
+      # By default, consider a worker node that has not been Ready for
+      # more than 5 mins unhealthy
+      unhealthyConditions:
+        - type: Ready
+          status: Unknown
+          timeout: 5m0s
+        - type: Ready
+          status: "False"
+          timeout: 5m0s
+
+# The worker node groups for the cluster
+nodeGroups:
+  -  # The name of the node group
+    name: md-0
+    # The number of machines in the node group if autoscale is false
+    machineCount: 3
+    # The minimum and maximum number of machines in the node group if autoscale is true
+    # machineCountMin: 3
+    # machineCountMax: 3
+
+# Configuration for the cluster autoscaler
+autoscaler:
+  # The image to use for the autoscaler component
+  image:
+    repository: registry.k8s.io/autoscaling/cluster-autoscaler
+    pullPolicy: IfNotPresent
+    tag: v1.30.4
+  imagePullSecrets: []
+  # Any extra args for the autoscaler
+  extraArgs:
+    # Make sure logs go to stderr
+    logtostderr: true
+    stderrthreshold: info
+    # Output at a decent log level
+    v: 4
+    # Cordon nodes before terminating them so new pods are not scheduled there
+    cordon-node-before-terminating: "true"
+    # When scaling up, choose the node group that will result in the least idle CPU after
+    expander: least-waste,random
+    # Allow pods in kube-system to prevent a node from being deleted
+    skip-nodes-with-system-pods: "true"
+    # Allow pods with emptyDirs to be evicted
+    skip-nodes-with-local-storage: "false"
+    # Allow pods with custom controllers to be evicted
+    skip-nodes-with-custom-controller-pods: "false"
+
+  # Pod-level security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+  # Container-level security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    readOnlyRootFilesystem: true
+  # Resource requests and limits for pods
+  resources: {}
+  # Node selector for pods
+  nodeSelector: {}
+  # Tolerations for pods
+  tolerations: []
+  # Topology spread constraints for pods
+  topologySpreadConstraints: []
+  # Affinity rules for pods
+  affinity: {}
+
+# Configuration for cluster addons
+addons:
+  # Indicates if cluster addons should be deployed
+  enabled: true
+  # Keep the baseline usable on small general-purpose clusters. Hardware-specific
+  # operators are opt-in through a cluster profile.
+  nodeFeatureDiscovery:
+    enabled: false
+  nvidiaGPUOperator:
+    enabled: false
+  mellanoxNetworkOperator:
+    enabled: false
+  # Enable the openstack integrations by default
+  openstack:
+    enabled: true
