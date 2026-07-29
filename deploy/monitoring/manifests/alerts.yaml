@@ -52,4 +52,19 @@ spec:
           labels: {severity: warning}
           annotations:
             summary: No successful synthetic test report in eight hours
-
+    - name: platform.hardware
+      rules:
+        - alert: ControllerCPUTemperatureHigh
+          expr: max by (instance) (node_hwmon_temp_celsius{chip="platform_coretemp_0"}) > 90
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: Controller CPU temperature is high
+            description: "CPU temperature on {{ $labels.instance }} has exceeded 90°C for five minutes."
+        - alert: ControllerCPUTemperatureCritical
+          expr: max by (instance) (node_hwmon_temp_celsius{chip="platform_coretemp_0"}) > 100
+          for: 1m
+          labels: {severity: critical}
+          annotations:
+            summary: Controller CPU temperature is near thermal shutdown
+            description: "CPU temperature on {{ $labels.instance }} has exceeded 100°C. The hardware critical threshold is approximately 107°C."
