@@ -15,3 +15,11 @@ Install with:
 ./scripts/install.sh
 ```
 
+The installer rejects an index that points at the retired
+`magnum-workload-chart-repository.capi-system` service. Repackage the chart and
+regenerate `index.yaml` with:
+
+```bash
+helm repo index helm/repositories/magnum-workload \
+  --url http://magnum-chart-repository.openstack.svc.cluster.local
+```

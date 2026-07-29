@@ -12,6 +12,9 @@ spec:
   identityRef:
     name: {{ include "openstack-cluster.cloudCredentialsSecretName" . }}
     cloudName: {{ .Values.infrastructureCloudName }}
+    {{- with .Values.infrastructureClusterIdentityRegion }}
+    region: {{ . }}
+    {{- end }}
   {{- with .Values.controlPlaneEndpoint }}
   controlPlaneEndpoint: {{ toYaml . | nindent 4 }}
   {{- end }}

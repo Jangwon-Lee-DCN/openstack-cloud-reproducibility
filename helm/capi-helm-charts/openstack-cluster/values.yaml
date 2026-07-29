@@ -6,6 +6,11 @@ cloudCredentialsSecretName:
 # Optional region used only by CAPO infrastructure reconciliation. This lets
 # the same clouds.yaml retain a VM-routable service-catalog region for CCM/CSI.
 infrastructureCloudName: openstack
+infrastructureMachineCloudName: ""
+# Compatibility only for upgrading clusters created by older chart renders.
+# New clusters should leave the identity region empty so CAPO and CCM produce
+# the same canonical openstack:///UUID provider ID.
+infrastructureClusterIdentityRegion: ""
 # OR
 # Content for the clouds.yaml file
 # Having this as a top-level item allows a clouds.yaml file from OpenStack to be used as a values file

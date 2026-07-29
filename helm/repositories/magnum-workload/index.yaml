@@ -3,7 +3,7 @@ entries:
   openstack-cluster:
   - apiVersion: v2
     appVersion: 89ad40e
-    created: "2026-07-29T07:25:03.794258864Z"
+    created: "2026-07-29T09:23:39.677137299Z"
     dependencies:
     - alias: addons
       condition: addons.enabled
@@ -12,10 +12,10 @@ entries:
       version: '>=0-0'
     description: Helm chart for deploying a cluster on an OpenStack cloud using Cluster
       API.
-    digest: 68dcc1c0b1359db4ae76001d9b935ec788456e58b1e0165b528344d39357aec7
+    digest: a8b798c279f40b4a4b5bbde25e65f311465e6d89ce37fa6fe9d79b3fb99ce865
     name: openstack-cluster
     type: application
     urls:
     - http://magnum-chart-repository.openstack.svc.cluster.local/openstack-cluster-0.26.0.tgz
     version: 0.26.0
-generated: "2026-07-29T07:25:03.775258726Z"
+generated: "2026-07-29T09:23:39.66055596Z"
