@@ -57,7 +57,7 @@ images:
     tags:
         db_drop: ENC[AES256_GCM,data:H7Aa3IJus2iAKvxcIRymOOkGXeMXxQ6rPTeMc4wWqqo8JwwtSfaqTH/riu+eaUcCPcjDmz4j,iv:WPNZIqkPayM1Qsw55uVYBKqDmhqRdXS0taJDjXamd3M=,tag:BpfGS2X+fDOToXZ2yRP7yA==,type:str]
         db_init: ENC[AES256_GCM,data:l3qxJTQMOoCJEOtb6IdVM5vs/hUN29RbYiFETG8N5hYGFa5+JGPl9YpNdKNc4D1cMTmrjWWg,iv:QmzCVXPPN5cMpKbkdvNxkdUKBvVXaQBwjSuu6UkiTiQ=,tag:VuKPamzkkvwEu1ZLIlFG3w==,type:str]
-        horizon: ENC[AES256_GCM,data:+V+ImHYzP0cGIzWA8SWW9NPWLgwIww0qMGDvDAKsldTFNZ0PKlEYmgsyVYmxthS/zZ71aEm5Qd9UDw28rCZgLhBMI1eAHsFgH40vLal4OxTTUjs+Rhv/0PNfPCba72wnStsnZVXujVao8WpWcGH9yw==,iv:7/aX54J0+Fu/MZ6y8yRnlYramL9/leG2+9lUmsB0LSU=,tag:9XfIOf66nO6wocEi6tt5LQ==,type:str]
+        horizon: ENC[AES256_GCM,data:R/96jcIx+vhYfnJy1OiHbkpEqNXqwQh8HHL3Mri3E75kqF+HE+AicOB/LfMjGjJPWdEyUrdgHb7pYD3DP1E6TB+yuGojL3NwEAtoeOWnv8Fvw2VjGEsxQBSCY0IfvyoQY/1GWcFJkuYcRPImHiDDtw==,iv:w9O6SVaq+QnOFxBMDlElQTJmUO6f1Ud4te6QKSkR2VM=,tag:gIvx56Hamm5p6xTu7VbK6A==,type:str]
         horizon_db_sync: ENC[AES256_GCM,data:aghfWQgnFQcCgv9WOTH08r02a04b4nDVYm2L/ktz4keDKof7VWnwpJYjp3rF,iv:xMQLnIz0ECRUepKK03IZatjYf82xS2l2tLLQkdkI3HI=,tag:QJdiRvCgLAxFIDy6vNK2qQ==,type:str]
 manifests:
     ingress_api: ENC[AES256_GCM,data:JLOFl6w=,iv:MIUK5Tu8/78ybzIN+3fzPMW5kOb0n6b77+A7uexCDuc=,tag:UVnXNLJrhcfsWZzAmhaJWg==,type:bool]
@@ -86,7 +86,7 @@ sops:
             k2oCZJgJ/xHuZbQ5KU8MXwNKS5f2DtW2RtVqJk+tRpjdPtMXGDceeQ==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-26T16:46:50Z"
-    mac: ENC[AES256_GCM,data:ioa5rR9yqqWMEzNmRnDpsX8JDaJmbZs5MzuNCrhSlny0tRVAUsw+v13QOaepiuAAUjeeixTIts1+P3EtZ3vD/Gl0BaC7S6WOb30e5oYc2QCG0FGR1tlVpd0QTry61Klh4tu77rlKVPtFBFmWxcs+6Bb7CbcmjIBnOrQWWmCr/a8=,iv:CC+0NoEF4Esm672dS0GVbpR7EjetDbFIiBslzewdzf0=,tag:287F3SJEn1eWNJfgszWtsA==,type:str]
+    lastmodified: "2026-07-30T09:45:28Z"
+    mac: ENC[AES256_GCM,data:sBi8hSxge1jZWXn/IuyHT4jDNXwRaU8UsCuwYB4cOSRithqTF/Kau1dHV1iMiFX2UEVD+ngP/POVwGZKC3lz7GFAu6046Rc0/IpMAcBHq337Aqiu1NuXl+tPbEGMEquJjbBwLALrWahShluFba12dDDWx0CLM9SPBWv4MDFMWAo=,iv:cmcEjJbCo12ojs2BkdK3dQ46QXkvyimJb9Fxl3AaTOk=,tag:PToHOP/2KN+TRS588yyqrw==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3
