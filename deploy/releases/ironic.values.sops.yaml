@@ -59,7 +59,7 @@ endpoints:
             admin:
                 password: ENC[AES256_GCM,data:TuNPXX6bBuhZk1WhWoOPgGzeQ+yHQ/hxbGHCrK+g7ZY/nTOP1q/g575+xzMKudtuUQvKtdkkD9DymddO5ayhSg==,iv:i0NSgoc+YbF8HgYsrIqom8sqeC5rFcxwX5vntzIJUzA=,tag:mIrkgNowPov+JKD+hJ101A==,type:str]
             ironic:
-                password: ENC[AES256_GCM,data:bSVYhXBUDhznzgb0W3+JccT60iKYTSR2zh+Em7OaVvktbtlFqD+Cz8jKp/ZOlmiK,iv:GOiqhz/JVtwgnt4UedFZ+uPMcbJS1a0SOvO2Um5s2oE=,tag:66VY7NTcOcaJAB9D3rsucw==,type:str]
+                password: ENC[AES256_GCM,data:yQhTYBqa03q/QMEQsJnZBjOx0BljtmTpUQsRjmqRARZ9pmcEF3cVxMqsMS71nhr/DDi3+Cv0Ne+rRMBzSp2phg==,iv:TaKsaOk6FWvFKdYDFvPfXGs/4vmgBTgph69A9zfzgo8=,tag:RC5U0gSWXawxwQRSFuiKmQ==,type:str]
 images:
     tags:
         bootstrap: ENC[AES256_GCM,data:gKtCG8kMrF5WEjKUkABJNrHvPYTPAppFqvXGjmpNHEho+GmdDCeO9KlDFGxlV+cMdxq4s1z9,iv:He3TGjcimcWj+iT9HnJDgxnRAV7p3tULKjdMih1lnaI=,tag:7XNfmtZ3RR4TQxiDaP8nkw==,type:str]
@@ -106,7 +106,7 @@ sops:
             atT1YpS4LEr4CFxiRRjARFBM6Q/glR+Lq6Qx5VvjkfiHbjjIvTa3sA==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-26T10:29:37Z"
-    mac: ENC[AES256_GCM,data:5VhbybpgvObLmmatIcNdYNhjtb8uZuWiXCW3Ec/cQ5BtqWSA0V9SEmThsYxWS7qb/VrQhVugEdloEq46OsmB18ofM4Hub7W5JHUsHvHGKe7q7dxSghTeSdn6CGKd3rxjZMlmGb/YKvGLq9K/Byr13KU28OzF9Ctbh7Zg0KW7U0Y=,iv:YHEnGwHjAtX0CdehbjIEByQD6nLf3BZd1E9OHZl73BI=,tag:/iryM7I607WWyHAL1y5nGQ==,type:str]
+    lastmodified: "2026-07-30T13:43:51Z"
+    mac: ENC[AES256_GCM,data:ZYcI0FWNsUNn69kUxlSbNZkV3o04gFmc2oGYSdz6bkUxwhpspyBA53HcLDqwakkbKxE+LC7Gnh17qlcBBgf68FlHk4txAZp0+r12u/m7au0AKG72fliuo0r/TN8HkDQb30o5YzPYgRL4ocSKlGYryraDpXQp6sNfo1f5tdiP1Ks=,iv:jWN/rbIB8AISxKzcnA6h1IYONnRwsmGs0uR0+toJoDw=,tag:5JnrhD7tD/TRb8NGbYxmcQ==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

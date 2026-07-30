@@ -93,6 +93,15 @@ spec:
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp
+            # The init script creates DEFAULT.tempdir here. This must be the
+            # same emptyDir mounted by the conductor container; otherwise the
+            # directory exists only in the init container's writable layer.
+            - name: pod-data
+              mountPath: /var/lib/openstack-helm
+            - name: ironic-etc
+              mountPath: /etc/ironic/ironic.conf
+              subPath: ironic.conf
+              readOnly: true
             - name: ironic-bin
               mountPath: /tmp/ironic-conductor-init.sh
               subPath: ironic-conductor-init.sh
@@ -155,6 +164,19 @@ spec:
             privileged: true
           command:
             - /tmp/ironic-conductor.sh
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - >-
+                  awk '$3 ~ /:1628$/ && $4 == "01" { found=1 }
+                  END { exit(found ? 0 : 1) }'
+                  /proc/net/tcp /proc/net/tcp6
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp

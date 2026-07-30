@@ -41,6 +41,14 @@ if [ -n "${ironictmpdir}" -a ! -d "${ironictmpdir}" ]; then
   chmod 1777 "${ironictmpdir}"
 fi
 
+# The iPXE interface writes boot.ipxe while drivers are loaded, even when
+# the chart's HTTP sidecar is disabled for a control-only deployment.
+# Create the configured shared HTTP root before the conductor starts.
+ironichttproot=$(python -c 'from configparser import ConfigParser;cfg = ConfigParser();cfg.read("/etc/ironic/ironic.conf");print(cfg.get("deploy", "http_root", fallback=""))')
+if [ -n "${ironichttproot}" -a ! -d "${ironichttproot}" ]; then
+  mkdir -p "${ironichttproot}"
+fi
+
 tee /tmp/pod-shared/conductor-local-ip.conf << EOF
 [DEFAULT]
 
