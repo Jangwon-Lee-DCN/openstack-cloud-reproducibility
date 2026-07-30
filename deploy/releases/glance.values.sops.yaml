@@ -6,7 +6,7 @@ endpoints:
     identity:
         auth:
             admin:
-                password: ENC[AES256_GCM,data:1UTAspLOpIemLkONc64QKrwyMrYzt17pscKkWrOEbt378MhUtj6JYfuPmf+Z/vUjRSbSMlKyUU+p6AjsuHT/LA==,iv:05ikHeGwEC/HbT36OTTzBTKDOhaVW+zKyr51x+CfuGE=,tag:0+n5A/QOQrp3ZQmI4DXsOA==,type:str]
+                password: ENC[AES256_GCM,data:QOyz1FKKtr2jh/WfTBYA4a82pYp6IupO3qt2VwC/iAaJGjA9OFBE9HkYd4RCl1yGZRulJ/kCLQrG0EWTVlG+eA==,iv:uhEwwBgiQ3caNx8AznjVbjk7PQ0UbWvbo3GC5Ui9XwU=,tag:1f/sUFkXKXWX7f+6VC1D/w==,type:str]
                 project_name: ENC[AES256_GCM,data:d67tqxo=,iv:EX7sYc3xJfnNgQtgez1YqDtNu1/XUhTVghputbmOVNE=,tag:sI0KbVl740yaZu5yLwfErQ==,type:str]
                 region_name: ENC[AES256_GCM,data:WAR7XUZ2gunA,iv:AxPgJv8DrOOZ0OaJQxmlehXeNoXaCdPvjvrlJEbtWH4=,tag:rAp+F+SN8KB4y4HnBEeB1Q==,type:str]
             glance:
@@ -74,7 +74,7 @@ sops:
             FfQc1wkVB/67d0NMR8N7FrlVhycBFmrhKEXwth79Ny3sh3uPBc9wWg==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-26T10:29:36Z"
-    mac: ENC[AES256_GCM,data:nzsnjKtD0KbxZRvFY3rnBAtm6G9YRGKMREq+B7Feu0qFgHdD73tMn9gEXjS6CqORFSkz/d0yKtD+c5RkK7+1LrDRSEDefL1yE4xj4MByuCoATnJYFKSIOU7rU6DPQChO61jug2GnKm7B1q8MKq3oeWOK5lFXT4PWUUcbKRUxxcU=,iv:HWkWp0ZcoHI3eATfF2aCrovrZvfofNN3IiFx9HZvK/M=,tag:ubNm4pjK/2ZyHtPbk5nthg==,type:str]
+    lastmodified: "2026-07-30T09:28:45Z"
+    mac: ENC[AES256_GCM,data:0/65ShBw7xA6sY94FjKYLfF76rRr90295SiPT1oNqzS+cvBhesfdwC38EqvQFbGBnDkMKue/RnKnH2qYZPBycFeG9aZlSDASNi2R4tDlRi1AiEjo7/W7dU5Ks6jz69d59n2Mx6tMegpg9TcxsA04rJFkfUHB5p9b188cEp3+YuQ=,iv:/W9Wgi8XwfWpF5AiAYlj8+iE+I8Yj1/Wik+puPWqdF4=,tag:BliUYR5ynnHGPVUDMcXJ4Q==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

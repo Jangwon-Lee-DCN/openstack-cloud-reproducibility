@@ -14,7 +14,7 @@ endpoints:
     identity:
         auth:
             admin:
-                password: ENC[AES256_GCM,data:IhlHM9+2BYja8nPtVleRBD+VkqpfVO9xmY1Vp0IzDAJs/MAsC8nm31BxSCTRfLk3cXKu6zXlfWohBXkokqfB3g==,iv:9GA3Z6UT65v6SkoDAEv2EhW+/aPbRXJ39I/gn8Dh59Q=,tag:7BVxyUkGOth9929cbGQ5OA==,type:str]
+                password: ENC[AES256_GCM,data:vvBBs2GthzclSpbqb2GGPX0BtPr4tS5w4acdjwPEW9zqcOUyvIrinz3Y3ZgKJ/DjhbzE/922GjD48r4PSyGjFg==,iv:hcBvoHfs5RaOF7FTxKSQ1xZi+VWh0BnT6rF9EBuBeus=,tag:AW2Nhcvj7csitQvx4tnEfA==,type:str]
                 project_name: ENC[AES256_GCM,data:ARX9kYE=,iv:wo6jI8tT7FsP248dyk+xiyONIR6jzF8c8DhZ07+1CD0=,tag:gjf8tp1XnYtTRIYwItDB2Q==,type:str]
                 region_name: ENC[AES256_GCM,data:uvr6hem7Uu2k,iv:EJY0MXT0emoey3fqsC09e7aoYqgBJONIr/73LuNladY=,tag:7SzFjOp/z0nyTUAMtJO9VA==,type:str]
             cinder:
@@ -104,7 +104,7 @@ sops:
             LayNILrjsoAXyTPQ3SZH4XfXKFVc/OaEUUCLSJdNfY8Rin6czcvnOQ==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-26T10:29:36Z"
-    mac: ENC[AES256_GCM,data:SJ6LsaulGDvbboXLKws4L1E/IwyqLu5Kw7stwLYoFVpj9Xx7Ebe1p3fU6QTTQGzPPiYBTOlLFngtS0Awx4InC8w3txJs6G3zSwuMZY1tH3ItbagkNoqJFvBBm+u1zKRJrhsPqXQ0p2w7ydavU5EOxMMQjF89J8IYdMmBq167aQ8=,iv:TsAGQalrqoeTbAFRsFBmImPzJkMnwYc4kG4a2eZf4fA=,tag:6yPvXrZ9pjhQAKDMv7aKhQ==,type:str]
+    lastmodified: "2026-07-30T09:28:45Z"
+    mac: ENC[AES256_GCM,data:MZe6QP0OsaLK4hUB+1ymTRy0oTSpPEe9DSK/K6sWOaS045JgW9KtFIvvYsV38tZarWl1w0ZEbq9+YdY8RqusaN18LjKJ1Le6rf/XavWZkjk9NqSa8J9tmyiH6AzSz/lMi9NRInwsAbJq+JDhcdgKqEVIN2nPEqRO+boji2u6gk0=,iv:yCgC6O++Rbxj4bjrKUYDlOd1QFMg5wRfXjl20kU2ivk=,tag:fSRCUI1IY3Zm55iUyANtZw==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

@@ -21,6 +21,39 @@ print(x[field])
 PYLOCK
 }
 
+validate_admin_passwords() {
+  local canonical_digest="" digest password release snapshot
+
+  while read -r release snapshot; do
+    if ! password=$(sops -d \
+      --extract '["endpoints"]["identity"]["auth"]["admin"]["password"]' \
+      "$REPO_ROOT/$snapshot" 2>/dev/null); then
+      continue
+    fi
+    digest=$(printf '%s' "$password" | sha256sum | awk '{print $1}')
+    unset password
+    if [[ -z "$canonical_digest" ]]; then
+      canonical_digest=$digest
+    elif [[ "$digest" != "$canonical_digest" ]]; then
+      echo "$release has a different Keystone admin password in $snapshot" >&2
+      echo "refusing reconciliation because repeated failures can lock the admin account" >&2
+      exit 1
+    fi
+  done < <(
+    python3 - "$LOCK_FILE" <<'PYLOCK'
+import sys
+import yaml
+
+with open(sys.argv[1]) as stream:
+    lock = yaml.safe_load(stream)
+for release in lock["spec"]["releases"]:
+    snapshot = release.get("valuesSnapshot")
+    if snapshot:
+        print(release["name"], snapshot)
+PYLOCK
+  )
+}
+
 wait_release() {
   local release=$1 obj
   if kubectl get jobs -n "$NAMESPACE" -l "release_group=$release" -o name | grep -q .; then
@@ -65,6 +98,8 @@ cleanup() {
   rmdir "$WORK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
+
+validate_admin_passwords
 
 if [[ "$BUILD_IMAGES" == "1" ]]; then
   "$REPO_ROOT/deploy/scripts/build-images.sh"

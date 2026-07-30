@@ -31,7 +31,19 @@ Site overrides pin `rabbit_init` to
 `quay.io/airshipit/rabbitmq:3.10.18-management`; the default Docker Hub image
 was unreliable through the local registry path. Existing Rook pools use the
 standard `rbd` application tag, so Glance and Cinder storage-init overrides
-must retain that tag. Secrets are stored only in age/SOPS-encrypted values. The Nova storage-init template is site-patched to pass Ceph's explicit confirmation flag when setting a pool to replication 1. Glance, Cinder, and Nova PoC RBD pools are configured for replication 1; this is never a production recommendation.
+must retain that tag. Secrets are stored only in age/SOPS-encrypted values.
+The Nova storage-init template is site-patched to pass Ceph's explicit
+confirmation flag when setting a pool to replication 1. Glance, Cinder, and
+Nova PoC RBD pools are configured for replication 1; this is never a
+production recommendation.
+
+All release snapshots must carry the same
+`endpoints.identity.auth.admin.password`. The full-stack reconciler compares
+their digests before changing the cluster and stops on a mismatch. A mismatch
+causes service hooks to retry invalid credentials and can trigger Keystone's
+admin-account lockout policy; it is not a propagation delay. Existing Pods
+that consume these Secrets through environment variables must be recreated
+after the Secret is corrected.
 
 The provider network `public` is ACTIVE with physical network `external`, CIDR `192.168.21.0/24`, gateway `192.168.21.1`, DHCP disabled, and the inclusive allocation pool `192.168.21.100-192.168.21.200`. The exposed `client.cinder` key was revoked and rotated on 2026-07-25; Cinder, Libvirt, and Nova compute were restarted and an RBD volume create/delete smoke test passed.
 
