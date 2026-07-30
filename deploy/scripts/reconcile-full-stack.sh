@@ -39,6 +39,12 @@ install_release() {
     "$REPO_ROOT/deploy/scripts/reconcile-octavia.sh"
     return
   fi
+  if [[ "$1" == "neutron" ]]; then
+    sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" \
+      | kubectl apply -f -
+    kubectl apply \
+      -f "$REPO_ROOT/deploy/manifests/neutron-harbor-serviceaccounts.yaml"
+  fi
   local release=$1 package snapshot expected actual values
   package=$(release_field "$release" package)
   snapshot=$(release_field "$release" valuesSnapshot)

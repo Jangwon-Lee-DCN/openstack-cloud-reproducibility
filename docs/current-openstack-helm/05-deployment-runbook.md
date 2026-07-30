@@ -13,7 +13,8 @@ The PoC execution started on 2026-07-25 with the pinned OpenStack-Helm
 6. `cinder` using `cinder.volumes` and `cinder.backups` through RBD
 7. `openvswitch` on both provider-connected nodes
 8. `ovn` with three-member NB/SB databases, two northd replicas, and two gateway chassis
-9. `neutron` with two API replicas and OVN metadata agents on both nodes
+9. `neutron` with two API replicas, OVN metadata agents on both nodes, and
+   FWaaS v2 using the upstream OVN service driver
 10. `libvirt` and `nova`, with HA control services and one KVM compute on `cloud-controller-0`
 11. `heat` with two API, CFN, and engine replicas
 12. `horizon` with two dashboard replicas

@@ -2,7 +2,7 @@ endpoints:
     identity:
         auth:
             admin:
-                password: ENC[AES256_GCM,data:cim4cDucJJkQfit/TftvvjR5oJbEhz3VlP5IWYtlJvOevzDy5y8BcTP5/1KKKJ++MvkO0+cnaF4ZjXIhO8n9Tg==,iv:TiAuq5JxBQ65w3VapbZ2CkDMP38Q4NYBoBgYroQCT2I=,tag:zmfmHyoNk+jKrqf2ghmODg==,type:str]
+                password: ENC[AES256_GCM,data:+Uf1J83K/WDDSU/OxTyxF0QRXUEVBGl8px4qVFRxOpSfWDyl5viqaTaZbkmx94zSpMz/0/g/OWquSXA9TudXjw==,iv:WtwMdFROAeG+Gqq7uYVZO473rqSGS/mIekcH2Sn6Mng=,tag:/G0EtfU0XkuLmcLCmFzfhg==,type:str]
                 project_name: ENC[AES256_GCM,data:3nPCeTY=,iv:OpSrd43xjyIUEL012KNZhIwOkAY/k6BqsXkbaA12yEM=,tag:H7/X6fIZ+rqygODOtv53Cg==,type:str]
                 region_name: ENC[AES256_GCM,data:QpTTU50qqjor,iv:x1lqLKYBg1LtVlEIXpOkOZkHNvNn1TMZ4rWwtwYf8wc=,tag:VRD08S0gbKrVtv/kTByK5g==,type:str]
             test:
@@ -68,7 +68,7 @@ sops:
             6h+l8dFf3P+Z6NW5O98z6HIezi9O3Mc7BF7vrDZxSTvymjq9sFvgRA==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-30T08:11:17Z"
-    mac: ENC[AES256_GCM,data:vEXGzb8EHCwNyaXjX2Clv44+S0XIO1O7+lYS80xY/S5IcQywATcDJlunZVncZfg9mbZmWnfejki6YRsl1IfUVP+zNt760sTyIkH8Y8dKC1Ghgg5ZU0/9h1I8ganPc130BEiLKtwvHZwakF2i0dLI54TjgEJMMhzlkOlKSq6ZF8I=,iv:TI0mdTc6Z0lO39llI5S3qBBzyPMwZi16DX6EN14zC3Q=,tag:XLjA9tmIwMLowzO14X/sxA==,type:str]
+    lastmodified: "2026-07-30T08:58:17Z"
+    mac: ENC[AES256_GCM,data:ditY56YoKw+6cA0Pr+SLE7I4fyKVGcGtj1NwC7MpxNXv+jxPsoVkMsEhBSUvf4w/4L5J13jej2PlMysY4dd9hd0E0HXcip1miNrqnaLk7cLSfW8qcEjq4eKLmvlDfAJ9dy9BPNmyamrBQAmloSRkxWGbBNRq7pNytAH1uduSl1s=,iv:KHxkxxW8avFekva/0eeXPIZtWQt3cBnNmbzSoiTCfPs=,tag:Y56mqte2PlWUnf2srZHXbg==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

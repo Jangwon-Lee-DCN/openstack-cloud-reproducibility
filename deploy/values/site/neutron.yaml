@@ -12,13 +12,17 @@ pod:
         min_available: 1
 images:
   tags:
+    neutron_db_sync: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:511e99c211303233f5a4778956490d415451911b1bcf175a6343c0edc6cef16f
+    neutron_server: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:511e99c211303233f5a4778956490d415451911b1bcf175a6343c0edc6cef16f
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
   neutron:
     DEFAULT:
       global_physnet_mtu: 1500
       router_distributed: true
-      service_plugins: ovn-router
+      service_plugins: ovn-router,firewall_v2
+    service_providers:
+      service_provider: FIREWALL_V2:fwaas_db:neutron_fwaas.services.firewall.service_drivers.ovn.firewall_l3_driver.OVNFwaasDriver:default
   plugins:
     ml2_conf:
       ml2:

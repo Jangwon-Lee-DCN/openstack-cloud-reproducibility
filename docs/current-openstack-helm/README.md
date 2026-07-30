@@ -25,7 +25,8 @@ namespace:
   backup worker; volumes and backups use dedicated RBD pools
 - `openvswitch` and `ovn` on both provider-connected nodes; OVN NB and SB use
   three-member Ceph-backed databases and both nodes are gateway chassis
-- `neutron` with two API replicas and two OVN metadata agents
+- `neutron` with two API replicas, two OVN metadata agents, and FWaaS v2 using
+  the upstream OVN service driver
 - `libvirt` and `nova`; Nova control services have two replicas and
   `cloud-controller-0` is registered as the active KVM compute
 - `heat` with two API, CFN, and engine replicas
@@ -168,3 +169,4 @@ on a dedicated provisioning VLAN and hardware inventory.
 - [Deployment runbook](docs/05-deployment-runbook.md)
 - [Provider bridge runbook](docs/06-provider-bridge-runbook.md)
 - [Neutron network acceptance](docs/07-network-acceptance.md)
+- [Neutron FWaaS v2 with ML2/OVN](docs/11-neutron-fwaas-v2.md)
