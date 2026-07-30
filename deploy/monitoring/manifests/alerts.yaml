@@ -68,3 +68,54 @@ spec:
           annotations:
             summary: Controller CPU temperature is near thermal shutdown
             description: "CPU temperature on {{ $labels.instance }} has exceeded 100°C. The hardware critical threshold is approximately 107°C."
+    - name: vpc-control-plane.operations
+      rules:
+        - alert: VPCControllerReconcileErrors
+          expr: sum by (controller) (rate(controller_runtime_reconcile_errors_total[5m])) > 0
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: VPC controller reconciliation is failing
+            description: "Controller {{ $labels.controller }} has returned errors for ten minutes."
+        - alert: VPCControllerReconcileLatencyHigh
+          expr: histogram_quantile(0.99, sum by (le, controller) (rate(vpc_reconcile_duration_seconds_bucket[10m]))) > 10
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: VPC controller reconciliation latency is high
+            description: "Controller {{ $labels.controller }} p99 reconcile latency exceeds 10 seconds."
+        - alert: VPCSecurityGroupExternalPortViolation
+          expr: increase(vpc_security_group_external_port_violations_total[10m]) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: VPC Security Group was found on an external port
+            description: "Security Group {{ $labels.security_group }} in {{ $labels.project_namespace }} was detached from an out-of-VPC port."
+        - alert: VPCElasticIPAssociationFailures
+          expr: increase(vpc_elastic_ip_association_failures_total[10m]) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: Elastic IP association failed
+            description: "Elastic IP operations failed with reason {{ $labels.reason }} in {{ $labels.project_namespace }}."
+        - alert: VPCProjectCredentialBindingMissing
+          expr: |
+            kube_namespace_labels{namespace=~"vpc-[0-9a-f]{32}"}
+              unless on(namespace)
+            kube_secret_info{secret="openstack-credentials"}
+          for: 10m
+          labels: {severity: critical}
+          annotations:
+            summary: VPC project credential binding is missing
+            description: "Namespace {{ $labels.namespace }} has no openstack-credentials Secret."
+        - alert: VPCControllerRolloutUnavailable
+          expr: kube_deployment_status_replicas_unavailable{namespace="vpc-control-plane-system",deployment=~"vpc-control-plane-controller-manager|vpc-facade"} > 0
+          for: 10m
+          labels: {severity: critical}
+          annotations:
+            summary: VPC control-plane rollout has unavailable replicas
+            description: "Deployment {{ $labels.deployment }} has unavailable replicas for ten minutes."
+        - alert: VPCNeutronConflictResponses
+          expr: increase(vpc_neutron_conflicts_total[10m]) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: VPC controller received Neutron HTTP 409
+            description: "{{ $labels.controller }} operation {{ $labels.operation }} received a conflict response."

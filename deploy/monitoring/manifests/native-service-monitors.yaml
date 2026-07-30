@@ -35,4 +35,59 @@ spec:
     - port: http
       interval: 60s
       scrapeTimeout: 30s
-
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpc-control-plane-prometheus-metrics-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vpc-control-plane-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: kube-prometheus-stack-prometheus
+    namespace: monitoring
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vpc-control-plane
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: vpc-control-plane
+spec:
+  namespaceSelector:
+    matchNames: [vpc-control-plane-system]
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: vpc-control-plane
+  endpoints:
+    - port: https
+      path: /metrics
+      scheme: https
+      interval: 30s
+      scrapeTimeout: 10s
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        insecureSkipVerify: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vpc-facade
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: vpc-control-plane
+spec:
+  namespaceSelector:
+    matchNames: [vpc-control-plane-system]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vpc-facade
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
