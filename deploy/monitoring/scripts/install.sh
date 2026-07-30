@@ -71,6 +71,7 @@ kubectl apply \
   -f "${ROOT}/manifests/native-service-monitors.yaml" \
   -f "${ROOT}/manifests/blackbox-probes.yaml" \
   -f "${ROOT}/manifests/dashboard.yaml" \
+  -f "${ROOT}/manifests/vpc-control-plane-dashboard.yaml" \
   -f "${ROOT}/manifests/alerts.yaml" \
   -f "${ROOT}/manifests/synthetic-test.yaml" \
   -f "${ROOT}/manifests/tempo-bucket.yaml"
@@ -95,4 +96,3 @@ kubectl apply -f "${ROOT}/manifests/tempo-datasource.yaml"
 
 "${ROOT}/scripts/verify.sh"
 printf 'STOP: step 8 was not installed; discuss the tenant VM agent policy.\n'
-

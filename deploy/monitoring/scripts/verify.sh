@@ -11,6 +11,7 @@ kubectl -n monitoring get probe openstack-public-api \
 kubectl -n monitoring get servicemonitor openstack-exporter \
   openstack-rabbitmq
 kubectl -n monitoring get prometheusrule openstack-platform
+kubectl -n monitoring get configmap grafana-dashboard-vpc-control-plane
 kubectl -n openstack get cronjob openstack-synthetic-test
 
 prometheus_ip="$(kubectl -n monitoring get pod \
@@ -22,6 +23,8 @@ for query in \
   'probe_success{job="openstack-public-api"}' \
   'mysql_up' \
   'up{job="rabbitmq"}' \
+  'up{namespace="vpc-control-plane-system",service=~"vpc-control-plane-controller-manager-metrics-service|vpc-facade"}' \
+  'vpc_reconcile_duration_seconds_count' \
   'openstack_synthetic_success'; do
   result="$(curl --fail --silent --get \
     --data-urlencode "query=${query}" \
@@ -33,4 +36,3 @@ done
 
 printf 'PASS: steps 1-7 resources and Prometheus queries are present.\n'
 printf 'STOP: step 8 tenant VM telemetry requires operator discussion.\n'
-

@@ -1,0 +1,342 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-vpc-control-plane
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  vpc-control-plane.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "Operational health of the VPC control plane, Security Groups, Elastic IPs, and Neutron integration.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "type": "row",
+          "title": "Overview",
+          "collapsed": false,
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+          "panels": []
+        },
+        {
+          "type": "stat",
+          "title": "Manager Replicas Ready",
+          "description": "Ready replicas / desired replicas for the controller manager.",
+          "targets": [
+            {
+              "expr": "max(kube_deployment_status_replicas_ready{namespace=\"vpc-control-plane-system\",deployment=\"vpc-control-plane-controller-manager\"}) / clamp_min(max(kube_deployment_spec_replicas{namespace=\"vpc-control-plane-system\",deployment=\"vpc-control-plane-controller-manager\"}), 1)",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "red", "value": null},
+                  {"color": "yellow", "value": 0.5},
+                  {"color": "green", "value": 1}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+          "gridPos": {"h": 5, "w": 4, "x": 0, "y": 1}
+        },
+        {
+          "type": "stat",
+          "title": "Facade Replicas Ready",
+          "description": "Ready replicas / desired replicas for the facade API.",
+          "targets": [
+            {
+              "expr": "max(kube_deployment_status_replicas_ready{namespace=\"vpc-control-plane-system\",deployment=\"vpc-facade\"}) / clamp_min(max(kube_deployment_spec_replicas{namespace=\"vpc-control-plane-system\",deployment=\"vpc-facade\"}), 1)",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "red", "value": null},
+                  {"color": "yellow", "value": 0.5},
+                  {"color": "green", "value": 1}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+          "gridPos": {"h": 5, "w": 4, "x": 4, "y": 1}
+        },
+        {
+          "type": "stat",
+          "title": "Metrics Targets Up",
+          "description": "Healthy VPC manager and facade Prometheus scrape targets.",
+          "targets": [
+            {
+              "expr": "sum(up{namespace=\"vpc-control-plane-system\",service=~\"vpc-control-plane-controller-manager-metrics-service|vpc-facade\"})",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 4}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+          "gridPos": {"h": 5, "w": 4, "x": 8, "y": 1}
+        },
+        {
+          "type": "stat",
+          "title": "Reconcile Success (5m)",
+          "description": "Successful reconciliations as a fraction of all instrumented reconciliations.",
+          "targets": [
+            {
+              "expr": "sum(rate(vpc_reconcile_duration_seconds_count{outcome=\"success\",controller=~\"$controller\"}[5m])) / sum(rate(vpc_reconcile_duration_seconds_count{controller=~\"$controller\"}[5m]))",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.95}, {"color": "green", "value": 0.99}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+          "gridPos": {"h": 5, "w": 4, "x": 12, "y": 1}
+        },
+        {
+          "type": "stat",
+          "title": "Neutron 409 (1h)",
+          "description": "Neutron conflict responses observed by VPC controllers.",
+          "targets": [
+            {
+              "expr": "sum(increase(vpc_neutron_conflicts_total{controller=~\"$controller\"}[1h])) or vector(0)",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+          "gridPos": {"h": 5, "w": 4, "x": 16, "y": 1}
+        },
+        {
+          "type": "stat",
+          "title": "Firing VPC Alerts",
+          "description": "Currently firing alerts from the VPC operations rule group.",
+          "targets": [
+            {
+              "expr": "sum(ALERTS{alertstate=\"firing\",alertname=~\"VPC.*\"}) or vector(0)",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+          "gridPos": {"h": 5, "w": 4, "x": 20, "y": 1}
+        },
+        {
+          "type": "row",
+          "title": "Reconciliation",
+          "collapsed": false,
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6},
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Reconcile Throughput",
+          "description": "Instrumented reconcile operations per second.",
+          "targets": [
+            {
+              "expr": "sum by (controller, outcome) (rate(vpc_reconcile_duration_seconds_count{controller=~\"$controller\"}[$__rate_interval]))",
+              "legendFormat": "{{controller}} / {{outcome}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 9, "w": 12, "x": 0, "y": 7}
+        },
+        {
+          "type": "timeseries",
+          "title": "Reconcile Latency",
+          "description": "p50, p95 and p99 reconcile latency by controller.",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le, controller) (rate(vpc_reconcile_duration_seconds_bucket{controller=~\"$controller\"}[$__rate_interval])))",
+              "legendFormat": "{{controller}} p50",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, controller) (rate(vpc_reconcile_duration_seconds_bucket{controller=~\"$controller\"}[$__rate_interval])))",
+              "legendFormat": "{{controller}} p95",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le, controller) (rate(vpc_reconcile_duration_seconds_bucket{controller=~\"$controller\"}[$__rate_interval])))",
+              "legendFormat": "{{controller}} p99",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 7}
+        },
+        {
+          "type": "row",
+          "title": "Security Groups and Elastic IPs",
+          "collapsed": false,
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Security Group External Port Violations",
+          "description": "Ports detached because they were outside the owning VPC.",
+          "targets": [
+            {
+              "expr": "sum by (project_namespace, security_group) (increase(vpc_security_group_external_port_violations_total{project_namespace=~\"$project_namespace\"}[$__rate_interval]))",
+              "legendFormat": "{{project_namespace}} / {{security_group}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 9, "w": 12, "x": 0, "y": 17}
+        },
+        {
+          "type": "timeseries",
+          "title": "Elastic IP Association Failures",
+          "description": "Elastic IP association failures grouped by stable reason.",
+          "targets": [
+            {
+              "expr": "sum by (project_namespace, reason) (increase(vpc_elastic_ip_association_failures_total{project_namespace=~\"$project_namespace\"}[$__rate_interval]))",
+              "legendFormat": "{{project_namespace}} / {{reason}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 17}
+        },
+        {
+          "type": "row",
+          "title": "Neutron and Deployment Safety",
+          "collapsed": false,
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 26},
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Neutron Conflicts",
+          "description": "Neutron HTTP 409 responses by controller and operation.",
+          "targets": [
+            {
+              "expr": "sum by (controller, operation) (increase(vpc_neutron_conflicts_total{controller=~\"$controller\"}[$__rate_interval]))",
+              "legendFormat": "{{controller}} / {{operation}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 27}
+        },
+        {
+          "type": "timeseries",
+          "title": "Deployment Availability",
+          "description": "Ready versus desired replicas for VPC manager and facade.",
+          "targets": [
+            {
+              "expr": "kube_deployment_status_replicas_ready{namespace=\"vpc-control-plane-system\",deployment=~\"vpc-control-plane-controller-manager|vpc-facade\"}",
+              "legendFormat": "{{deployment}} ready",
+              "refId": "A"
+            },
+            {
+              "expr": "kube_deployment_spec_replicas{namespace=\"vpc-control-plane-system\",deployment=~\"vpc-control-plane-controller-manager|vpc-facade\"}",
+              "legendFormat": "{{deployment}} desired",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 27}
+        },
+        {
+          "type": "state-timeline",
+          "title": "VPC Alert State",
+          "description": "Pending and firing VPC operational alerts.",
+          "targets": [
+            {
+              "expr": "ALERTS{alertname=~\"VPC.*\"}",
+              "legendFormat": "{{alertname}} / {{alertstate}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {"type": "value", "options": {"1": {"color": "red", "index": 0, "text": "Active"}}}
+              ],
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+            },
+            "overrides": []
+          },
+          "options": {"alignValue": "left", "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "mergeValues": true, "rowHeight": 0.9, "showValue": "auto", "tooltip": {"mode": "single", "sort": "none"}},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 27}
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 41,
+      "tags": ["OpenStack", "VPC", "Operations"],
+      "templating": {
+        "list": [
+          {
+            "name": "controller",
+            "label": "Controller",
+            "type": "query",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "definition": "label_values(vpc_reconcile_duration_seconds_count, controller)",
+            "query": {"query": "label_values(vpc_reconcile_duration_seconds_count, controller)", "refId": "StandardVariableQuery"},
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "refresh": 1,
+            "sort": 1,
+            "current": {"selected": true, "text": ["All"], "value": ["$__all"]}
+          },
+          {
+            "name": "project_namespace",
+            "label": "Project Namespace",
+            "type": "query",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "definition": "label_values(vpc_elastic_ip_association_failures_total, project_namespace)",
+            "query": {"query": "label_values(vpc_elastic_ip_association_failures_total, project_namespace)", "refId": "StandardVariableQuery"},
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "refresh": 1,
+            "sort": 1,
+            "current": {"selected": true, "text": ["All"], "value": ["$__all"]}
+          }
+        ]
+      },
+      "time": {"from": "now-6h", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "VPC Control Plane Operations",
+      "uid": "vpc-control-plane-operations",
+      "version": 1,
+      "weekStart": ""
+    }
