@@ -52,6 +52,11 @@ pod:
     tolerations:
         keystone:
             enabled: ENC[AES256_GCM,data:ipsAOA==,iv:Awd5ua4Pom2+HYEPYnOeIhOW0TIfA9zD+cyd1NjT1NY=,tag:pGG6RJhbEPoWG9N50yqORA==,type:bool]
+conf:
+    keystone:
+        resource:
+            admin_project_domain_name: ENC[AES256_GCM,data:k9V7HuvjQw==,iv:DcLwxbukNEJtqdTVK8I5hShLTt7EewiDouER/F3fW20=,tag:vpTqT63gj1qpvsCLSzeKnA==,type:str]
+            admin_project_name: ENC[AES256_GCM,data:e/3lIscrUQ==,iv:CHoihwY+7A8HYkbkDQ1l2ALzog8YRm5LqI7X+BcW+VI=,tag:eiwSuBamEmrhE4KQmpVMLw==,type:str]
 sops:
     age:
         - enc: |
@@ -63,7 +68,7 @@ sops:
             6h+l8dFf3P+Z6NW5O98z6HIezi9O3Mc7BF7vrDZxSTvymjq9sFvgRA==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-26T10:29:37Z"
-    mac: ENC[AES256_GCM,data:DVgPkcFJBe+otgBMVe/xHYPrUKF3zvt5iQ4eR9Pyn7HZPCwy2cWhpN6WN0npOa/NvhMXkCQXS7xJ7YVJ9CXk50Dn+34i5Z0ZveL0OVJK+1K7A7StyAu6R1V9zEDGxFnzdMwdjKJ5NSHZwYgDC9l/MP3EuTBSygKarRjIFwlrwS4=,iv:T/99fyQPEwIUADsvt01ixHuFLrTCnV1EcW0JSQqM+0M=,tag:fiM8twC/ryOat7Pri508IQ==,type:str]
+    lastmodified: "2026-07-30T08:11:17Z"
+    mac: ENC[AES256_GCM,data:vEXGzb8EHCwNyaXjX2Clv44+S0XIO1O7+lYS80xY/S5IcQywATcDJlunZVncZfg9mbZmWnfejki6YRsl1IfUVP+zNt760sTyIkH8Y8dKC1Ghgg5ZU0/9h1I8ganPc130BEiLKtwvHZwakF2i0dLI54TjgEJMMhzlkOlKSq6ZF8I=,iv:TI0mdTc6Z0lO39llI5S3qBBzyPMwZi16DX6EN14zC3Q=,tag:XLjA9tmIwMLowzO14X/sxA==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

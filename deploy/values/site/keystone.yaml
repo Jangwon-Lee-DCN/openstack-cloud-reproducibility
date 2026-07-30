@@ -8,6 +8,11 @@ images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
+  keystone:
+    resource:
+      # Service-to-service requests must see resources across tenant projects.
+      admin_project_domain_name: service
+      admin_project_name: service
   # Project-scoped exporter 1.7.0 compatibility: read-only inventory only.
   policy:
     "identity:list_projects": "role:admin or role:monitoring"
