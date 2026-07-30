@@ -4,7 +4,7 @@ conf:
             global_physnet_mtu: ENC[AES256_GCM,data:lqj0+A==,iv:ucCWKP1H6pZuvoJ4/RwnqenYDnyJYb+zsHVyWwPZhGc=,tag:9gMItqUVYct5aieOGCMcCg==,type:int]
             l3_ha_network_type: ENC[AES256_GCM,data:07rak/bs,iv:j/uK9GUZl5gW0rAnEHUNYHEn7CJgDDkkMTknDM2AzG0=,tag:08anPhJFTlOjfbIROoNO6Q==,type:str]
             router_distributed: ENC[AES256_GCM,data:a+fpqg==,iv:maDOay9IGrlFvI+TQkjfHu/OHsxKiyvIIEVY3ZLiAd8=,tag:fKhzph3hbvl/xwjUFdlc7A==,type:bool]
-            service_plugins: ENC[AES256_GCM,data:6ldVUx9kwZMQ/lmnZW8b/46NHAVufg==,iv:9PimG8eJibq4bsypELtUQNVj5y7CmxD47SF+LbLHwhM=,tag:w/FRgTkWAUbysvV27Y1eHA==,type:str]
+            service_plugins: ENC[AES256_GCM,data:RqmCqC7/B9c08DU71amWUhR/I5HBfF7wyYo=,iv:MeOB9XfTozIkNmX9Cn1B23ie1qRo1ectzHWNtgAujZc=,tag:nVh+mE514pJJKfrudqQMeA==,type:str]
         service_providers:
             service_provider: ENC[AES256_GCM,data:jYWCxlLqhiSmkJrBM1sUw+KRnYfofdueAprqigFHui1nhBXt2hSaZowvKmqOb0Mv9lz5kWsmqu7lSec+LQr4QoEzaYq9gg5YKG46HYfWAp553hMhDoQOVEyi2NwBCPQeNt0PUL1pTzrQTbATPMyrnK3A,iv:tlP1KTNLPdxdWAqNHJsri7xxt2WkB6jbcHyrH9+6RF0=,tag:WqRSM61YuF2vK0JqkB2xSA==,type:str]
     plugins:
@@ -24,6 +24,9 @@ conf:
                 enable_distributed_floating_ip: ENC[AES256_GCM,data:tmG1Eg==,iv:lw+tbuUDUEBW9GJlQcR4tdmHpmY3ApQGgzo9tQkSWdg=,tag:MIjYYeF+PJIvVWKVGkm4Ww==,type:bool]
                 neutron_sync_mode: ENC[AES256_GCM,data:O21nimt1,iv:X/QYjPG711ir+asKG0Yt+kx57jAHYH4cJDQs6N5CPL8=,tag:kRIXQeBV6b3UrTmeitsAdw==,type:str]
                 ovn_l3_scheduler: ENC[AES256_GCM,data:tpBTDy1siOdBnOo=,iv:/tmZPCiz1vohJxIuz/vHL7nJeND3lfenQbXnC1aDg0U=,tag:eF8B62fM0LHNAi3VicqSxQ==,type:str]
+            network_log:
+                rate_limit: ENC[AES256_GCM,data:nFzT,iv:WRv9Qrv/ySwCpCyyiiN0e9kb8/4O7ZhIp2XrA7L+c7Y=,tag:FBTnP+ATOl4AZTNVgEH6Tg==,type:float]
+                burst_limit: ENC[AES256_GCM,data:ou8=,iv:sSKFmKNpHQMK2Pgeo/yN6JOmcH9cwkpmDQ5BW5ksxQo=,tag:Ea1YuClDhqRM06nptgSNnw==,type:float]
 endpoints:
     identity:
         auth:
@@ -121,7 +124,7 @@ sops:
             BCWTToSC6ecLUPsq8bCaYfLtShlQ9gW+4cJjyHImnteuN9H+vBwz8A==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-30T08:45:42Z"
-    mac: ENC[AES256_GCM,data:8SNOQx9fh8G+EcYPve7zHaabd9pDeS51i2Jw9fyQU1emPl++hg1Arxsp8UA9fU0v9Ak7BJd1nC5t9ql0SEx0BCYBaUKaW0YDGiJZ8pOStnU00AcJKrtWuWdsZKEyvwMrLOQuwKnVaEDi2oUTT08st6f2LyszOaxG7joA7aTfQH0=,iv:NrW5Aa2xV+T9YqB40ULahuPSaKtndHe1YK5l3+PI9MI=,tag:lQGMzPObbT4cCW2F4gxxlw==,type:str]
+    lastmodified: "2026-07-30T17:10:15Z"
+    mac: ENC[AES256_GCM,data:+E5sAdiLDlSh11duJY1mpyJZdg3v4825FvfganCdJyKKCoKRAx//zdcIDCMo3GOe+WXbEDui8ctXQXKkveIxhdPMe+KlD1bv3zyi9O/UG8fsL4qwhzJi4crkQEjmfEbaRFdaXe7tjUpxGKPIcPuHJ/FplBJd8NW7tr/2Gqrky3w=,iv:f0Hjn7MESwTuIcVNcfnK0L+TwgyOuclw9BkE4HOyRK4=,tag:ntTBF39SiSdEb9IWCSERtA==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

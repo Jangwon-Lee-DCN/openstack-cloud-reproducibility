@@ -20,7 +20,7 @@ conf:
     DEFAULT:
       global_physnet_mtu: 1500
       router_distributed: true
-      service_plugins: ovn-router,firewall_v2
+      service_plugins: ovn-router,firewall_v2,log
     service_providers:
       service_provider: FIREWALL_V2:fwaas_db:neutron_fwaas.services.firewall.service_drivers.ovn.firewall_l3_driver.OVNFwaasDriver:default
   plugins:
@@ -40,6 +40,9 @@ conf:
         neutron_sync_mode: repair
         enable_distributed_floating_ip: true
         dns_servers: 192.168.21.10,8.8.8.8,1.1.1.1
+      network_log:
+        rate_limit: 150
+        burst_limit: 50
 endpoints:
   identity:
     auth:

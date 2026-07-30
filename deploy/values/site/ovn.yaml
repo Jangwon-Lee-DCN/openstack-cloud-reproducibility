@@ -13,12 +13,39 @@ network:
   interface:
     tunnel: eno1
     tunnel_network_cidr: 192.168.21.0/24
+images:
+  tags:
+    vector: docker.io/timberio/vector@sha256:31c01788f10c47530a99a51bb22d37582d557e3b8edd02dc5bd62f58b2659e34
 conf:
   ovn_encap_type: geneve
   ovn_bridge_mappings: external:br-ex
   auto_bridge_add:
     br-ex: eno2
+  # The upstream parser sidecar image currently lacks the WSGI entry file.
+  # Preserve the Neutron log object ID in the raw acl_log message and ingest
+  # directly into the single-tenant platform Loki instead.
+  vector: |
+    [sources.ovn_controller_logs]
+    type = "file"
+    include = ["/logs/ovn-controller.log"]
+    read_from = "end"
+
+    [transforms.network_logs_only]
+    type = "filter"
+    inputs = ["ovn_controller_logs"]
+    condition = 'contains(string!(.message), "acl_log") && contains(string!(.message), "name=\"neutron-")'
+
+    [sinks.loki_sink]
+    type = "loki"
+    inputs = ["network_logs_only"]
+    endpoint = "http://loki.monitoring:3100"
+    labels.event_source = "network_logs"
+    labels.source = "ovn-controller"
+    encoding.codec = "json"
 pod:
+  sidecars:
+    ovn_logging_parser: false
+    vector: true
   tolerations:
     ovn_ovsdb_nb:
       enabled: true
