@@ -214,7 +214,7 @@ data:
           ],
           "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
           "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-          "gridPos": {"h": 9, "w": 12, "x": 0, "y": 17}
+          "gridPos": {"h": 9, "w": 8, "x": 0, "y": 17}
         },
         {
           "type": "timeseries",
@@ -229,7 +229,22 @@ data:
           ],
           "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
           "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 17}
+          "gridPos": {"h": 9, "w": 8, "x": 8, "y": 17}
+        },
+        {
+          "type": "timeseries",
+          "title": "Elastic IP Pool Capacity",
+          "description": "Remaining project floating-IP quota by platform pool name. This is quota headroom, not physical subnet free-address inventory.",
+          "targets": [
+            {
+              "expr": "max by (project_namespace, pool) (vpc_elastic_ip_pool_quota_remaining{project_namespace=~\"$project_namespace\"})",
+              "legendFormat": "{{project_namespace}} / {{pool}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "min"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"h": 9, "w": 8, "x": 16, "y": 17}
         },
         {
           "type": "row",

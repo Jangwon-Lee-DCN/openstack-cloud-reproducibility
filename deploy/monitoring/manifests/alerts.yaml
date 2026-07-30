@@ -96,6 +96,20 @@ spec:
           annotations:
             summary: Elastic IP association failed
             description: "Elastic IP operations failed with reason {{ $labels.reason }} in {{ $labels.project_namespace }}."
+        - alert: VPCElasticIPPoolQuotaLow
+          expr: vpc_elastic_ip_pool_quota_remaining < 3
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: Elastic IP pool quota is nearly exhausted
+            description: "Pool {{ $labels.pool }} in {{ $labels.project_namespace }} has only {{ $value }} project quota slots remaining."
+        - alert: VPCElasticIPPoolQuotaExhausted
+          expr: vpc_elastic_ip_pool_quota_remaining == 0
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: Elastic IP pool quota is exhausted
+            description: "Pool {{ $labels.pool }} in {{ $labels.project_namespace }} has no project floating-IP quota remaining."
         - alert: VPCProjectCredentialBindingMissing
           expr: |
             kube_namespace_labels{namespace=~"vpc-[0-9a-f]{32}"}
