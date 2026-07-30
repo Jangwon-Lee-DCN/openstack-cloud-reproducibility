@@ -1,0 +1,14 @@
+[Unit]
+Description=Isolated network for the Ironic virtual Redfish lab
+Before=ironic-sushy-emulator.service ironic-lab-dnsmasq.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/ironic-lab/setup-network.sh up
+ExecStop=/usr/local/libexec/ironic-lab/setup-network.sh down
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

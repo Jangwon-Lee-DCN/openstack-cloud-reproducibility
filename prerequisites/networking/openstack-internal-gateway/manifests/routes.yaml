@@ -38,3 +38,6 @@ spec:
     - matches: [{path: {type: PathPrefix, value: /container-infra}}]
       filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]
       backendRefs: [{name: magnum-api, port: 9511}]
+    - matches: [{path: {type: PathPrefix, value: /baremetal}}]
+      filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]
+      backendRefs: [{name: ironic-api, port: 6385}]

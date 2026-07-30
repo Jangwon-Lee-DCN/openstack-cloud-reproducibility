@@ -1,0 +1,18 @@
+[Unit]
+Description=DHCP for the isolated Ironic virtual Redfish lab
+Requires=ironic-lab-network.service
+After=ironic-lab-network.service
+
+[Service]
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --bind-interfaces \
+  --port=0 \
+  --interface=br-ironic-poc --except-interface=lo \
+  --dhcp-range=172.31.250.100,172.31.250.150,255.255.255.0,12h \
+  --dhcp-host=52:54:00:10:00:01,172.31.250.100 \
+  --dhcp-option=option:router,172.31.250.1 \
+  --dhcp-option=option:dns-server,192.168.21.10
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

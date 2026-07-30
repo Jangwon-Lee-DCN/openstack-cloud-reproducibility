@@ -5,7 +5,7 @@ bootstrap:
         enabled: ENC[AES256_GCM,data:+DU55Cw=,iv:aunqrMN/d1WQ93NM5VxczpQg9lS+45dZsuy30iPJDt0=,tag:WDEQBbJExQi6HNshFNprdQ==,type:bool]
 conductor:
     http:
-        enabled: ENC[AES256_GCM,data:nzyr2fQ=,iv:+4f++udVrfB3+TND9sb2qX0SkHE4Hk3EdMvh6xpXH+k=,tag:hUebLw4hTDt4cyGodKX+Rg==,type:bool]
+        enabled: ENC[AES256_GCM,data:sVYqlg==,iv:GtRgC9hine9uTtsFsMONs2aySmY5IShpMexf6BWPlQ8=,tag:RdL/5L9bg0WTVjt4vCC0NA==,type:bool]
     pxe:
         enabled: ENC[AES256_GCM,data:txHKLaM=,iv:fjnunIOaWvE4I3EPSYRj35kbsbs52XUMLFmMIcD1tX4=,tag:93E2H13og16pJrMyUupuRQ==,type:bool]
 conf:
@@ -106,7 +106,7 @@ sops:
             atT1YpS4LEr4CFxiRRjARFBM6Q/glR+Lq6Qx5VvjkfiHbjjIvTa3sA==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-30T13:43:51Z"
-    mac: ENC[AES256_GCM,data:ZYcI0FWNsUNn69kUxlSbNZkV3o04gFmc2oGYSdz6bkUxwhpspyBA53HcLDqwakkbKxE+LC7Gnh17qlcBBgf68FlHk4txAZp0+r12u/m7au0AKG72fliuo0r/TN8HkDQb30o5YzPYgRL4ocSKlGYryraDpXQp6sNfo1f5tdiP1Ks=,iv:jWN/rbIB8AISxKzcnA6h1IYONnRwsmGs0uR0+toJoDw=,tag:5JnrhD7tD/TRb8NGbYxmcQ==,type:str]
+    lastmodified: "2026-07-30T14:53:21Z"
+    mac: ENC[AES256_GCM,data:07fMI/yvCZUZS/ad5SCyVFdsRQbH+ahuEIxihsJuQtiOUUUiY7VSQhQpn9NNG05ei4Zk3zBVWDgSN4/OK3p6jo9f8YR8/AzwFIPgIQhHbWj8qrn1JzYas8kQ61nMNxQOJJ9i2TTPO+UNVy1ddJOBjetqOKf/ansptiC4n3knwUw=,iv:LDWi20prCnJK3fAnci5qaW2EPGkWlkG/CHjx5Gr9RDw=,tag:klEFUMdI5C4wHZb2L4OGwQ==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

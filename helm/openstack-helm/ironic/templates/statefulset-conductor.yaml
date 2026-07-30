@@ -93,11 +93,13 @@ spec:
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp
-            # The init script creates DEFAULT.tempdir here. This must be the
-            # same emptyDir mounted by the conductor container; otherwise the
-            # directory exists only in the init container's writable layer.
+            # DEFAULT.tempdir can be below either persistent tree. Mount both
+            # so the directory is created on the same filesystem used by the
+            # conductor instead of the init container's writable layer.
             - name: pod-data
               mountPath: /var/lib/openstack-helm
+            - name: host-var-lib-ironic
+              mountPath: /var/lib/ironic
             - name: ironic-etc
               mountPath: /etc/ironic/ironic.conf
               subPath: ironic.conf
@@ -162,6 +164,16 @@ spec:
 {{ tuple $envAll $envAll.Values.pod.resources.conductor | include "helm-toolkit.snippets.kubernetes_resources" | indent 10 }}
           securityContext:
             privileged: true
+          env:
+            # The Airship Ironic image does not ship an ISO authoring utility.
+            # PoC hosts provide a pinned genisoimage-compatible mkisofs binary
+            # below /var/lib/ironic/boot-tools.
+            - name: PATH
+              value: /var/lib/ironic/boot-tools:/var/lib/openstack/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            - name: LD_LIBRARY_PATH
+              value: /var/lib/ironic/boot-tools
+            - name: MAGIC
+              value: /var/lib/ironic/boot-tools/magic.mgc
           command:
             - /tmp/ironic-conductor.sh
           readinessProbe:

@@ -17,13 +17,34 @@ images:
     ironic_pxe_init: quay.io/airshipit/ironic:2026.1-ubuntu_noble
 conf:
   ironic:
+    DEFAULT:
+      # Redfish virtual-media uses hardlinks from master_iso_images. Keep the
+      # temporary build directory on the same /var/lib/ironic filesystem.
+      tempdir: /var/lib/ironic/tmp
+      isolinux_bin: /var/lib/ironic/boot-tools/isolinux.bin
+      ldlinux_c32: /var/lib/ironic/boot-tools/ldlinux.c32
     api:
       workers: 4
+    pxe:
+      # Temporary PoC exception for the self-signed internal Gateway CA.
+      # Production IPA images must trust the institutional CA instead.
+      pxe_append_params: "nofb nomodeset vga=normal ipa-debug=1 ipa-insecure=1"
+    redfish:
+      # Redfish virtual-media has its own kernel parameter namespace and does
+      # not inherit [pxe]. Remove ipa-insecure in production after IPA trusts
+      # the institutional CA used by the internal OpenStack API Gateway.
+      kernel_append_params: "nofb nomodeset vga=normal console=ttyS0,115200n8 ipa-debug=1 ipa-insecure=1"
+    service_catalog:
+      # IPA cannot reach the Kubernetes ClusterIP catalog endpoint. Advertise
+      # the VM-routable internal Gateway callback URL instead.
+      endpoint_override: https://api.internal.cloud.dcn.ssu.ac.kr/baremetal
 conductor:
   pxe:
     enabled: false
   http:
-    enabled: false
+    # Required by redfish-virtual-media. This exposes only the generated boot
+    # artifacts on TCP/8080; PXE/TFTP and DHCP remain disabled.
+    enabled: true
 bootstrap:
   image:
     enabled: false

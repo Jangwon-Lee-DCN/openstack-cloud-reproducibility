@@ -1,0 +1,13 @@
+[Unit]
+Description=Route from the secondary controller to the Ironic PoC network
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ip route replace 172.31.250.0/24 via 192.168.21.10
+ExecStop=/usr/sbin/ip route del 172.31.250.0/24 via 192.168.21.10
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
