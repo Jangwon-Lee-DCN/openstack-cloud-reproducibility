@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:d6848116e20fe9e370cd6b33c3deb46ecd8a6e39add467dea5f9a6d2b68a05a3
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:fb146bd85456861201fa3a2f1c610779b7300c9b245b72eca01fe41ee5a7bbf5
 pod:
   image_pull_secrets:
     horizon:
