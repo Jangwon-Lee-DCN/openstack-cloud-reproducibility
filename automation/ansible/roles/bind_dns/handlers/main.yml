@@ -1,0 +1,23 @@
+---
+- name: Validate BIND configuration
+  ansible.builtin.command: named-checkconf
+  listen: Validate and reload BIND
+  changed_when: false
+
+- name: Validate primary forward zone
+  ansible.builtin.command: "named-checkzone {{ dns_domain }} /etc/bind/zones/db.{{ dns_domain }}"
+  when: dns_role == 'primary'
+  listen: Validate and reload BIND
+  changed_when: false
+
+- name: Validate primary reverse zone
+  ansible.builtin.command: "named-checkzone {{ dns_reverse_zone }} /etc/bind/zones/db.{{ dns_reverse_zone }}"
+  when: dns_role == 'primary'
+  listen: Validate and reload BIND
+  changed_when: false
+
+- name: Reload BIND
+  ansible.builtin.systemd_service:
+    name: named
+    state: reloaded
+  listen: Validate and reload BIND

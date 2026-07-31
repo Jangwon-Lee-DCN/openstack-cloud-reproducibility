@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 BUILD_IMAGES=${BUILD_IMAGES:-0}
+VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
 for command in kubectl helm sops python3 sha256sum; do
@@ -137,4 +138,6 @@ install_release aodh
 kubectl apply -f "$REPO_ROOT/deploy/manifests/openstack-public-routes.yaml"
 
 "$REPO_ROOT/deploy/scripts/verify-barbican.sh"
-"$REPO_ROOT/deploy/scripts/verify-full-stack.sh"
+if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then
+  "$REPO_ROOT/deploy/scripts/verify-full-stack.sh"
+fi

@@ -1,0 +1,16 @@
+$TTL 300
+@ IN SOA ns1.{{ dns_domain }}. hostmaster.{{ dns_domain }}. (
+  {{ dns_zone_serial }} 300 120 604800 300 )
+@ IN NS ns1.{{ dns_domain }}.
+@ IN NS ns2.{{ dns_domain }}.
+{% for node in groups['control_plane'] if hostvars[node].dns_role is defined %}
+ns{{ loop.index }} IN A {{ hostvars[node].ansible_host }}
+{% endfor %}
+{{ kubernetes_api_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ kubernetes_api_vip }}
+{{ openstack_public_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ openstack_public_gateway_ip }}
+{{ openstack_internal_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ openstack_internal_gateway_ip }}
+{{ platform_gateway_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ platform_gateway_ip }}
+{{ registry_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ registry_gateway_ip }}
+{% for node in (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique %}
+{{ node }} IN A {{ hostvars[node].ansible_host }}
+{% endfor %}

@@ -24,6 +24,14 @@ openstack_public_fqdn: cloud.example.org
 openstack_public_gateway_ip: 192.0.2.6
 openstack_internal_fqdn: internal.cloud.example.org
 openstack_internal_gateway_ip: 192.0.2.7
+platform_gateway_fqdn: platform.example.org
+platform_gateway_ip: 192.0.2.5
+registry_fqdn: registry.example.org
+registry_gateway_ip: 192.0.2.4
+dns_domain: example.org
+dns_reverse_zone: 2.0.192.in-addr.arpa
+dns_zone_serial: 2026073101
+dns_forwarders: [1.1.1.1, 8.8.8.8]
 external_network_cidr: 192.0.2.0/24
 external_network_gateway: 192.0.2.1
 external_allocation_start: 192.0.2.100

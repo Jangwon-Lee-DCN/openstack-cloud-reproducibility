@@ -1,0 +1,44 @@
+{% if dns_role == 'primary' %}
+zone "{{ dns_domain }}" {
+  type primary;
+  file "/etc/bind/zones/db.{{ dns_domain }}";
+  allow-transfer {
+{% for node in groups['control_plane'] if hostvars[node].dns_role | default('') == 'secondary' %}
+    {{ hostvars[node].ansible_host }};
+{% endfor %}
+  };
+  also-notify {
+{% for node in groups['control_plane'] if hostvars[node].dns_role | default('') == 'secondary' %}
+    {{ hostvars[node].ansible_host }};
+{% endfor %}
+  };
+};
+zone "{{ dns_reverse_zone }}" {
+  type primary;
+  file "/etc/bind/zones/db.{{ dns_reverse_zone }}";
+  allow-transfer {
+{% for node in groups['control_plane'] if hostvars[node].dns_role | default('') == 'secondary' %}
+    {{ hostvars[node].ansible_host }};
+{% endfor %}
+  };
+};
+{% else %}
+zone "{{ dns_domain }}" {
+  type secondary;
+  masters {
+{% for node in groups['control_plane'] if hostvars[node].dns_role | default('') == 'primary' %}
+    {{ hostvars[node].ansible_host }};
+{% endfor %}
+  };
+  file "db.{{ dns_domain }}";
+};
+zone "{{ dns_reverse_zone }}" {
+  type secondary;
+  masters {
+{% for node in groups['control_plane'] if hostvars[node].dns_role | default('') == 'primary' %}
+    {{ hostvars[node].ansible_host }};
+{% endfor %}
+  };
+  file "db.{{ dns_reverse_zone }}";
+};
+{% endif %}

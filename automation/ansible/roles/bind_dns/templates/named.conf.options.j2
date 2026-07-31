@@ -1,0 +1,21 @@
+acl internal-networks {
+  127.0.0.0/8;
+  {{ external_network_cidr }};
+  {{ pod_cidr }};
+};
+
+options {
+  directory "/var/cache/bind";
+  recursion yes;
+  allow-query { internal-networks; };
+  allow-recursion { internal-networks; };
+  allow-query-cache { internal-networks; };
+  listen-on { any; };
+  listen-on-v6 { none; };
+  dnssec-validation auto;
+  forwarders {
+{% for address in dns_forwarders %}
+    {{ address }};
+{% endfor %}
+  };
+};

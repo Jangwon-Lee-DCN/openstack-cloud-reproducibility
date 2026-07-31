@@ -29,6 +29,14 @@ openstack_public_fqdn: cloud.dcn.ssu.ac.kr
 openstack_public_gateway_ip: 192.168.21.6
 openstack_internal_fqdn: internal.cloud.dcn.ssu.ac.kr
 openstack_internal_gateway_ip: 192.168.21.7
+platform_gateway_fqdn: platform.dcn.ssu.ac.kr
+platform_gateway_ip: 192.168.21.5
+registry_fqdn: registry.dcn.ssu.ac.kr
+registry_gateway_ip: 192.168.21.4
+dns_domain: dcn.ssu.ac.kr
+dns_reverse_zone: 21.168.192.in-addr.arpa
+dns_zone_serial: 2026073101
+dns_forwarders: [1.1.1.1, 8.8.8.8]
 external_network_cidr: 192.168.21.0/24
 external_network_gateway: 192.168.21.1
 external_allocation_start: 192.168.21.100

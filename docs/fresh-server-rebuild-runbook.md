@@ -77,18 +77,23 @@ Gate:
 
 ```bash
 ./bin/preflight.sh inventory/local
+ALLOW_DIRTY_REBUILD_INPUTS=0 ../bin/verify-inputs.sh
 ```
 
 ## Phase 2 — Host baseline
 
 ```bash
 ansible-playbook -i inventory/local/hosts.yml playbooks/10-hosts.yml
+ansible-playbook -i inventory/local/hosts.yml playbooks/15-dns.yml
 ```
 
 This disables swap, loads required modules, applies sysctls, installs CRI-O
 and pinned Kubernetes packages, enables time/iSCSI services, installs Helm,
-and creates an HAProxy/Keepalived Kubernetes API VIP. Validate SSH through
-`eno1`, DNS, NTP, package holds, CRI-O, and VIP failover before continuing.
+and creates an HAProxy/Keepalived Kubernetes API VIP. The DNS playbook renders
+an inventory-driven BIND primary and secondary, validates both zones, enables
+AXFR/notify, and gives every host both resolvers in priority order. Increment
+`dns_zone_serial` for every accepted zone change. Validate SSH through `eno1`,
+DNS, NTP, package holds, CRI-O, recursive Pod lookup, and VIP failover.
 
 Rollback: restore the captured host configuration or reinstall the fresh OS.
 Do not attempt an in-place network rollback without console access.
@@ -113,9 +118,9 @@ correct; API access survives stopping HAProxy on either controller.
 
 The playbook stops unless `confirm_ceph_device_wipe` is true. Before setting
 it, compare `lsblk -e7 -o NAME,SIZE,MODEL,SERIAL,FSTYPE,MOUNTPOINTS` and
-`wipefs -n` with every inventory `ceph_device`. Adapt and review the selected
-Rook values profile; the existing PoC profile contains the old node name and
-disk ID and must never be blindly reused.
+`wipefs -n` with every inventory `ceph_device`. The automation renders Rook
+values from stable inventory device IDs and selects PoC or production replica
+policy; review the rendered `/tmp/dcn-rook-values.yaml` before installation.
 
 For PoC, install one OSD, replica-1 pools, and document that controller loss
 loses storage. For production, use at least three nodes/devices, MON count 3,
@@ -148,18 +153,26 @@ Dependency order is:
 8. optional Gitea, Keycloak federation, CAPI/CAPO/ORC, and Magnum GitOps.
 
 Run each component's own `preflight.sh`, `install.sh`, and `verify.sh`. The
-Ansible role automates components whose accepted scripts are present. BIND
-zone changes, provider `br-ex`, and the production Rook profile remain review
-gates because a generic unattended change can remove management access or
-data.
+Ansible role automates components whose accepted scripts are present. BIND is
+inventory-driven and validated before reload. Provider `br-ex` and Ceph disk
+ownership remain review gates because an incorrect unattended change can
+remove management access or data.
 
 ## Phase 6 — Provider network
 
-With local console and a timed rollback, attach `eno2` to `br-ex` on every
-compute/OVN gateway node. Do not assign the provider subnet to `eno2`; the
-host management route remains on `eno1`. Validate OpenFlow, OVN chassis
-registration, physical network mapping `external:br-ex`, MTU, upstream VLAN
-mode, ARP, and direct egress from every gateway node.
+Render and inspect the Layer 2-only candidate first:
+
+```bash
+ansible-playbook -i inventory/local/hosts.yml playbooks/35-provider-uplinks.yml --check --diff
+```
+
+The playbook refuses an `eno2`-equivalent interface with a Layer 3 address or
+route. With local console and a timed rollback available, set
+`confirm_provider_bridge_change=true` and apply it. This preserves `eno1` as
+the management/default-route interface. The pinned OpenStack-Helm OVS values
+subsequently create `br-ex` and attach `eno2`. Validate OpenFlow, OVN chassis
+registration, `external:br-ex`, MTU, upstream VLAN mode, ARP, and direct egress
+from every gateway node.
 
 Only after this gate create Neutron's external network with allocation range
 `192.168.21.100-192.168.21.200` (or the new site's approved equivalent).
@@ -170,21 +183,30 @@ Only after this gate create Neutron's external network with allocation range
 ansible-playbook -i inventory/local/hosts.yml playbooks/50-openstack.yml
 ```
 
-The reconciler verifies package checksums, decrypts values only into a
-temporary directory, installs OpenStack-Helm releases in dependency order,
-applies custom telemetry resources, publishes routes, and runs verification.
+The input verifier rejects a dirty checkout and validates all 25 pinned chart
+checksums, chart names/versions, and values references. The reconciler decrypts
+values only into a temporary directory, installs OpenStack-Helm releases in
+dependency order, applies custom telemetry resources, and publishes routes.
 Do not use Helm `--wait` for charts whose post-install hooks unblock API init
 containers; the reconciler handles readiness explicitly.
 
-After the core stack, reconcile Designate/PowerDNS, Amphora resources,
-Magnum+CAPI/CAPO, Keycloak federation, Horizon/Skyline extensions, and the VPC
-control plane/dashboard from their pinned repositories.
+The Ansible phase then installs Designate/PowerDNS, CAPI/CAPO/ORC, the add-on
+provider, the workload-chart repository, and Magnum before final full-stack
+verification. Reconcile Amphora resources, optional Keycloak federation,
+Horizon/Skyline extensions, and the VPC control plane/dashboard from their
+pinned repositories after their independent acceptance gates.
 
 ## Phase 8 — Acceptance and failure tests
 
 ```bash
 ansible-playbook -i inventory/local/hosts.yml playbooks/60-verify.yml
 ```
+
+The verifier fails unhealthy controller-owned Pods, non-ready running
+containers, Helm drift, route failures, and HA replica violations. Retained
+terminal Pods owned by completed/failed Jobs and unowned diagnostic Pods are
+reported as warnings rather than treated as current service outages; the
+latest scheduled synthetic test must still be successful.
 
 In addition to script checks, create disposable tenants and verify identity,
 image upload, VM boot, metadata, security groups, isolated overlapping VPC

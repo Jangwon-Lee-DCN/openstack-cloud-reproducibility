@@ -1,0 +1,62 @@
+---
+- name: Install BIND
+  ansible.builtin.apt:
+    name: [bind9, bind9-utils, dnsutils]
+    state: present
+    update_cache: true
+
+- name: Create primary zone directory
+  ansible.builtin.file:
+    path: /etc/bind/zones
+    state: directory
+    owner: root
+    group: bind
+    mode: '0750'
+  when: dns_role == 'primary'
+
+- name: Render BIND options
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    owner: root
+    group: bind
+    mode: '0644'
+  notify: Validate and reload BIND
+
+- name: Render BIND zone declarations
+  ansible.builtin.template:
+    src: named.conf.local.j2
+    dest: /etc/bind/named.conf.local
+    owner: root
+    group: bind
+    mode: '0644'
+  notify: Validate and reload BIND
+
+- name: Render forward zone on the primary
+  ansible.builtin.template:
+    src: db.forward.j2
+    dest: "/etc/bind/zones/db.{{ dns_domain }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+  notify: Validate and reload BIND
+
+- name: Render reverse zone on the primary
+  ansible.builtin.template:
+    src: db.reverse.j2
+    dest: "/etc/bind/zones/db.{{ dns_reverse_zone }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+  notify: Validate and reload BIND
+
+- name: Enable BIND
+  ansible.builtin.systemd_service:
+    name: named
+    enabled: true
+    state: started
+
+- name: Apply validated DNS configuration now
+  ansible.builtin.meta: flush_handlers

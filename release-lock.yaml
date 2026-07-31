@@ -37,6 +37,14 @@ spec:
     package: helm/packages/upstream/cinder-2026.1.0.tgz
     sha256: 8d81d34640ab5af652bdf82178fc3caca302988590ddf27fa9013ebe003d76d3
     valuesSnapshot: deploy/releases/cinder.values.sops.yaml
+  - name: designate
+    chart: designate
+    chartVersion: 2026.1.0
+    appVersion: 22.0.0
+    package: helm/packages/patched/designate-2026.1.0.tgz
+    sha256: 6dc75e56528517c1514a076b861073f92c395d869f666dca95b4cc9ae3b7e69c
+    valuesFile: deploy/releases/designate.site.yaml
+    secretsFile: deploy/secrets/designate.values.sops.yaml
   - name: barbican
     chart: barbican
     chartVersion: 2026.1.0
@@ -63,7 +71,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: 18.0.0
     package: helm/packages/patched/octavia-2026.1.0.tgz
-    sha256: b3ef67f4ae2fcb53b217bf1b271ce32c31f9cda1ea33583ddd5a473e32380036
+    sha256: 396b38941b00d3fc62d79c14885ec71638bb2e20a96193bf509a5a47c4803038
     valuesSnapshot: deploy/releases/octavia.values.sops.yaml
   - name: horizon
     chart: horizon
@@ -112,7 +120,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: 22.0.0
     package: helm/packages/patched/magnum-2026.1.0.tgz
-    sha256: 1b7b62ff731a9b98e6f798a8c0f6cda42d60aba59cd97a1cab2cf6f89c42ea88
+    sha256: c419e79ded47bd20251f6c525e91ddbcd789163a1d32275d603b68795c7398c9
     valuesFile: deploy/values/site/magnum.yaml
     secretsFile: deploy/secrets/magnum.values.sops.yaml
   - name: memcached
@@ -157,6 +165,14 @@ spec:
     package: helm/packages/upstream/placement-2026.1.0.tgz
     sha256: 27482884bc3d987b78265268d1be8dde7805cf949ae89c68f887e9416d935b6d
     valuesSnapshot: deploy/releases/placement.values.sops.yaml
+  - name: powerdns
+    chart: powerdns
+    chartVersion: 2026.1.0
+    appVersion: v4.1.10
+    package: helm/packages/patched/powerdns-2026.1.0.tgz
+    sha256: 035abd6cbe3b30445429e8ca86f4e23392409e058354d908306070332e66ec5d
+    valuesFile: deploy/releases/powerdns.site.yaml
+    secretsFile: deploy/secrets/powerdns.values.sops.yaml
   - name: prometheus-openstack-exporter
     chart: prometheus-openstack-exporter
     chartVersion: 2026.1.0

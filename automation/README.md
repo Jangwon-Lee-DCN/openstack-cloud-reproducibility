@@ -26,10 +26,13 @@ cd automation/ansible
 cp -a inventory/poc-two-node inventory/local
 # Edit inventory/local/hosts.yml and group_vars/all.yml.
 ./bin/preflight.sh inventory/local
+ALLOW_DIRTY_REBUILD_INPUTS=0 ../bin/verify-inputs.sh
 
 ansible-playbook -i inventory/local/hosts.yml playbooks/10-hosts.yml
+ansible-playbook -i inventory/local/hosts.yml playbooks/15-dns.yml
 ansible-playbook -i inventory/local/hosts.yml playbooks/20-kubernetes.yml
 ansible-playbook -i inventory/local/hosts.yml playbooks/30-cluster-baseline.yml
+ansible-playbook -i inventory/local/hosts.yml playbooks/35-provider-uplinks.yml
 
 export SOPS_AGE_KEY_FILE=/media/offline/dcn-cloud.agekey
 ansible-playbook -i inventory/local/hosts.yml playbooks/40-platform.yml
@@ -43,3 +46,7 @@ inventory and runbook.
 
 The authoritative sequence, gates, rollback points, and acceptance tests are
 in [the rebuild runbook](../docs/fresh-server-rebuild-runbook.md).
+
+`verify-inputs.sh` rejects a dirty checkout by default and validates every
+locked chart checksum and metadata field. Set `ALLOW_DIRTY_REBUILD_INPUTS=1`
+only while developing the automation, never for an accepted rebuild.

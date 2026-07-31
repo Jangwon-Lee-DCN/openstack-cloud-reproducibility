@@ -1,8 +1,19 @@
 ---
-- import_playbook: 00-preflight.yml
-- import_playbook: 10-hosts.yml
-- import_playbook: 20-kubernetes.yml
-- import_playbook: 30-cluster-baseline.yml
-- import_playbook: 40-platform.yml
-- import_playbook: 50-openstack.yml
-- import_playbook: 60-verify.yml
+- name: Run topology preflight
+  import_playbook: 00-preflight.yml
+- name: Configure hosts
+  import_playbook: 10-hosts.yml
+- name: Configure authoritative DNS
+  import_playbook: 15-dns.yml
+- name: Build Kubernetes
+  import_playbook: 20-kubernetes.yml
+- name: Apply the cluster baseline
+  import_playbook: 30-cluster-baseline.yml
+- name: Prepare OpenStack provider uplinks
+  import_playbook: 35-provider-uplinks.yml
+- name: Install platform prerequisites
+  import_playbook: 40-platform.yml
+- name: Install OpenStack
+  import_playbook: 50-openstack.yml
+- name: Verify the rebuilt cloud
+  import_playbook: 60-verify.yml

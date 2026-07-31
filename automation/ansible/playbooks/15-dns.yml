@@ -1,0 +1,35 @@
+---
+- name: Configure BIND primary and secondary servers
+  hosts: control_plane
+  become: true
+  gather_facts: true
+  roles:
+    - role: bind_dns
+      when: dns_role is defined
+
+- name: Configure host resolver priority
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Create systemd-resolved drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d
+        state: directory
+        mode: '0755'
+
+    - name: Prefer both authoritative recursive resolvers
+      ansible.builtin.copy:
+        dest: /etc/systemd/resolved.conf.d/dcn-cloud.conf
+        mode: '0644'
+        content: |
+          [Resolve]
+          DNS={% for node in groups['control_plane'] if hostvars[node].dns_role is defined %}{{ hostvars[node].ansible_host }} {% endfor %}
+          Domains=~{{ dns_domain }}
+          DNSStubListener=yes
+      notify: Restart systemd-resolved
+  handlers:
+    - name: Restart systemd-resolved
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: restarted

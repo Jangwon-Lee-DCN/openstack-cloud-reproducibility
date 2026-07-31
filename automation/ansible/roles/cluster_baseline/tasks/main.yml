@@ -34,7 +34,7 @@
       - --set
       - "ipam.mode=cluster-pool"
       - --set
-      - "ipam.operator.clusterPoolIPv4PodCIDRList={{{ pod_cidr }}}"
+      - "ipam.operator.clusterPoolIPv4PodCIDRList[0]={{ pod_cidr }}"
       - --set
       - routingMode=tunnel
       - --set
@@ -60,7 +60,11 @@
 - name: Apply declared node role labels
   ansible.builtin.shell: |
     set -euo pipefail
-    kubectl label node {{ item }}{% for role in hostvars[item].node_roles | default([]) %} openstack-{{ role | replace('_', '-') }}=enabled{% endfor %} --overwrite
+    kubectl label node {{ item }} \
+    {% for role in hostvars[item].node_roles | default([]) %}
+      openstack-{{ role | replace('_', '-') }}=enabled \
+    {% endfor %}
+      --overwrite
   args:
     executable: /bin/bash
   loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique }}"

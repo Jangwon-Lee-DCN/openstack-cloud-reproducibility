@@ -20,7 +20,33 @@ for release in $(helm list -n "$NAMESPACE" -q); do
   [[ "$status" == deployed ]] || { echo "$release status=$status" >&2; exit 1; }
 done
 
-kubectl get pods -n "$NAMESPACE" --no-headers   | awk '$3 !~ /Running|Completed/ {print; bad=1} END {exit bad}'
+kubectl get pods -n "$NAMESPACE" -o json | python3 /dev/fd/3 3<<'PODCHECK'
+import json
+import sys
+
+pods = json.load(sys.stdin)["items"]
+bad = []
+historical = []
+for pod in pods:
+    name = pod["metadata"]["name"]
+    phase = pod.get("status", {}).get("phase", "Unknown")
+    owners = pod["metadata"].get("ownerReferences", [])
+    owner_kind = owners[0].get("kind") if owners else None
+    if phase == "Succeeded":
+        continue
+    if phase == "Failed" and owner_kind in {None, "Job"}:
+        historical.append(name)
+        continue
+    statuses = pod.get("status", {}).get("containerStatuses", [])
+    if phase != "Running" or any(not status.get("ready", False) for status in statuses):
+        bad.append(f"{name}: phase={phase}, owner={owner_kind or 'none'}")
+
+for name in historical:
+    print(f"warning: ignoring retained terminal test/job Pod: {name}", file=sys.stderr)
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    raise SystemExit(1)
+PODCHECK
 
 for workload in octavia-api octavia-driver-agent octavia-housekeeping; do
   [[ "$(kubectl get deployment -n "$NAMESPACE" "$workload" -o jsonpath='{.status.readyReplicas}')" == "2" ]] || {

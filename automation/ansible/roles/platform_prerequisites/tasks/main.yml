@@ -1,6 +1,6 @@
 ---
 - name: Require the pinned services repository checkout
-  ansible.builtin.command: "git -C {{ services_repo_path }} rev-parse HEAD"
+  ansible.builtin.command: "git -C {{ services_repo_path }} rev-parse HEAD"  # noqa command-instead-of-module
   register: services_head
   changed_when: false
 

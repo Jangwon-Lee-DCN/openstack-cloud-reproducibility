@@ -5,15 +5,50 @@
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
     SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+    REPRO_ROOT: "{{ repro_repo_path }}"
+    VERIFY_AFTER_RECONCILE: "0"
   tasks:
     - name: Require an external SOPS age identity
       ansible.builtin.assert:
         that: lookup('env', 'SOPS_AGE_KEY_FILE') | length > 0
         fail_msg: Export SOPS_AGE_KEY_FILE from offline media.
 
+    - name: Verify immutable rebuild inputs
+      ansible.builtin.command: "{{ repro_repo_path }}/automation/bin/verify-inputs.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      changed_when: false
+
     - name: Reconcile pinned OpenStack-Helm releases
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/reconcile-full-stack.sh"
       args:
         chdir: "{{ repro_repo_path }}"
       register: openstack_reconcile
+      changed_when: true
+
+    - name: Install Designate and PowerDNS
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-designate.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      changed_when: true
+
+    - name: Install CAPI, CAPO, and ORC management providers
+      ansible.builtin.command: >-
+        {{ repro_repo_path }}/prerequisites/cluster-api/management-cluster/scripts/install.sh
+      changed_when: true
+
+    - name: Install the CAPI add-on provider
+      ansible.builtin.command: >-
+        {{ repro_repo_path }}/prerequisites/cluster-api/addon-provider/scripts/install.sh
+      changed_when: true
+
+    - name: Install the Magnum workload chart repository
+      ansible.builtin.command: >-
+        {{ repro_repo_path }}/prerequisites/cluster-api/workload-chart-repository/scripts/install.sh
+      changed_when: true
+
+    - name: Install Magnum with CAPI integration
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-magnum.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
       changed_when: true
