@@ -210,4 +210,7 @@ zero changes, and the four-by-four Pod network plus ClusterIP test passed.
 It subsequently added a fifth Ubuntu VM as a compute-only Kubernetes worker.
 The node stayed outside etcd, received only the compute/OVS canonical labels,
 passed the five-by-five network test, survived a reboot, and converged on a
-second phase-20 run.
+second phase-20 run. The rehearsal then applied the approved provider Netplan
+to that worker: the management route remained on `ens3`, the `ens8` provider
+link remained Layer 2-only, the second phase-35 run was unchanged, and the
+configuration survived a reboot.

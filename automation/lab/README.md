@@ -161,6 +161,12 @@ ambiguity: Floating IP creation now binds explicitly to the management port
 instead of asking the client to choose between management and address-less
 provider ports.
 
+The compute worker also exercised the normally gated phase-35 mutation. After
+the candidate review, the approved Netplan installed successfully, retained
+the management default route on `ens3`, and kept `ens8` free of addresses and
+routes. A second run reported zero changes. After another reboot the Netplan,
+SSH path, kubelet, CRI-O, and Kubernetes Ready state all persisted.
+
 ## Destroy
 
 ```bash
