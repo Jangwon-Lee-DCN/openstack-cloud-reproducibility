@@ -70,8 +70,10 @@ Use `playbooks/site.yml` only after each phase has been rehearsed. Stateful
 phases intentionally require confirmation variables described in the
 inventory and runbook.
 
-The authoritative sequence, gates, rollback points, and acceptance tests are
-in [the rebuild runbook](../docs/fresh-server-rebuild-runbook.md).
+The copy-and-run operator procedure is in
+[the operator guide](../docs/fresh-server-rebuild-operator-guide.md). The
+authoritative design, gates, rollback points, and acceptance tests are in
+[the rebuild runbook](../docs/fresh-server-rebuild-runbook.md).
 
 `verify-inputs.sh` rejects a dirty checkout by default and validates every
 locked chart checksum and metadata field. Set `ALLOW_DIRTY_REBUILD_INPUTS=1`

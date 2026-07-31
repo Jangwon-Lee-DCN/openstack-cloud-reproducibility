@@ -1,5 +1,8 @@
 # Fresh Server Platform Rebuild Runbook
 
+For the command-by-command installation procedure, use
+[`fresh-server-rebuild-operator-guide.md`](fresh-server-rebuild-operator-guide.md).
+
 ## Objective
 
 Recreate the DCN Kubernetes management platform, OpenStack control plane, and
