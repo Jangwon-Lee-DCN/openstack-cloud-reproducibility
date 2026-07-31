@@ -1,0 +1,49 @@
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: designate-authoritative-dns
+spec:
+  blocks:
+    - cidr: 192.168.21.9/32
+  serviceSelector:
+    matchLabels:
+      dcn.ssu.ac.kr/address-pool: designate-authoritative-dns
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: powerdns-authoritative
+  namespace: openstack
+  labels:
+    dcn.ssu.ac.kr/address-pool: designate-authoritative-dns
+  annotations:
+    lbipam.cilium.io/ips: 192.168.21.9
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    release_group: powerdns
+    application: powerdns
+    component: server
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: 5353
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: 5353
+      protocol: TCP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: powerdns
+  namespace: openstack
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      release_group: powerdns
+      application: powerdns
+      component: server

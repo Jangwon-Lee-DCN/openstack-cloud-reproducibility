@@ -1,0 +1,88 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: powerdns-schema-4-9
+  namespace: openstack
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        application: powerdns
+        component: schema-migration
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        openstack-control-plane: enabled
+      containers:
+        - name: migrate
+          image: quay.io/airshipit/designate:2026.1-ubuntu_noble
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: powerdns-db-user
+                  key: DB_CONNECTION
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              python3 - <<'PY'
+              import os
+              from urllib.parse import urlsplit
+
+              import pymysql
+
+              uri = urlsplit(os.environ["DB_CONNECTION"].replace(
+                  "mysql+pymysql://", "mysql://", 1
+              ))
+              connection = pymysql.connect(
+                  host=uri.hostname,
+                  port=uri.port or 3306,
+                  user=uri.username,
+                  password=uri.password,
+                  database=uri.path.lstrip("/"),
+                  autocommit=True,
+              )
+              with connection.cursor() as cursor:
+                  def ensure_column(table, column, definition):
+                      cursor.execute(
+                          """
+                          SELECT COUNT(*) FROM information_schema.COLUMNS
+                          WHERE TABLE_SCHEMA = DATABASE()
+                            AND TABLE_NAME = %s
+                            AND COLUMN_NAME = %s
+                          """,
+                          (table, column),
+                      )
+                      if cursor.fetchone()[0] == 0:
+                          cursor.execute(
+                              f"ALTER TABLE {table} "
+                              f"ADD COLUMN {column} {definition}"
+                          )
+
+                  ensure_column(
+                      "domains", "options", "VARCHAR(64000) DEFAULT NULL"
+                  )
+                  ensure_column(
+                      "domains", "catalog", "VARCHAR(255) DEFAULT NULL"
+                  )
+                  ensure_column(
+                      "cryptokeys", "published", "BOOL DEFAULT 1"
+                  )
+                  cursor.execute(
+                      """
+                      SELECT COUNT(*) FROM information_schema.STATISTICS
+                      WHERE TABLE_SCHEMA = DATABASE()
+                        AND TABLE_NAME = 'domains'
+                        AND INDEX_NAME = 'catalog_idx'
+                      """
+                  )
+                  if cursor.fetchone()[0] == 0:
+                      cursor.execute(
+                          "CREATE INDEX catalog_idx ON domains(catalog)"
+                      )
+              connection.close()
+              print("PowerDNS 4.9 schema migration is present")
+              PY

@@ -1,0 +1,48 @@
+# Designate authoritative DNS backend. Runtime credentials are supplied from
+# secrets/powerdns.values.sops.yaml.
+images:
+  tags:
+    powerdns: docker.io/powerdns/pdns-auth-49:4.9.16
+    db_sync: docker.io/psitrax/powerdns:4.1.10
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    dep_check: quay.io/airshipit/kubernetes-entrypoint:latest-ubuntu_noble
+
+network:
+  node_port_enabled: false
+  external_policy_local: false
+
+pod:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    server: 2
+  resources:
+    enabled: true
+
+conf:
+  powerdns:
+    allow_notify_from: 10.200.0.0/16
+    launch: gmysql
+    local_port: 5353
+    socket_dir: /tmp
+
+endpoints:
+  powerdns:
+    port:
+      powerdns:
+        default: 5353
+        protocol: UDP
+      powerdns_tcp:
+        default: 5353
+
+manifests:
+  service_api: true
+  secret_registry: false

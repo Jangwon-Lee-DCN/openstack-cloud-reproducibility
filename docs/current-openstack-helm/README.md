@@ -71,8 +71,9 @@ Heat follows core-service validation. Ironic has a dedicated bare-metal phase
 requiring a provisioning network, BMC inventory, deploy images, cleaning
 policy, and conductor placement.
 
-Octavia, Designate, Barbican, monitoring, and logging are staged additions
-after the foundation passes validation.
+Octavia, Designate, Barbican, monitoring, and logging have passed their PoC
+deployment phases. The exact Designate and PowerDNS chart fixes and packages
+are preserved in this repository.
 
 Magnum, CAPI, and CAPO are explicitly outside this deployment milestone. Their
 future feasibility work is documented at the project level.

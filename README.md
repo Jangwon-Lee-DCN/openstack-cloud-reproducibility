@@ -29,6 +29,10 @@ default user dashboard and Horizon is preserved as the `/horizon/`
 administrator and compatibility fallback. It is the immutable
 artifact source consumed by `openstack-cloud-services`.
 
+Designate and its PowerDNS authoritative backend are pinned with their
+upstream and patched chart packages, encrypted credentials, schema migration,
+DNS VIP, public API route, and acceptance records.
+
 The Magnum workload-cluster path is also pinned: CAPI/CAPO/ORC management
 manifests, the add-on provider, upstream and patched workload charts, the
 custom Magnum and CAPO build inputs, and an unmodified CAPO source archive

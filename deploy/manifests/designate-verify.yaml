@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: designate-zone-crud
+  namespace: openstack
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        application: designate
+        component: acceptance
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: verify
+          image: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: keystone-keystone-admin
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              zone=designate-poc.cloud.dcn.ssu.ac.kr.
+              record=www.designate-poc.cloud.dcn.ssu.ac.kr.
+              openstack zone delete "${zone}" >/dev/null 2>&1 || true
+              for attempt in $(seq 1 60); do
+                if ! openstack zone show "${zone}" >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 2
+              done
+              if openstack zone show "${zone}" >/dev/null 2>&1; then
+                echo "Timed out waiting for the previous zone to be deleted." >&2
+                exit 1
+              fi
+              openstack zone create --email hostmaster@dcn.ssu.ac.kr "${zone}"
+              for attempt in $(seq 1 60); do
+                status="$(openstack zone show "${zone}" -f value -c status)"
+                test "${status}" = ACTIVE && break
+                sleep 2
+              done
+              test "${status}" = ACTIVE
+              openstack recordset create --type A --record 192.0.2.80 \
+                "${zone}" www
+              for attempt in $(seq 1 60); do
+                status="$(openstack recordset show "${zone}" "${record}" \
+                  -f value -c status)"
+                test "${status}" = ACTIVE && break
+                sleep 2
+              done
+              test "${status}" = ACTIVE
+              echo "Designate zone and recordset reached ACTIVE."
