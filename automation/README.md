@@ -40,6 +40,17 @@ ansible-playbook -i inventory/local/hosts.yml playbooks/50-openstack.yml
 ansible-playbook -i inventory/local/hosts.yml playbooks/60-verify.yml
 ```
 
+Before accepting an automation change, run the complete static and immutable
+input validation suite (Ansible syntax, `ansible-lint`, YAML, shell syntax, and
+the release lock):
+
+```bash
+automation/bin/verify-automation.sh
+```
+
+The suite permits the checkout changes being reviewed. Run it with
+`ALLOW_DIRTY_REBUILD_INPUTS=0` once the accepted commit is clean.
+
 Phase 20 fetches `/etc/kubernetes/admin.conf` from the first controller into
 the ignored `automation/ansible/artifacts/` directory. Phases 40, 50, and 60
 run on the Ansible control host using that kubeconfig, the local pinned Git
