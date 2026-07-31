@@ -32,7 +32,7 @@
 
     - name: Inspect hardware virtualization for production compute nodes
       ansible.builtin.stat:
-        path: /dev/kvm
+        path: "{{ compute_kvm_device | default('/dev/kvm') }}"
       register: compute_kvm
       when:
         - deployment_profile == 'production'

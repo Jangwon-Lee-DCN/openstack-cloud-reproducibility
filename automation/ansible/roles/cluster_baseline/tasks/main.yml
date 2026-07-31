@@ -68,12 +68,14 @@
   args:
     executable: /bin/bash
   loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique }}"
-  changed_when: true
+  register: declared_role_labels
+  changed_when: "'not labeled' not in (declared_role_labels.stdout | default(''))"
 
 - name: Apply canonical OpenStack node labels explicitly
   ansible.builtin.command: "kubectl label node {{ item }} openstack-control-plane=enabled --overwrite"
   loop: "{{ groups['control_plane'] }}"
-  changed_when: true
+  register: control_plane_labels
+  changed_when: "'not labeled' not in (control_plane_labels.stdout | default(''))"
 
 - name: Apply canonical Nova and OVS labels to compute nodes
   ansible.builtin.command: >-
@@ -83,7 +85,8 @@
     --overwrite
   loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
   when: "'compute' in (hostvars[item].node_roles | default([]))"
-  changed_when: true
+  register: compute_labels
+  changed_when: "'not labeled' not in (compute_labels.stdout | default(''))"
 
 - name: Apply canonical OVN gateway labels
   ansible.builtin.command: >-
@@ -95,21 +98,24 @@
     --overwrite
   loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
   when: "'ovn_gateway' in (hostvars[item].node_roles | default([]))"
-  changed_when: true
+  register: ovn_gateway_labels
+  changed_when: "'not labeled' not in (ovn_gateway_labels.stdout | default(''))"
 
 - name: Apply canonical Cinder volume labels
   ansible.builtin.command: >-
     kubectl label node {{ item }} openstack-cinder-volume=enabled --overwrite
   loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
   when: "'cinder' in (hostvars[item].node_roles | default([]))"
-  changed_when: true
+  register: cinder_labels
+  changed_when: "'not labeled' not in (cinder_labels.stdout | default(''))"
 
 - name: Apply canonical object-storage labels
   ansible.builtin.command: >-
     kubectl label node {{ item }} openstack-object-storage=enabled --overwrite
   loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
   when: "'object_storage' in (hostvars[item].node_roles | default([]))"
-  changed_when: true
+  register: object_storage_labels
+  changed_when: "'not labeled' not in (object_storage_labels.stdout | default(''))"
 
 - name: Remove the control-plane scheduling taint from compute-capable controllers
   ansible.builtin.command: >-

@@ -11,6 +11,7 @@ helm_version: v3.18.4
 kubeadm_api_version: kubeadm.k8s.io/v1beta4
 management_interface: eno1
 provider_interface: eno2
+compute_kvm_device: /dev/kvm
 pod_cidr: 10.200.0.0/16
 service_cidr: 10.96.0.0/12
 cluster_dns_domain: cluster.local

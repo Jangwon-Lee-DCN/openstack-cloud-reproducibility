@@ -196,3 +196,9 @@ disk inventory.
 These labels are matched to the pinned Nova, Neutron, OVN, and Open vSwitch
 chart selectors. Do not substitute similarly named labels without checking the
 accepted chart packages.
+
+`automation/bin/verify-automation.sh` includes a synthetic four-controller,
+one-compute, three-storage inventory test. It verifies the init/control-plane/
+worker join target sets, every HAProxy API backend, positive and negative KVM
+gates, and the canonical selectors in the pinned Nova, OVN, and Open vSwitch
+charts. Run it before accepting an inventory or expansion-automation change.

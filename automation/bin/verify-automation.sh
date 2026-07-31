@@ -23,6 +23,7 @@ yamllint -d \
   playbooks roles inventory/production inventory/poc-two-node
 
 bash -n bin/*.sh ../bin/*.sh ../lab/*.sh
+bin/verify-expansion-contract.sh
 ALLOW_DIRTY_REBUILD_INPUTS=${ALLOW_DIRTY_REBUILD_INPUTS:-1} \
   "$root/automation/bin/verify-inputs.sh"
 
