@@ -2,6 +2,8 @@
 *.plain.yaml
 /tmp/
 .DS_Store
+__pycache__/
+*.pyc
 
 # Keep operational incident evidence local to the deployment.
 docs/incidents/

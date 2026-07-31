@@ -1,16 +1,29 @@
 # Neutron drift audit
 
-`scripts/audit-vpc-neutron-drift.sh` compares SecurityGroup, ElasticIP, and
-NatGateway status IDs with real Neutron SG/FIP/router inventories. It detects
-both CRs whose actual resource is missing and managed Neutron resources not
-tracked by a CR.
+The legacy `scripts/audit-vpc-neutron-drift.sh` remains useful for an ad-hoc
+report. The production path is a per-project CronJob installed by
+`scripts/install-drift-auditor.sh`. It runs every 15 minutes and compares:
 
-Run it with project-scoped OpenStack credentials:
+- Security Group and rule IDs
+- Floating IP existence, target port, and fixed IP
+- NAT router existence, external network/fixed IPs, and `enable_snat`
+- managed Neutron resources no longer tracked by a CR
 
 ```sh
-deploy/monitoring/scripts/audit-vpc-neutron-drift.sh project-<id> report.json
+deploy/monitoring/scripts/install-drift-auditor.sh vpc-<project-id> [...]
 ```
 
-Set `PUSHGATEWAY_URL` to publish `vpc_neutron_drift_resources` for Grafana.
-The auditor never mutates CRs or Neutron. Review its JSON and Kubernetes Events,
-then use the normal controller retry path separately if correction is safe.
+Each Job uses only that namespace's project credential and read-only CRD RBAC.
+It publishes `vpc_neutron_drift_resources` and a last-success timestamp for
+Grafana/Prometheus. The auditor never mutates CRs or Neutron.
+
+After reviewing the report, an operator can explicitly request a single
+controller retry. There is no unattended repair loop:
+
+```sh
+APPROVE_RECONCILE=yes deploy/monitoring/scripts/request-drift-reconcile.sh \
+  vpc-<project-id> securitygroup <name>
+```
+
+`VPCNeutronDriftPersistent` fires when drift lasts 30 minutes and
+`VPCNeutronDriftAuditStale` fires when successful audits stop.

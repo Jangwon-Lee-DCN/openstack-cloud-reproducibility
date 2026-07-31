@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: vpc-neutron-drift-auditor, namespace: __PROJECT_NAMESPACE__}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: vpc-neutron-drift-auditor, namespace: __PROJECT_NAMESPACE__}
+rules:
+- apiGroups: [vpc.dcn.ssu.ac.kr]
+  resources: [securitygroups, elasticips, natgateways]
+  verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: vpc-neutron-drift-auditor, namespace: __PROJECT_NAMESPACE__}
+subjects:
+- {kind: ServiceAccount, name: vpc-neutron-drift-auditor, namespace: __PROJECT_NAMESPACE__}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: vpc-neutron-drift-auditor}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: vpc-neutron-drift-auditor, namespace: __PROJECT_NAMESPACE__}
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: vpc-neutron-drift-auditor
+          restartPolicy: Never
+          containers:
+          - name: audit
+            image: quay.io/airshipit/openstack-client:2025.1-ubuntu_noble
+            command: [python3, /opt/audit/audit.py]
+            env:
+            - {name: PROJECT_NAMESPACE, value: __PROJECT_NAMESPACE__}
+            - {name: OS_CLIENT_CONFIG_FILE, value: /etc/openstack/clouds.yaml}
+            - {name: HOME, value: /tmp}
+            - {name: PUSHGATEWAY_URL, value: "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091"}
+            volumeMounts:
+            - {name: audit, mountPath: /opt/audit, readOnly: true}
+            - {name: cloud, mountPath: /etc/openstack, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: {drop: [ALL]}
+          volumes:
+          - configMap: {name: vpc-neutron-drift-auditor}
+            name: audit
+          - secret: {secretName: openstack-credentials}
+            name: cloud
+          - emptyDir: {}
+            name: tmp

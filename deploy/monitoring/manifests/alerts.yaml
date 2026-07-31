@@ -151,3 +151,19 @@ spec:
             summary: VPC controller received Neutron HTTP 409
             description: "{{ $labels.controller }} operation {{ $labels.operation }} received a conflict response."
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
+        - alert: VPCNeutronDriftPersistent
+          expr: sum by (project_namespace) (vpc_neutron_drift_resources) > 0
+          for: 30m
+          labels: {severity: warning}
+          annotations:
+            summary: VPC CRM and Neutron state have persistent drift
+            description: "{{ $labels.project_namespace }} has reported drift for more than 30 minutes. Audit is read-only; review before requesting reconcile."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/neutron-drift-audit.md
+        - alert: VPCNeutronDriftAuditStale
+          expr: time() - vpc_neutron_drift_last_success_timestamp_seconds > 3600
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: VPC Neutron drift audit is stale
+            description: "No successful drift report for {{ $labels.project_namespace }} in more than one hour."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/neutron-drift-audit.md
