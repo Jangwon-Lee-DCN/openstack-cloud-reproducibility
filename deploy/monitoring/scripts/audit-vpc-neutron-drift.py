@@ -49,6 +49,34 @@ def normalized_gateway(value):
     }
 
 
+def tags(row):
+    value = field(row, "Tags", "tags") or []
+    if isinstance(value, str):
+        value = [item.strip() for item in value.split(",") if item.strip()]
+    return set(value)
+
+
+def ownership_tag_drift(items, actual_by_id, status_key):
+    missing = []
+    for item in items:
+        neutron_id = item.get("status", {}).get(status_key)
+        actual = actual_by_id.get(neutron_id)
+        if not neutron_id or actual is None:
+            continue
+        required = {
+            "vpc-control-plane",
+            "vpc-cr-uid=" + item.get("metadata", {}).get("uid", ""),
+        }
+        if not required.issubset(tags(actual)):
+            missing.append({
+                "id": neutron_id,
+                "kind": item.get("kind"),
+                "name": item.get("metadata", {}).get("name"),
+                "missingTags": sorted(required - tags(actual)),
+            })
+    return missing
+
+
 security_groups, elastic_ips, nat_gateways = kube("securitygroups"), kube("elasticips"), kube("natgateways")
 actual_sg, actual_fip, actual_router = osc("security", "group", "list"), osc("floating", "ip", "list"), osc("router", "list")
 actual_rules = osc("security", "group", "rule", "list")
@@ -67,6 +95,8 @@ actual_rule_ids = {row_id(x) for x in actual_rules}
 
 fip_association_drift, fip_fixed_ip_drift = [], []
 actual_fip_by_id = {row_id(x): x for x in actual_fip}
+actual_sg_by_id = {row_id(x): x for x in actual_sg}
+actual_router_by_id = {row_id(x): x for x in actual_router}
 for item in elastic_ips:
     status = item.get("status", {})
     actual = actual_fip_by_id.get(status.get("floatingIPID"), {})
@@ -128,11 +158,17 @@ report = {
         "floatingIPFixedIPs": sorted(fip_fixed_ip_drift),
         "routerGateways": router_gateway_drift,
     },
+    "ownershipTagDrift": [
+        *ownership_tag_drift(security_groups, actual_sg_by_id, "securityGroupID"),
+        *ownership_tag_drift(elastic_ips, actual_fip_by_id, "floatingIPID"),
+        *ownership_tag_drift(nat_gateways, actual_router_by_id, "routerID"),
+    ],
 }
 report["summary"] = {
     "missingActual": sum(map(len, report["missingActual"].values())),
     "untrackedManaged": sum(map(len, report["untrackedManaged"].values())),
     "associationDrift": len(fip_association_drift) + len(fip_fixed_ip_drift) + len(router_gateway_drift),
+    "ownershipTagDrift": len(report["ownershipTagDrift"]),
 }
 print(json.dumps(report, sort_keys=True))
 
