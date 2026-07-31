@@ -1,0 +1,151 @@
+<div ng-controller="LoadBalancerDetailsController as ctrl">
+  <p translate>Provide the details for the load balancer.</p>
+
+  <div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12">
+      <div class="form-group">
+        <label class="control-label required" translate>Load balancer type</label>
+        <div class="form-field">
+          <div class="btn-group" role="group">
+            <label class="btn btn-default"
+                   ng-repeat="option in ctrl.providerOptions"
+                   ng-model="model.spec.loadbalancer.provider"
+                   ng-disabled="model.context.id"
+                   ng-click="ctrl.setProvider(option.value)"
+                   ng-class="{active: model.spec.loadbalancer.provider === option.value}">
+              {$ ::option.label $}
+            </label>
+          </div>
+        </div>
+        <span class="help-block" translate ng-if="model.context.id">
+          The load balancer type cannot be changed after creation.
+        </span>
+        <span class="help-block" translate ng-if="!model.context.id">
+          Choose L4 only unless a listener needs HTTP/HTTPS -- L4+L7
+          load balancers use a real virtual machine and have higher
+          overhead. Only protocols and algorithms this type actually
+          supports will be offered in the following steps.
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+
+    <div class="col-xs-12 col-sm-8 col-md-6">
+      <div class="form-group">
+        <label translate class="control-label" for="name">Name</label>
+        <input name="name" id="name" type="text" class="form-control"
+               ng-model="model.spec.loadbalancer.name">
+      </div>
+    </div>
+
+    <div class="col-xs-12 col-sm-8 col-md-6">
+      <div class="form-group"
+        ng-class="{ 'has-error': loadBalancerDetailsForm.ip.$invalid && loadBalancerDetailsForm.ip.$dirty }">
+        <label translate class="control-label" for="ip">IP address</label>
+        <input name="ip" id="ip" type="text" class="form-control"
+               ng-model="model.spec.loadbalancer.vip_address" ng-pattern="::ctrl.ipPattern"
+               ng-disabled="model.context.id">
+        <span class="help-block" ng-show="loadBalancerDetailsForm.ip.$invalid && loadBalancerDetailsForm.ip.$dirty">
+          {$ ::ctrl.ipError $}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12">
+      <div class="form-group">
+        <label translate class="control-label" for="description">Description</label>
+        <input name="description" id="description" type="text" class="form-control"
+               ng-model="model.spec.loadbalancer.description">
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12">
+      <div class="form-group">
+        <label class="control-label">
+          <translate>Availability Zone</translate>
+        </label>
+        <!-- value="model.spec.loadbalancer.availability_zone" -->
+        <filter-select
+          shorthand="ctrl.availabilityZoneShorthand"
+
+          on-select="ctrl.setAvailabilityZone(option)"
+          disabled="model.context.id"
+          columns="ctrl.availabilityZoneColumns"
+          options="ctrl.availabilityZoneOptions"
+          loaded="ctrl.dataLoaded"
+
+          ng-model="model.spec.loadbalancer.availability_zone"
+        ></filter-select>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12">
+      <div class="form-group">
+        <label class="control-label">
+          <translate>Flavor</translate>
+        </label>
+        <!-- value="model.spec.loadbalancer.flavor_id" -->
+        <filter-select
+          shorthand="ctrl.flavorShorthand"
+
+          on-select="ctrl.setFlavor(option)"
+          disabled="model.context.id"
+          columns="ctrl.flavorColumns"
+          options="ctrl.flavorOptions"
+          loaded="ctrl.dataLoaded"
+
+          ng-model="model.spec.loadbalancer.flavor_id"
+        ></filter-select>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-12">
+      <div class="form-group">
+        <label class="control-label">
+          <translate>Subnet</translate>
+          <span class="hz-icon-required fa fa-asterisk"></span>
+        </label>
+        <!-- value="model.spec.loadbalancer.vip_subnet_id" -->
+        <filter-select
+          shorthand="ctrl.shorthand"
+
+          on-select="ctrl.setSubnet(option)"
+          disabled="model.context.id"
+          columns="ctrl.subnetColumns"
+          options="ctrl.subnetOptions"
+          loaded="ctrl.dataLoaded"
+
+          ng-required="true"
+          ng-model="model.spec.loadbalancer.vip_subnet_id"
+        ></filter-select>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12 col-sm-8 col-md-6">
+      <div class="form-group">
+        <label class="control-label required" translate>Admin State Up</label>
+        <div class="form-field">
+          <div class="btn-group">
+            <label class="btn btn-default"
+                   ng-repeat="option in model.yesNoOptions"
+                   ng-model="model.spec.loadbalancer.admin_state_up"
+                   uib-btn-radio="option.value">{$ ::option.label $}</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

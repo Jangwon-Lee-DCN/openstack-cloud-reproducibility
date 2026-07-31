@@ -15,8 +15,8 @@ images:
     ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     octavia_db_sync: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
-    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:44eea4b421d619d442b868b958fb0b8dabfa8e649c35f81ea41662ff5390bd49
-    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:44eea4b421d619d442b868b958fb0b8dabfa8e649c35f81ea41662ff5390bd49
+    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:30a2d22ea9294ea6e6193c922af679929415953a7aa17f263c9669e7ca65ab4a
+    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:30a2d22ea9294ea6e6193c922af679929415953a7aa17f263c9669e7ca65ab4a
     octavia_worker: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:3f052c46f46ec08d5a39c76719a2db70067637135fe695b5ca9c3f1536045a1f
     octavia_worker_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     octavia_housekeeping: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
@@ -52,6 +52,7 @@ conf:
       ovn_sb_connection: tcp:10.200.1.251:6642,tcp:10.200.1.132:6642,tcp:10.200.0.200:6642
     service_auth:
       endpoint_type: internalURL
+      valid_interfaces: internal
       cafile: /etc/ssl/certs/openstack-internal-ca.crt
     controller_worker:
       amp_boot_network_list: f4ee31af-2888-4ec5-894a-b01896d59eb2
@@ -89,6 +90,17 @@ pod:
         operator: Exists
         effect: NoSchedule
   mounts:
+    octavia_driver_agent:
+      octavia_driver_agent:
+        volumeMounts:
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: openstack-internal-ca
+            secret:
+              secretName: openstack-internal-ca
     octavia_api:
       octavia_api:
         volumeMounts:

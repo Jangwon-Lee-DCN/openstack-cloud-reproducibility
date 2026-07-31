@@ -18,19 +18,36 @@ spec:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
+      initContainers:
+        # ConfigMap volumes expose every entry as a symlink into a
+        # versioned ..data directory (Kubernetes' atomic-update
+        # mechanism). Kaniko's COPY preserves symlinks verbatim rather
+        # than dereferencing them, so building directly against the
+        # ConfigMap mount bakes broken symlinks into the image. Flatten
+        # it into a plain directory (cp -rL dereferences every symlink)
+        # before handing it to Kaniko as the build context.
+        - name: flatten-context
+          image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+          command: ["/busybox/sh", "-c", "cp -rL /workspace/. /context-plain/"]
+          volumeMounts:
+            - name: context
+              mountPath: /workspace
+              readOnly: true
+            - name: context-plain
+              mountPath: /context-plain
       containers:
         - name: kaniko
           image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
           args:
-            - --context=dir:///workspace
-            - --dockerfile=/workspace/Dockerfile
-            - --destination=registry.dcn.ssu.ac.kr/openstack/horizon:2026.1-octavia-dashboard-poc1
+            - --context=dir:///context-plain
+            - --dockerfile=/context-plain/Dockerfile
+            - --destination=registry.dcn.ssu.ac.kr/openstack/horizon:2026.1-octavia-dashboard-panelmove1
             - --digest-file=/dev/termination-log
             - --skip-tls-verify
             - --snapshot-mode=redo
           volumeMounts:
-            - name: context
-              mountPath: /workspace
+            - name: context-plain
+              mountPath: /context-plain
               readOnly: true
             - name: registry-auth
               mountPath: /kaniko/.docker
@@ -39,6 +56,8 @@ spec:
         - name: context
           configMap:
             name: horizon-octavia-dashboard-image-build
+        - name: context-plain
+          emptyDir: {}
         - name: registry-auth
           secret:
             secretName: telemetry-harbor-push
