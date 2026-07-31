@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:cf1b6e3d6e83f5aef38691f2cc9198e0ded029ac81b7eade2fc12ba4df92a668
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:4265112e4d813b3a317b9a09e383a01e7fefdcf31cb86780f4e688bb84ae4e07
 pod:
   image_pull_secrets:
     horizon:
@@ -92,7 +92,12 @@ conf:
         raw:
           FORCE_SCRIPT_NAME: /horizon
           WEBROOT: /horizon/
-          COMPRESS_OFFLINE: "False"
+          # Keep offline manifests disabled; they were generated
+          # nondeterministically across replicas. Runtime compression remains
+          # enabled, with the startup script handing the static directory to
+          # the Horizon WSGI user after collectstatic/compress.
+          COMPRESS_OFFLINE: false
+          COMPRESS_ENABLED: true
           LOGIN_URL: /horizon/auth/login/
           LOGOUT_URL: /horizon/auth/logout/
           LOGIN_REDIRECT_URL: /horizon/

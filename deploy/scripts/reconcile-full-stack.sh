@@ -89,6 +89,9 @@ install_release() {
   values="$WORK_DIR/$release.yaml"
   sops -d "$REPO_ROOT/$snapshot" > "$values"
   helm upgrade --install "$release" "$REPO_ROOT/$package"     --namespace "$NAMESPACE" --create-namespace -f "$values" --timeout 15m
+  if [[ "$release" == "horizon" ]]; then
+    "$REPO_ROOT/deploy/scripts/ensure-horizon-static-ownership.sh"
+  fi
   wait_release "$release"
 }
 
