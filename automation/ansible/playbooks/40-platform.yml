@@ -1,0 +1,9 @@
+---
+- name: Install platform prerequisites in dependency order
+  hosts: control_plane[0]
+  become: false
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+    SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+  roles:
+    - platform_prerequisites

@@ -1,0 +1,14 @@
+---
+- name: Prepare all Kubernetes and OpenStack hosts
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - host_base
+    - kubernetes_packages
+
+- name: Configure the Kubernetes API virtual endpoint
+  hosts: control_plane
+  become: true
+  roles:
+    - api_load_balancer

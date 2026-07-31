@@ -1,0 +1,7 @@
+---
+- name: Join Kubernetes worker node
+  ansible.builtin.command: >-
+    {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
+    --cri-socket unix:///var/run/crio/crio.sock
+  args:
+    creates: /etc/kubernetes/kubelet.conf

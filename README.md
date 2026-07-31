@@ -58,3 +58,8 @@ BUILD_IMAGES=1 ./deploy/scripts/reconcile-full-stack.sh
 
 Read each component's `ISSUE.md`, `FIX.md`, `RECONCILE.md`, and `VERIFY.md`
 before using the environment-specific encrypted profile on another cloud.
+
+For a rebuild from fresh Ubuntu Server 24.04 hosts, start with
+[`automation/README.md`](automation/README.md) and the
+[`fresh-server-rebuild-runbook`](docs/fresh-server-rebuild-runbook.md). The
+Ansible workflow deliberately stops at disk and provider-network safety gates.

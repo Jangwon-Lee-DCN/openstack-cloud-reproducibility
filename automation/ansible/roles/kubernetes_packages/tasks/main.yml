@@ -1,0 +1,69 @@
+---
+- name: Create APT keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Kubernetes repository key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_minor }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes.asc
+    mode: '0644'
+
+- name: Configure Kubernetes repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes.asc] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_minor }}/deb/ /"
+    filename: kubernetes
+    state: present
+
+- name: Download CRI-O repository key
+  ansible.builtin.get_url:
+    url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_minor }}/deb/Release.key"
+    dest: /etc/apt/keyrings/cri-o.asc
+    mode: '0644'
+
+- name: Configure CRI-O repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/cri-o.asc] https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_minor }}/deb/ /"
+    filename: cri-o
+    state: present
+
+- name: Install Kubernetes and CRI-O packages
+  ansible.builtin.apt:
+    name:
+      - cri-o
+      - "kubelet={{ kubernetes_deb_version }}"
+      - "kubeadm={{ kubernetes_deb_version }}"
+      - "kubectl={{ kubernetes_deb_version }}"
+    state: present
+    update_cache: true
+    allow_downgrade: false
+
+- name: Prevent implicit Kubernetes package upgrades
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [kubelet, kubeadm, kubectl, cri-o]
+
+- name: Enable CRI-O and kubelet
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [crio, kubelet]
+
+- name: Download pinned Helm archive
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: "/var/cache/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    mode: '0644'
+
+- name: Extract pinned Helm binary
+  ansible.builtin.unarchive:
+    src: "/var/cache/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /usr/local/bin
+    remote_src: true
+    include: [linux-amd64/helm]
+    extra_opts: [--strip-components=1]
+    creates: /usr/local/bin/helm

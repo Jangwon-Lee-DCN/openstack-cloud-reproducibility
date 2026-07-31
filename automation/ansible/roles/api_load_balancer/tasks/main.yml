@@ -1,0 +1,27 @@
+---
+- name: Install API load-balancer packages
+  ansible.builtin.apt:
+    name: [haproxy, keepalived]
+    state: present
+
+- name: Render Kubernetes API HAProxy configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+    validate: haproxy -c -f %s
+  notify: Restart API load balancer
+
+- name: Render Kubernetes API Keepalived configuration
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0600'
+  notify: Restart API load balancer
+
+- name: Enable API virtual endpoint services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [haproxy, keepalived]

@@ -1,0 +1,58 @@
+---
+- name: Validate fresh Ubuntu hosts and topology
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Require Ubuntu 24.04
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+          - ansible_distribution_version is version('24.04', '>=')
+        fail_msg: This automation supports Ubuntu Server 24.04 or newer only.
+
+    - name: Read network interfaces
+      ansible.builtin.command: ip -json link show
+      register: network_links
+      changed_when: false
+
+    - name: Require management and provider interfaces
+      ansible.builtin.assert:
+        that:
+          - ('\"ifname\":\"' + management_interface + '\"') in network_links.stdout
+          - ('\"ifname\":\"' + provider_interface + '\"') in network_links.stdout
+          - management_interface != provider_interface
+        fail_msg: eno1/eno2-equivalent interfaces must be explicit and distinct.
+
+    - name: Verify passwordless sudo
+      ansible.builtin.command: /usr/bin/true
+      changed_when: false
+
+    - name: Inspect declared Ceph device
+      ansible.builtin.command: "lsblk -dn -o TYPE,FSTYPE,MOUNTPOINTS {{ ceph_device }}"
+      when: ceph_device is defined
+      register: ceph_device_state
+      changed_when: false
+      check_mode: false
+
+    - name: Require a stable, unmounted Ceph disk
+      ansible.builtin.assert:
+        that:
+          - ceph_device.startswith('/dev/disk/by-id/')
+          - ceph_device_state.stdout.startswith('disk')
+          - ceph_device_state.stdout.split() | length == 1
+        fail_msg: The declared Ceph device must be a whole, unformatted, unmounted by-id disk.
+      when: ceph_device is defined
+
+- name: Validate cluster-wide HA policy
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Require three control-plane nodes outside PoC
+      ansible.builtin.assert:
+        that:
+          - groups['control_plane'] | length >= 3 or allow_poc_quorum | bool
+          - deployment_profile == 'poc-two-node' or groups['ceph_nodes'] | length >= 3
+          - keepalived_auth_pass != 'REPLACE_WITH_8_CHARS'
+          - keepalived_auth_pass | length <= 8
+        fail_msg: Resolve quorum, Ceph failure domains, and the Keepalived secret before deployment.

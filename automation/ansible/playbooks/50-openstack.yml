@@ -1,0 +1,19 @@
+---
+- name: Reconcile the pinned OpenStack control plane
+  hosts: control_plane[0]
+  become: false
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+    SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+  tasks:
+    - name: Require an external SOPS age identity
+      ansible.builtin.assert:
+        that: lookup('env', 'SOPS_AGE_KEY_FILE') | length > 0
+        fail_msg: Export SOPS_AGE_KEY_FILE from offline media.
+
+    - name: Reconcile pinned OpenStack-Helm releases
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/reconcile-full-stack.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      register: openstack_reconcile
+      changed_when: true

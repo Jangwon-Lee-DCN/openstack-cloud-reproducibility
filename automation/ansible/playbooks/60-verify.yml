@@ -1,0 +1,15 @@
+---
+- name: Run cluster and OpenStack acceptance checks
+  hosts: control_plane[0]
+  become: false
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+  tasks:
+    - name: Check Kubernetes nodes
+      ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=10m
+      changed_when: false
+    - name: Verify the pinned OpenStack deployment
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-full-stack.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      changed_when: false

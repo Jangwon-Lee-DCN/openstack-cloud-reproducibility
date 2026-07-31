@@ -1,0 +1,30 @@
+vrrp_script check_haproxy {
+  script "/usr/bin/pgrep haproxy"
+  interval 2
+  fall 2
+  rise 2
+}
+
+vrrp_instance KUBERNETES_API {
+  state BACKUP
+  interface {{ management_interface }}
+  virtual_router_id {{ kubernetes_api_vrid }}
+  priority {{ 200 - groups['control_plane'].index(inventory_hostname) }}
+  advert_int 1
+  authentication {
+    auth_type PASS
+    auth_pass {{ keepalived_auth_pass }}
+  }
+  unicast_src_ip {{ ansible_host }}
+  unicast_peer {
+{% for node in groups['control_plane'] if node != inventory_hostname %}
+    {{ hostvars[node].ansible_host }}
+{% endfor %}
+  }
+  virtual_ipaddress {
+    {{ kubernetes_api_vip }}/{{ management_prefix }} dev {{ management_interface }}
+  }
+  track_script {
+    check_haproxy
+  }
+}

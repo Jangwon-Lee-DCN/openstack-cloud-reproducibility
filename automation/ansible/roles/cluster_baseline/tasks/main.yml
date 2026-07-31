@@ -1,0 +1,81 @@
+---
+- name: Add the pinned Cilium Helm repository
+  ansible.builtin.command: helm repo add cilium https://helm.cilium.io --force-update
+  changed_when: false
+
+- name: Update Helm repository metadata
+  ansible.builtin.command: helm repo update cilium
+  changed_when: false
+
+- name: Install pinned Gateway API standard CRDs
+  ansible.builtin.command: >-
+    kubectl apply -f
+    https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
+  changed_when: true
+
+- name: Install Cilium without kube-proxy
+  ansible.builtin.command:
+    argv:
+      - helm
+      - upgrade
+      - --install
+      - cilium
+      - cilium/cilium
+      - --version
+      - "{{ cilium_version }}"
+      - --namespace
+      - kube-system
+      - --set
+      - kubeProxyReplacement=true
+      - --set
+      - "k8sServiceHost={{ kubernetes_api_fqdn }}"
+      - --set
+      - "k8sServicePort={{ kubernetes_api_port }}"
+      - --set
+      - "ipam.mode=cluster-pool"
+      - --set
+      - "ipam.operator.clusterPoolIPv4PodCIDRList={{{ pod_cidr }}}"
+      - --set
+      - routingMode=tunnel
+      - --set
+      - tunnelProtocol=vxlan
+      - --set
+      - gatewayAPI.enabled=true
+      - --set
+      - l2announcements.enabled=true
+      - --set
+      - hubble.relay.enabled=true
+      - --set
+      - hubble.ui.enabled=true
+      - --set
+      - prometheus.enabled=true
+      - --set
+      - operator.prometheus.enabled=true
+  changed_when: true
+
+- name: Wait for Cilium
+  ansible.builtin.command: kubectl -n kube-system rollout status daemonset/cilium --timeout=10m
+  changed_when: false
+
+- name: Apply declared node role labels
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl label node {{ item }}{% for role in hostvars[item].node_roles | default([]) %} openstack-{{ role | replace('_', '-') }}=enabled{% endfor %} --overwrite
+  args:
+    executable: /bin/bash
+  loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique }}"
+  changed_when: true
+
+- name: Apply canonical OpenStack node labels explicitly
+  ansible.builtin.command: "kubectl label node {{ item }} openstack-control-plane=enabled --overwrite"
+  loop: "{{ groups['control_plane'] }}"
+  changed_when: true
+
+- name: Remove the control-plane scheduling taint from compute-capable controllers
+  ansible.builtin.command: >-
+    kubectl taint node {{ item }} node-role.kubernetes.io/control-plane:NoSchedule-
+  loop: "{{ groups['control_plane'] }}"
+  when: "'compute' in (hostvars[item].node_roles | default([]))"
+  register: untaint_result
+  changed_when: "'untainted' in untaint_result.stdout | default('')"
+  failed_when: false

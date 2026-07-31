@@ -1,0 +1,8 @@
+---
+- import_playbook: 00-preflight.yml
+- import_playbook: 10-hosts.yml
+- import_playbook: 20-kubernetes.yml
+- import_playbook: 30-cluster-baseline.yml
+- import_playbook: 40-platform.yml
+- import_playbook: 50-openstack.yml
+- import_playbook: 60-verify.yml

@@ -4,6 +4,10 @@
 .DS_Store
 __pycache__/
 *.pyc
+.ansible/
+automation/ansible/inventory/local/
+automation/ansible/*.retry
+automation/ansible/artifacts/
 
 # Keep operational incident evidence local to the deployment.
 docs/incidents/

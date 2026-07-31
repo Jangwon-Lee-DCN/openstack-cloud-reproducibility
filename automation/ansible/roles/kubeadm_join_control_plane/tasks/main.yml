@@ -1,0 +1,9 @@
+---
+- name: Join additional control-plane node
+  ansible.builtin.command: >-
+    {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
+    --control-plane
+    --certificate-key {{ hostvars[groups['control_plane'][0]].kubeadm_certificate_key }}
+    --cri-socket unix:///var/run/crio/crio.sock
+  args:
+    creates: /etc/kubernetes/admin.conf

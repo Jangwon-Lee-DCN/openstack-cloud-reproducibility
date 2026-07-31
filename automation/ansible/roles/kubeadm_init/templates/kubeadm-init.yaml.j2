@@ -1,0 +1,26 @@
+apiVersion: {{ kubeadm_api_version }}
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: unix:///var/run/crio/crio.sock
+  name: {{ inventory_hostname }}
+  kubeletExtraArgs:
+  - name: node-ip
+    value: {{ ansible_host }}
+---
+apiVersion: {{ kubeadm_api_version }}
+kind: ClusterConfiguration
+kubernetesVersion: {{ kubernetes_version }}
+controlPlaneEndpoint: {{ kubernetes_api_fqdn }}:{{ kubernetes_api_port }}
+networking:
+  podSubnet: {{ pod_cidr }}
+  serviceSubnet: {{ service_cidr }}
+  dnsDomain: {{ cluster_dns_domain }}
+proxy:
+  disabled: true
+apiServer:
+  certSANs:
+  - {{ kubernetes_api_fqdn }}
+  - {{ kubernetes_api_vip }}
+etcd:
+  local:
+    dataDir: /var/lib/etcd

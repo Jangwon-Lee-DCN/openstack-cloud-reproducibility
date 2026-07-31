@@ -1,0 +1,96 @@
+operatorNamespace: rook-ceph
+clusterName: rook-ceph
+kubeVersion: {{ kubernetes_version }}
+cephImage:
+  repository: quay.io/ceph/ceph
+  tag: v20.2.2
+  allowUnsupported: false
+toolbox:
+  enabled: true
+monitoring:
+  enabled: true
+  createPrometheusRules: true
+configOverride: |
+  [global]
+  mon_allow_pool_delete = true
+  osd_pool_default_size = {{ 1 if deployment_profile == 'poc-two-node' else 3 }}
+  osd_pool_default_min_size = {{ 1 if deployment_profile == 'poc-two-node' else 2 }}
+cephClusterSpec:
+  dataDirHostPath: /var/lib/rook
+  mon:
+    count: {{ 1 if deployment_profile == 'poc-two-node' else 3 }}
+    allowMultiplePerNode: {{ 'true' if deployment_profile == 'poc-two-node' else 'false' }}
+  mgr:
+    count: {{ 1 if deployment_profile == 'poc-two-node' else 2 }}
+    allowMultiplePerNode: {{ 'true' if deployment_profile == 'poc-two-node' else 'false' }}
+  dashboard:
+    enabled: true
+    ssl: true
+  storage:
+    useAllNodes: false
+    useAllDevices: false
+    nodes:
+{% for node in groups['ceph_nodes'] %}
+      - name: {{ node }}
+        devices:
+          - name: {{ hostvars[node].ceph_device }}
+{% endfor %}
+  disruptionManagement:
+    managePodBudgets: true
+    osdMaintenanceTimeout: 30
+{% set replica = 1 if deployment_profile == 'poc-two-node' else 3 %}
+{% set safe = 'false' if deployment_profile == 'poc-two-node' else 'true' %}
+cephBlockPools:
+{% for pool in ['kubernetes.volumes', 'cinder.volumes', 'cinder.backups', 'glance.images', 'nova.vms'] %}
+  - name: {{ pool }}
+    spec:
+      failureDomain: {{ 'osd' if deployment_profile == 'poc-two-node' else 'host' }}
+      replicated:
+        size: {{ replica }}
+        requireSafeReplicaSize: {{ safe }}
+{% if pool == 'kubernetes.volumes' %}
+    storageClass:
+      enabled: true
+      name: rook-ceph-block
+      isDefault: true
+      reclaimPolicy: {{ 'Delete' if deployment_profile == 'poc-two-node' else 'Retain' }}
+      allowVolumeExpansion: true
+      volumeBindingMode: Immediate
+      parameters:
+        imageFormat: "2"
+        imageFeatures: layering
+        csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+        csi.storage.k8s.io/controller-expand-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+        csi.storage.k8s.io/controller-publish-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/controller-publish-secret-namespace: rook-ceph
+        csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+        csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+        csi.storage.k8s.io/fstype: ext4
+{% else %}
+    storageClass:
+      enabled: false
+{% endif %}
+{% endfor %}
+cephFileSystems: []
+cephObjectStores:
+  - name: openstack-object-store
+    spec:
+      metadataPool:
+        failureDomain: {{ 'osd' if deployment_profile == 'poc-two-node' else 'host' }}
+        replicated: {size: {{ replica }}, requireSafeReplicaSize: {{ safe }}}
+      dataPool:
+        failureDomain: {{ 'osd' if deployment_profile == 'poc-two-node' else 'host' }}
+        replicated: {size: {{ replica }}, requireSafeReplicaSize: {{ safe }}}
+      preservePoolsOnDelete: true
+      gateway:
+        port: 80
+        instances: 2
+    storageClass:
+      enabled: true
+      name: rook-ceph-bucket
+      reclaimPolicy: Retain
+      parameters: {region: RegionOne}
+    ingress:
+      enabled: false

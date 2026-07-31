@@ -1,0 +1,19 @@
+---
+- name: Initialize the first Kubernetes control plane
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - kubeadm_init
+
+- name: Join the remaining control-plane nodes
+  hosts: control_plane[1:]
+  become: true
+  serial: 1
+  roles:
+    - kubeadm_join_control_plane
+
+- name: Join worker and storage-only nodes
+  hosts: workers:ceph_nodes:!control_plane
+  become: true
+  roles:
+    - kubeadm_join_worker

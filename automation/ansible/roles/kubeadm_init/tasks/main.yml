@@ -1,0 +1,43 @@
+---
+- name: Render kubeadm initialization configuration
+  ansible.builtin.template:
+    src: kubeadm-init.yaml.j2
+    dest: /root/kubeadm-init.yaml
+    mode: '0600'
+
+- name: Initialize Kubernetes
+  ansible.builtin.command: kubeadm init --config /root/kubeadm-init.yaml --upload-certs
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Create operator kubeconfig directory
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0700'
+
+- name: Install operator kubeconfig
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    remote_src: true
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Create worker join command
+  ansible.builtin.command: kubeadm token create --ttl 2h --print-join-command
+  register: worker_join
+  changed_when: false
+
+- name: Upload control-plane certificates
+  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
+  register: cert_upload
+  changed_when: false
+
+- name: Publish ephemeral join data to the play
+  ansible.builtin.set_fact:
+    kubeadm_join_command: "{{ worker_join.stdout }}"
+    kubeadm_certificate_key: "{{ cert_upload.stdout_lines | last }}"

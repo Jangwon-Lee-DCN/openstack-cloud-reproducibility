@@ -1,0 +1,117 @@
+---
+- name: Require the pinned services repository checkout
+  ansible.builtin.command: "git -C {{ services_repo_path }} rev-parse HEAD"
+  register: services_head
+  changed_when: false
+
+- name: Enforce the services repository revision
+  ansible.builtin.assert:
+    that: services_head.stdout == services_repo_ref
+    fail_msg: The services repository is not at the approved immutable revision.
+
+- name: Require an external SOPS age identity
+  ansible.builtin.assert:
+    that: lookup('env', 'SOPS_AGE_KEY_FILE') | length > 0
+    fail_msg: Export SOPS_AGE_KEY_FILE from offline media before platform deployment.
+
+- name: Install pinned SOPS and age tools
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/security/secrets/scripts/install-tools.sh"
+  changed_when: true
+
+- name: Install cert-manager
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/security/cert-manager/scripts/install.sh"
+  changed_when: true
+
+- name: Render the temporary PoC self-signed ClusterIssuer
+  ansible.builtin.copy:
+    dest: /tmp/dcn-selfsigned-clusterissuer.yaml
+    mode: '0600'
+    content: |
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: selfsigned-temporary
+      spec:
+        selfSigned: {}
+  when: deployment_profile == 'poc-two-node'
+
+- name: Create the temporary PoC self-signed ClusterIssuer
+  ansible.builtin.command: kubectl apply -f /tmp/dcn-selfsigned-clusterissuer.yaml
+  when: deployment_profile == 'poc-two-node'
+  changed_when: true
+
+- name: Stop before any implicit Ceph disk operation
+  ansible.builtin.assert:
+    that: confirm_ceph_device_wipe | bool
+    fail_msg: >-
+      Set confirm_ceph_device_wipe=true only after matching every ceph_device
+      stable ID to an empty disk and adapting the selected Rook values profile.
+
+- name: Render the reviewed inventory-driven Rook-Ceph profile
+  ansible.builtin.template:
+    src: rook-values.yaml.j2
+    dest: /tmp/dcn-rook-values.yaml
+    mode: '0600'
+
+- name: Add pinned Rook and Ceph CSI Helm repositories
+  ansible.builtin.shell: |
+    set -euo pipefail
+    helm repo add rook-release https://charts.rook.io/release --force-update
+    helm repo add ceph-csi-operator https://ceph.github.io/ceph-csi-operator --force-update
+    helm repo update rook-release ceph-csi-operator
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Install the Rook operator
+  ansible.builtin.command: >-
+    helm upgrade --install rook-ceph rook-release/rook-ceph --version v1.20.2
+    --namespace rook-ceph --create-namespace
+    --values {{ services_repo_path }}/deployment/prerequisites/storage/rook-ceph/values/operator.yaml
+    --wait --timeout 10m
+  changed_when: true
+
+- name: Install Ceph CSI drivers
+  ansible.builtin.command: >-
+    helm upgrade --install ceph-csi-drivers ceph-csi-operator/ceph-csi-drivers
+    --version 1.0.4 --namespace rook-ceph
+    --values {{ services_repo_path }}/deployment/prerequisites/storage/rook-ceph/values/csi-drivers.yaml
+    --wait --timeout 10m
+  changed_when: true
+
+- name: Install the inventory-driven Ceph cluster
+  ansible.builtin.command: >-
+    helm upgrade --install rook-ceph-cluster rook-release/rook-ceph-cluster
+    --version v1.20.2 --namespace rook-ceph
+    --values /tmp/dcn-rook-values.yaml --wait --timeout 30m
+  changed_when: true
+
+- name: Install public OpenStack Gateway resources
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/networking/openstack-public-gateway/scripts/install.sh"
+  changed_when: true
+
+- name: Install internal OpenStack Gateway resources
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/networking/openstack-internal-gateway/scripts/install.sh"
+  changed_when: true
+
+- name: Install Harbor registry
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/registry/scripts/install.sh"
+  changed_when: true
+
+- name: Install the PoC observability NFS provisioner
+  ansible.builtin.command: >-
+    {{ services_repo_path }}/deployment/prerequisites/storage/nfs-subdir-provisioner/scripts/install.sh
+  when: deployment_profile == 'poc-two-node'
+  changed_when: true
+
+- name: Install platform metrics
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/observability/kube-prometheus-stack/scripts/install.sh"
+  changed_when: true
+
+- name: Install platform logs
+  ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/observability/logging/scripts/install.sh"
+  changed_when: true
+
+- name: Install the Octavia jobboard
+  ansible.builtin.command: "{{ repro_repo_path }}/prerequisites/octavia-jobboard/scripts/install.sh"
+  changed_when: true
