@@ -18,5 +18,5 @@ backend kubernetes_api_nodes
   option tcp-check
   balance roundrobin
 {% for node in groups['control_plane'] %}
-  server {{ node }} {{ hostvars[node].ansible_host }}:6443 check
+  server {{ node }} {{ hostvars[node].node_ip | default(hostvars[node].ansible_host) }}:6443 check
 {% endfor %}

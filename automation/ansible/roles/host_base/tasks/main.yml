@@ -26,6 +26,13 @@
     state: present
     update_cache: true
 
+- name: Make the Kubernetes API bootstrap name resolvable before BIND exists
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "\\s{{ kubernetes_api_fqdn | regex_escape }}(?:\\s|$)"
+    line: "{{ kubernetes_api_vip }} {{ kubernetes_api_fqdn }}"
+    state: present
+
 - name: Load Kubernetes and OpenStack kernel modules at boot
   ansible.builtin.copy:
     dest: /etc/modules-load.d/dcn-cloud.conf

@@ -15,10 +15,10 @@ vrrp_instance KUBERNETES_API {
     auth_type PASS
     auth_pass {{ keepalived_auth_pass }}
   }
-  unicast_src_ip {{ ansible_host }}
+  unicast_src_ip {{ node_ip | default(ansible_host) }}
   unicast_peer {
 {% for node in groups['control_plane'] if node != inventory_hostname %}
-    {{ hostvars[node].ansible_host }}
+    {{ hostvars[node].node_ip | default(hostvars[node].ansible_host) }}
 {% endfor %}
   }
   virtual_ipaddress {

@@ -42,9 +42,10 @@ After creation, obtain addresses with:
 
 Copy `inventory/rehearsal/hosts.yml` from the printed addresses, run phases
 `00`, `10`, `15`, `20`, `30`, and `35`, and keep Ceph disk confirmation false.
-Nested VMs have only one tenant NIC by default, so provider-uplink validation
-requires adding a second Neutron port to each VM or limiting the rehearsal to
-the Kubernetes baseline.
+The lifecycle script attaches a second, subnet-less Neutron network so the
+guest's second NIC can exercise the Layer 2-only provider-uplink checks without
+touching its management interface. It also reserves `10.77.0.250` and adds it
+as an allowed-address pair on all management ports for the Keepalived API VIP.
 
 ## Destroy
 

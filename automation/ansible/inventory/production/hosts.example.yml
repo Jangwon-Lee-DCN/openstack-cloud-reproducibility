@@ -3,15 +3,15 @@ all:
   children:
     control_plane:
       hosts:
-        controller-0: {ansible_host: 192.0.2.10, dns_role: primary, node_roles: [controller, ovn_gateway]}
-        controller-1: {ansible_host: 192.0.2.11, dns_role: secondary, node_roles: [controller, ovn_gateway]}
-        controller-2: {ansible_host: 192.0.2.12, node_roles: [controller, ovn_gateway]}
+        controller-0: {ansible_host: 198.51.100.10, node_ip: 192.0.2.10, dns_role: primary, node_roles: [controller, ovn_gateway]}
+        controller-1: {ansible_host: 198.51.100.11, node_ip: 192.0.2.11, dns_role: secondary, node_roles: [controller, ovn_gateway]}
+        controller-2: {ansible_host: 198.51.100.12, node_ip: 192.0.2.12, node_roles: [controller, ovn_gateway]}
     workers:
       hosts:
-        compute-0: {ansible_host: 192.0.2.20, node_roles: [compute, ovn_gateway]}
-        compute-1: {ansible_host: 192.0.2.21, node_roles: [compute, ovn_gateway]}
+        compute-0: {ansible_host: 198.51.100.20, node_ip: 192.0.2.20, node_roles: [compute, ovn_gateway]}
+        compute-1: {ansible_host: 198.51.100.21, node_ip: 192.0.2.21, node_roles: [compute, ovn_gateway]}
     ceph_nodes:
       hosts:
-        storage-0: {ansible_host: 192.0.2.30, ceph_device: /dev/disk/by-id/REPLACE_0}
-        storage-1: {ansible_host: 192.0.2.31, ceph_device: /dev/disk/by-id/REPLACE_1}
-        storage-2: {ansible_host: 192.0.2.32, ceph_device: /dev/disk/by-id/REPLACE_2}
+        storage-0: {ansible_host: 198.51.100.30, node_ip: 192.0.2.30, ceph_device: /dev/disk/by-id/REPLACE_0}
+        storage-1: {ansible_host: 198.51.100.31, node_ip: 192.0.2.31, ceph_device: /dev/disk/by-id/REPLACE_1}
+        storage-2: {ansible_host: 198.51.100.32, node_ip: 192.0.2.32, ceph_device: /dev/disk/by-id/REPLACE_2}

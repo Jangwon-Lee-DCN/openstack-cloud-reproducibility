@@ -15,6 +15,7 @@
       ansible.builtin.command: ip -json link show
       register: network_links
       changed_when: false
+      check_mode: false
 
     - name: Require management and provider interfaces
       ansible.builtin.assert:
@@ -27,6 +28,7 @@
     - name: Verify passwordless sudo
       ansible.builtin.command: /usr/bin/true
       changed_when: false
+      check_mode: false
 
     - name: Inspect declared Ceph device
       ansible.builtin.command: "lsblk -dn -o TYPE,FSTYPE,MOUNTPOINTS {{ ceph_device }}"
@@ -52,7 +54,7 @@
       ansible.builtin.assert:
         that:
           - groups['control_plane'] | length >= 3 or allow_poc_quorum | bool
-          - deployment_profile == 'poc-two-node' or groups['ceph_nodes'] | length >= 3
+          - deployment_profile in ['poc-two-node', 'rehearsal'] or groups['ceph_nodes'] | length >= 3
           - keepalived_auth_pass != 'REPLACE_WITH_8_CHARS'
           - keepalived_auth_pass | length <= 8
         fail_msg: Resolve quorum, Ceph failure domains, and the Keepalived secret before deployment.

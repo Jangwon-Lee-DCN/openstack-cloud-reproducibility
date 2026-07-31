@@ -5,7 +5,7 @@ nodeRegistration:
   name: {{ inventory_hostname }}
   kubeletExtraArgs:
   - name: node-ip
-    value: {{ ansible_host }}
+    value: {{ node_ip | default(ansible_host) }}
 ---
 apiVersion: {{ kubeadm_api_version }}
 kind: ClusterConfiguration

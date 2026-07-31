@@ -7,29 +7,56 @@
     - role: bind_dns
       when: dns_role is defined
 
-- name: Configure host resolver priority
+- name: Configure persistent per-link resolver priority
   hosts: all
   become: true
   gather_facts: false
   tasks:
-    - name: Create systemd-resolved drop-in directory
-      ansible.builtin.file:
-        path: /etc/systemd/resolved.conf.d
-        state: directory
-        mode: '0755'
+    - name: Build authoritative resolver address list
+      ansible.builtin.set_fact:
+        authoritative_dns_addresses: >-
+          {{ (authoritative_dns_addresses | default([]))
+             + [hostvars[item].node_ip | default(hostvars[item].ansible_host)] }}
+      loop: "{{ groups['control_plane'] }}"
+      when: hostvars[item].dns_role is defined
 
-    - name: Prefer both authoritative recursive resolvers
+    - name: Remove obsolete global resolver override
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d/dcn-cloud.conf
+        state: absent
+      notify:
+        - Restart systemd-resolved after global override removal
+        - Reload and apply resolver preference
+
+    - name: Install persistent per-link DNS preference service
       ansible.builtin.copy:
-        dest: /etc/systemd/resolved.conf.d/dcn-cloud.conf
+        dest: /etc/systemd/system/dcn-cloud-dns.service
         mode: '0644'
         content: |
-          [Resolve]
-          DNS={% for node in groups['control_plane'] if hostvars[node].dns_role is defined %}{{ hostvars[node].ansible_host }} {% endfor %}
-          Domains=~{{ dns_domain }}
-          DNSStubListener=yes
-      notify: Restart systemd-resolved
+          [Unit]
+          Description=Prefer DCN authoritative DNS on the management link
+          Wants=network-online.target systemd-resolved.service
+          After=network-online.target systemd-resolved.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/usr/bin/resolvectl dns {{ management_interface }} {{ authoritative_dns_addresses | join(' ') }}
+          ExecStart=/usr/bin/resolvectl domain {{ management_interface }} ~. ~{{ dns_domain }}
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload and apply resolver preference
+
   handlers:
-    - name: Restart systemd-resolved
+    - name: Restart systemd-resolved after global override removal
       ansible.builtin.systemd_service:
         name: systemd-resolved
+        state: restarted
+
+    - name: Reload and apply resolver preference
+      ansible.builtin.systemd_service:
+        name: dcn-cloud-dns.service
+        daemon_reload: true
+        enabled: true
         state: restarted

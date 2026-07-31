@@ -4,7 +4,7 @@ $TTL 300
 @ IN NS ns1.{{ dns_domain }}.
 @ IN NS ns2.{{ dns_domain }}.
 {% for node in (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique %}
-{{ hostvars[node].ansible_host.split('.')[-1] }} IN PTR {{ node }}.{{ dns_domain }}.
+{{ (hostvars[node].node_ip | default(hostvars[node].ansible_host)).split('.')[-1] }} IN PTR {{ node }}.{{ dns_domain }}.
 {% endfor %}
 {{ kubernetes_api_vip.split('.')[-1] }} IN PTR {{ kubernetes_api_fqdn }}.
 {{ openstack_public_gateway_ip.split('.')[-1] }} IN PTR {{ openstack_public_fqdn }}.
