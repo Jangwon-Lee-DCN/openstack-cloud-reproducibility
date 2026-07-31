@@ -127,6 +127,39 @@ status_lab() {
   openstack hypervisor stats show -f yaml
 }
 
+inventory_lab() {
+  local index server management_port node_ip floating_ip dns_line roles
+
+  printf '%s\n' '---' 'all:' '  children:' '    control_plane:' '      hosts:'
+  for index in 0 1 2; do
+    server=${prefix}-${index}
+    openstack server show "$server" >/dev/null
+    management_port=$(openstack port list --server "$server" --network "$network" \
+      -f value -c ID | head -1)
+    node_ip=$(openstack port show "$management_port" -f json -c fixed_ips | \
+      python3 -c 'import json,sys; print(json.load(sys.stdin)["fixed_ips"][0]["ip_address"])')
+    floating_ip=$(openstack floating ip list --port "$management_port" \
+      -f value -c 'Floating IP Address' | head -1)
+    test -n "$node_ip"
+    test -n "$floating_ip"
+
+    dns_line=""
+    roles='[controller, ovn_gateway]'
+    if [[ $index == 0 ]]; then
+      dns_line='          dns_role: primary'
+      roles='[controller, compute, ovn_gateway]'
+    elif [[ $index == 1 ]]; then
+      dns_line='          dns_role: secondary'
+    fi
+    printf '        %s:\n' "$server"
+    printf '          ansible_host: %s\n' "$floating_ip"
+    printf '          node_ip: %s\n' "$node_ip"
+    printf '          node_roles: %s\n' "$roles"
+    [[ -n "$dns_line" ]] && printf '%s\n' "$dns_line"
+  done
+  printf '%s\n' '    workers:' '      hosts: {}' '    ceph_nodes:' '      hosts: {}'
+}
+
 destroy_lab() {
   for index in 0 1 2; do
     server=${prefix}-${index}
@@ -159,6 +192,7 @@ destroy_lab() {
 case "$action" in
   create) create_lab ;;
   status) status_lab ;;
+  inventory) inventory_lab ;;
   destroy) destroy_lab ;;
   *) echo "unsupported action: $action" >&2; exit 2 ;;
 esac

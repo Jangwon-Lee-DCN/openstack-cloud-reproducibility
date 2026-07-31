@@ -46,8 +46,15 @@ After creation, obtain addresses with:
 ./run.sh status
 ```
 
-Copy `inventory/rehearsal/hosts.yml` from the printed addresses, run phases
-`00`, `10`, `15`, `20`, `30`, and `35`, and keep Ceph disk confirmation false.
+Generate the ignored, machine-specific inventory without copying addresses by
+hand:
+
+```bash
+./run.sh inventory > ../ansible/inventory/local/hosts.yml
+```
+
+Then run phases `00`, `10`, `15`, `20`, `30`, and `35`, and keep Ceph disk
+confirmation false.
 The lifecycle script attaches a second, subnet-less Neutron network so the
 guest's second NIC can exercise the Layer 2-only provider-uplink checks without
 touching its management interface. It also reserves `10.77.0.250` and adds it

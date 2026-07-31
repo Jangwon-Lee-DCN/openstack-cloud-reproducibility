@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-action=${1:?usage: run.sh <create|status|destroy>}
+action=${1:?usage: run.sh <create|status|inventory|destroy>}
 root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 namespace=${OPENSTACK_NAMESPACE:-openstack}
 pod=${LAB_OSC_POD:-rebuild-lab-osc}
@@ -9,7 +9,7 @@ image=${LAB_OSC_IMAGE:-quay.io/airshipit/openstack-client:2026.1-ubuntu_noble}
 secret=${LAB_OSC_SECRET:-horizon-keystone-admin}
 
 case "$action" in
-  create|status|destroy) ;;
+  create|status|inventory|destroy) ;;
   *) echo "unsupported action: $action" >&2; exit 2 ;;
 esac
 
