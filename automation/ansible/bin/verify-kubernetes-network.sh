@@ -4,6 +4,13 @@ set -euo pipefail
 namespace=${CONNECTIVITY_NAMESPACE:-rebuild-connectivity-test}
 image=${CONNECTIVITY_IMAGE:-busybox:1.36.1}
 
+# Make remote/root execution deterministic instead of relying on the invoking
+# user's optional ~/.kube/config. Callers can still select another cluster by
+# exporting KUBECONFIG explicitly.
+if [[ -z ${KUBECONFIG:-} && -r /etc/kubernetes/admin.conf ]]; then
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+fi
+
 cleanup() {
   kubectl delete namespace "$namespace" --ignore-not-found --wait=true >/dev/null
 }

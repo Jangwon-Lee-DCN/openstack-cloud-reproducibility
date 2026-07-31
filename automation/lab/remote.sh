@@ -131,10 +131,13 @@ destroy_lab() {
   for index in 0 1 2; do
     server=${prefix}-${index}
     if openstack server show "$server" >/dev/null 2>&1; then
-      while read -r address; do
-        [[ -n "$address" ]] && openstack floating ip delete "$address"
-      done < <(openstack floating ip list --server "$server" -f value \
-        -c 'Floating IP Address')
+      while read -r port_id; do
+        [[ -n "$port_id" ]] || continue
+        while read -r address; do
+          [[ -n "$address" ]] && openstack floating ip delete "$address"
+        done < <(openstack floating ip list --port "$port_id" -f value \
+          -c 'Floating IP Address')
+      done < <(openstack port list --server "$server" -f value -c ID)
       openstack server delete --wait "$server"
     fi
     openstack port delete "${prefix}-provider-port-${index}" 2>/dev/null || true

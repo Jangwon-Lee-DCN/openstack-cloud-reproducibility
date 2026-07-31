@@ -79,6 +79,15 @@ This run also verified why `ansible_host` and `node_ip` are separate inventory
 fields: Ansible reaches these VMs through Floating IPs, while BIND, HAProxy,
 Keepalived, kubelet, and etcd must advertise the tenant-network node addresses.
 
+The same day, the lab was then fully destroyed and recreated with three fresh
+Ubuntu instances and new Neutron ports and addresses. The second clean run
+again completed phases `00` through `35`, proving that the first result did not
+depend on retained VM disks or Kubernetes state. This lifecycle test also found
+and fixed two rehearsal-tool assumptions: Floating IP cleanup now discovers
+addresses through each server port (the client has no `floating ip list
+--server` option), and the network verifier automatically uses the node's
+administrative kubeconfig when invoked remotely as root.
+
 ## Destroy
 
 ```bash
