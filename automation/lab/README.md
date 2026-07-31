@@ -68,6 +68,12 @@ the non-mutating checks in `35`:
   Keepalived was stopped on the owner, and `/readyz` continued to return `ok`;
 - every `ens8` provider interface passed the no-address and no-route safety
   assertions. The bridge candidate was rendered only, as intended.
+- stopping primary BIND left both internal and forwarded Internet resolution
+  available through the secondary, and the primary returned cleanly;
+- rebooting a non-VIP control-plane VM preserved API availability and the node,
+  kubelet, CRI-O, Cilium, and its etcd member returned healthy automatically;
+- the disposable network verifier passed all nine cross-node client-to-Pod-IP
+  paths and all three client-to-ClusterIP paths.
 
 This run also verified why `ansible_host` and `node_ip` are separate inventory
 fields: Ansible reaches these VMs through Floating IPs, while BIND, HAProxy,

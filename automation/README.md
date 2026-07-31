@@ -49,6 +49,12 @@ The control host must be able to resolve and route to the configured
 Kubernetes API VIP/FQDN; phases 40 and 50 fail before making changes when the
 fetched kubeconfig cannot reach `/readyz`.
 
+After phase 30, run `ansible/bin/verify-kubernetes-network.sh` from a host with
+the rebuilt cluster kubeconfig. It
+places one disposable server and client Pod on every node and verifies
+ClusterIP service routing plus every client-to-Pod-IP path, then removes its
+test namespace.
+
 Use `playbooks/site.yml` only after each phase has been rehearsed. Stateful
 phases intentionally require confirmation variables described in the
 inventory and runbook.

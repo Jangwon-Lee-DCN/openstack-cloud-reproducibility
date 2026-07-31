@@ -124,6 +124,11 @@ Do not proceed by copying the SOPS identity onto a controller as a workaround.
 Gate: all Nodes are Ready; Cilium connectivity tests pass; etcd membership is
 correct; API access survives stopping HAProxy on either controller.
 
+Run `automation/ansible/bin/verify-kubernetes-network.sh` with the rebuilt
+kubeconfig to verify one client and server on every node, every cross-node Pod
+IP path, and ClusterIP routing. The script removes its disposable namespace on
+success or failure.
+
 ## Phase 4 — Storage (explicit destructive boundary)
 
 The playbook stops unless `confirm_ceph_device_wipe` is true. Before setting
