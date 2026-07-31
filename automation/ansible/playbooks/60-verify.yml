@@ -6,6 +6,20 @@
   gather_facts: false
   environment:
     KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
+  pre_tasks:
+    - name: Require the fetched administrative kubeconfig
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../artifacts/admin.conf"
+      register: rebuild_kubeconfig
+
+    - name: Refuse acceptance checks without the fetched kubeconfig
+      ansible.builtin.assert:
+        that: rebuild_kubeconfig.stat.isreg | default(false)
+        fail_msg: Run playbooks/20-kubernetes.yml before acceptance checks.
+
+    - name: Verify Kubernetes API access from the Ansible control host
+      ansible.builtin.command: kubectl get --raw=/readyz
+      changed_when: false
   tasks:
     - name: Check Kubernetes nodes
       ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=10m

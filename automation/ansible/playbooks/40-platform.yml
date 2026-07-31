@@ -21,5 +21,17 @@
     - name: Verify Kubernetes API access from the Ansible control host
       ansible.builtin.command: kubectl get --raw=/readyz
       changed_when: false
+
+    - name: Inspect the external SOPS age identity
+      ansible.builtin.stat:
+        path: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+      register: rebuild_sops_identity
+
+    - name: Refuse platform installation without a readable SOPS identity
+      ansible.builtin.assert:
+        that:
+          - rebuild_sops_identity.stat.isreg | default(false)
+          - rebuild_sops_identity.stat.readable | default(false)
+        fail_msg: Export SOPS_AGE_KEY_FILE with the path to a readable offline identity.
   roles:
     - platform_prerequisites

@@ -29,6 +29,18 @@
         that: lookup('env', 'SOPS_AGE_KEY_FILE') | length > 0
         fail_msg: Export SOPS_AGE_KEY_FILE from offline media.
 
+    - name: Inspect the external SOPS age identity
+      ansible.builtin.stat:
+        path: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+      register: rebuild_sops_identity
+
+    - name: Require a readable SOPS age identity
+      ansible.builtin.assert:
+        that:
+          - rebuild_sops_identity.stat.isreg | default(false)
+          - rebuild_sops_identity.stat.readable | default(false)
+        fail_msg: SOPS_AGE_KEY_FILE must identify a readable regular file.
+
     - name: Verify immutable rebuild inputs
       ansible.builtin.command: "{{ repro_repo_path }}/automation/bin/verify-inputs.sh"
       args:
