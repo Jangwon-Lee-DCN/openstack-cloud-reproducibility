@@ -1,9 +1,25 @@
 ---
 - name: Install platform prerequisites in dependency order
-  hosts: control_plane[0]
+  hosts: localhost
+  connection: local
   become: false
+  gather_facts: false
   environment:
-    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
     SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+  pre_tasks:
+    - name: Require the fetched administrative kubeconfig
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../artifacts/admin.conf"
+      register: rebuild_kubeconfig
+
+    - name: Refuse platform installation without the fetched kubeconfig
+      ansible.builtin.assert:
+        that: rebuild_kubeconfig.stat.isreg | default(false)
+        fail_msg: Run playbooks/20-kubernetes.yml before platform installation.
+
+    - name: Verify Kubernetes API access from the Ansible control host
+      ansible.builtin.command: kubectl get --raw=/readyz
+      changed_when: false
   roles:
     - platform_prerequisites

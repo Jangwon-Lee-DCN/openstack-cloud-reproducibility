@@ -111,6 +111,16 @@ VXLAN cluster-pool IPAM, Gateway API, LB-IPAM/L2 announcements, Hubble, and
 metrics. The automation applies OpenStack role labels and untaints only a
 controller explicitly carrying the `compute` role.
 
+Phase 20 also fetches the administrative kubeconfig to the Ansible control
+host's ignored `automation/ansible/artifacts/` directory. Later platform and
+OpenStack phases execute from the control host, where the pinned repositories
+and offline SOPS identity reside; those credentials are not copied to cluster
+nodes.
+
+Gate: from the Ansible control host, the fetched kubeconfig must resolve the
+API FQDN, route to the management-network VIP, and return `ok` from `/readyz`.
+Do not proceed by copying the SOPS identity onto a controller as a workaround.
+
 Gate: all Nodes are Ready; Cilium connectivity tests pass; etcd membership is
 correct; API access survives stopping HAProxy on either controller.
 

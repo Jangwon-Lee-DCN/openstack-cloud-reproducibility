@@ -4,6 +4,13 @@
   become: true
   roles:
     - kubeadm_init
+  post_tasks:
+    - name: Fetch the administrative kubeconfig to the Ansible control host
+      ansible.builtin.fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ playbook_dir }}/../artifacts/admin.conf"
+        flat: true
+      no_log: true
 
 - name: Join the remaining control-plane nodes
   hosts: control_plane[1:]

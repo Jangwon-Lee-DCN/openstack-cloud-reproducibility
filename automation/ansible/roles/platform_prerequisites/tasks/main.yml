@@ -14,6 +14,13 @@
     that: lookup('env', 'SOPS_AGE_KEY_FILE') | length > 0
     fail_msg: Export SOPS_AGE_KEY_FILE from offline media before platform deployment.
 
+- name: Stop before any implicit Ceph disk operation
+  ansible.builtin.assert:
+    that: confirm_ceph_device_wipe | bool
+    fail_msg: >-
+      Set confirm_ceph_device_wipe=true only after matching every ceph_device
+      stable ID to an empty disk and adapting the selected Rook values profile.
+
 - name: Install pinned SOPS and age tools
   ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/security/secrets/scripts/install-tools.sh"
   changed_when: true
@@ -39,13 +46,6 @@
   ansible.builtin.command: kubectl apply -f /tmp/dcn-selfsigned-clusterissuer.yaml
   when: deployment_profile == 'poc-two-node'
   changed_when: true
-
-- name: Stop before any implicit Ceph disk operation
-  ansible.builtin.assert:
-    that: confirm_ceph_device_wipe | bool
-    fail_msg: >-
-      Set confirm_ceph_device_wipe=true only after matching every ceph_device
-      stable ID to an empty disk and adapting the selected Rook values profile.
 
 - name: Render the reviewed inventory-driven Rook-Ceph profile
   ansible.builtin.template:

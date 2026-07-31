@@ -40,6 +40,15 @@ ansible-playbook -i inventory/local/hosts.yml playbooks/50-openstack.yml
 ansible-playbook -i inventory/local/hosts.yml playbooks/60-verify.yml
 ```
 
+Phase 20 fetches `/etc/kubernetes/admin.conf` from the first controller into
+the ignored `automation/ansible/artifacts/` directory. Phases 40, 50, and 60
+run on the Ansible control host using that kubeconfig, the local pinned Git
+checkouts, and the locally mounted SOPS age identity. Do not copy the age
+identity or repository credentials onto Kubernetes nodes.
+The control host must be able to resolve and route to the configured
+Kubernetes API VIP/FQDN; phases 40 and 50 fail before making changes when the
+fetched kubeconfig cannot reach `/readyz`.
+
 Use `playbooks/site.yml` only after each phase has been rehearsed. Stateful
 phases intentionally require confirmation variables described in the
 inventory and runbook.

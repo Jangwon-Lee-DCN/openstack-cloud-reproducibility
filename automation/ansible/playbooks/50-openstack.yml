@@ -1,13 +1,29 @@
 ---
 - name: Reconcile the pinned OpenStack control plane
-  hosts: control_plane[0]
+  hosts: localhost
+  connection: local
   become: false
+  gather_facts: false
   environment:
-    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
     SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
     REPRO_ROOT: "{{ repro_repo_path }}"
     VERIFY_AFTER_RECONCILE: "0"
   tasks:
+    - name: Require the fetched administrative kubeconfig
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../artifacts/admin.conf"
+      register: rebuild_kubeconfig
+
+    - name: Refuse reconciliation without the fetched kubeconfig
+      ansible.builtin.assert:
+        that: rebuild_kubeconfig.stat.isreg | default(false)
+        fail_msg: Run playbooks/20-kubernetes.yml before OpenStack reconciliation.
+
+    - name: Verify Kubernetes API access from the Ansible control host
+      ansible.builtin.command: kubectl get --raw=/readyz
+      changed_when: false
+
     - name: Require an external SOPS age identity
       ansible.builtin.assert:
         that: lookup('env', 'SOPS_AGE_KEY_FILE') | length > 0

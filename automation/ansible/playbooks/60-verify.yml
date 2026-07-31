@@ -1,9 +1,11 @@
 ---
 - name: Run cluster and OpenStack acceptance checks
-  hosts: control_plane[0]
+  hosts: localhost
+  connection: local
   become: false
+  gather_facts: false
   environment:
-    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
   tasks:
     - name: Check Kubernetes nodes
       ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=10m
