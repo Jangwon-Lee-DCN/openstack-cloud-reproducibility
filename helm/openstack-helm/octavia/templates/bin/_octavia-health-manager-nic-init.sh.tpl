@@ -20,6 +20,8 @@ set -ex
 
 HM_PORT_ID=$(cat /tmp/pod-shared/HM_PORT_ID)
 HM_PORT_MAC=$(cat /tmp/pod-shared/HM_PORT_MAC)
+HM_PORT_IP=$(cat /tmp/pod-shared/HM_PORT_IP)
+HM_PREFIX=$(cat /tmp/pod-shared/HM_PREFIX)
 
 ovs-vsctl --no-wait show
 
@@ -31,5 +33,8 @@ ovs-vsctl --may-exist add-port br-int o-hm0 \
         -- set Interface o-hm0 external-ids:skip_cleanup=true
 
 ip link set dev o-hm0 address $HM_PORT_MAC
+ip address replace "$HM_PORT_IP/$HM_PREFIX" dev o-hm0
+ip link set dev o-hm0 up
 
-iptables -I INPUT -i o-hm0 -p udp --dport {{ .Values.conf.octavia.health_manager.bind_port }} -j ACCEPT
+iptables -C INPUT -i o-hm0 -p udp --dport {{ .Values.conf.octavia.health_manager.bind_port }} -j ACCEPT 2>/dev/null || \
+  iptables -I INPUT -i o-hm0 -p udp --dport {{ .Values.conf.octavia.health_manager.bind_port }} -j ACCEPT

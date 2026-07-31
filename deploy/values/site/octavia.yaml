@@ -1,10 +1,10 @@
-# Octavia API with the OVN provider for the two-controller PoC.
+# Octavia API with OVN and Amphora providers for the two-controller PoC.
 #
 # OVN is the default provider because the cloud networking backend is OVN.
-# Amphora-only worker, health-manager, management-network, and certificate
-# resources are deliberately disabled. An Amphora provider can be added later
-# when features absent from OVN (for example LB statistics or flavors) are
-# required.
+# Amphora is an additional provider for advanced L7 features. Its controller
+# worker and health-manager run on both controllers. ACTIVE_STANDBY is used for
+# service-plane HA, while the single current compute host remains an explicit
+# PoC limitation.
 images:
   tags:
     bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
@@ -17,7 +17,12 @@ images:
     octavia_db_sync: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
     octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:44eea4b421d619d442b868b958fb0b8dabfa8e649c35f81ea41662ff5390bd49
     octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:44eea4b421d619d442b868b958fb0b8dabfa8e649c35f81ea41662ff5390bd49
+    octavia_worker: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:3f052c46f46ec08d5a39c76719a2db70067637135fe695b5ca9c3f1536045a1f
+    octavia_worker_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     octavia_housekeeping: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+    octavia_health_manager: quay.io/airshipit/octavia@sha256:f38440062afb29db0c8d805f024c3a18e127a119b05b249d26962bc4716d9332
+    octavia_health_manager_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    openvswitch_vswitchd: quay.io/airshipit/openvswitch:latest-ubuntu_noble
   pull_policy: IfNotPresent
 
 conf:
@@ -28,23 +33,61 @@ conf:
     api_settings:
       api_handler: queue_producer
       default_provider_driver: ovn
-      enabled_provider_drivers: "ovn:OVN provider"
+      enabled_provider_drivers: "amphora:Amphora provider,ovn:OVN provider"
     driver_agent:
       enabled_provider_agents: ovn
     neutron:
       valid_interfaces: internal
+    glance:
+      endpoint_type: internalURL
+      ca_certificates_file: /etc/ssl/certs/openstack-internal-ca.crt
+    nova:
+      endpoint_type: internalURL
+      ca_certificates_file: /etc/ssl/certs/openstack-internal-ca.crt
+    cinder:
+      endpoint_type: internalURL
+      ca_certificates_file: /etc/ssl/certs/openstack-internal-ca.crt
     ovn:
       ovn_nb_connection: tcp:10.200.1.69:6641,tcp:10.200.1.175:6641,tcp:10.200.0.45:6641
       ovn_sb_connection: tcp:10.200.1.251:6642,tcp:10.200.1.132:6642,tcp:10.200.0.200:6642
     service_auth:
       endpoint_type: internalURL
+      cafile: /etc/ssl/certs/openstack-internal-ca.crt
+    controller_worker:
+      amp_boot_network_list: f4ee31af-2888-4ec5-894a-b01896d59eb2
+      amp_flavor_id: 130e1cf9-ba3d-47af-8475-95fb1225b24f
+      amp_image_owner_id: 81e8c458d40e429aaa579aaafcd865b0
+      amp_secgroup_list: 419f2c0f-cafb-4ef7-b9f4-46398e11a610
+      amp_image_tag: amphora
+      amp_ssh_key_name: octavia-key
+      loadbalancer_topology: ACTIVE_STANDBY
+    health_manager:
+      bind_ip: 0.0.0.0
+      bind_port: 5555
+      controller_ip_port_list: "172.31.255.145:5555,172.31.255.104:5555"
     task_flow:
-      jobboard_enabled: false
+      jobboard_enabled: true
+      jobboard_backend_driver: redis_taskflow_driver
+      jobboard_backend_hosts: valkey.openstack.svc.cluster.local
+      jobboard_backend_port: 26379
+      jobboard_backend_username: default
+      jobboard_backend_namespace: octavia_jobboard
+      jobboard_redis_sentinel: octavia-jobboard
+      jobboard_expiration_time: 30
 
 pod:
   image_pull_secrets:
     default:
       - name: telemetry-harbor-push
+  tolerations:
+    octavia_worker:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    octavia_health_manager:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
   mounts:
     octavia_api:
       octavia_api:
@@ -55,6 +98,13 @@ pod:
             mountPath: /var/run/ovn
           - name: octavia-driver-agents
             mountPath: /var/run/octavia
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs
+            readOnly: true
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
         volumes:
           - name: pod-tmp
             emptyDir: {}
@@ -66,6 +116,91 @@ pod:
             hostPath:
               path: /var/lib/octavia/run
               type: Directory
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0444
+              items:
+                - {key: server_ca.cert.pem, path: server_ca.cert.pem}
+                - {key: server_ca-chain.cert.pem, path: server_ca-chain.cert.pem}
+                - {key: server_ca.key.pem, path: private/server_ca.key.pem}
+                - {key: client_ca.cert.pem, path: client_ca.cert.pem}
+                - {key: client.cert-and-key.pem, path: private/client.cert-and-key.pem}
+          - name: openstack-internal-ca
+            secret:
+              secretName: openstack-internal-ca
+    octavia_worker:
+      octavia_worker:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs
+            readOnly: true
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0444
+              items:
+                - {key: server_ca.cert.pem, path: server_ca.cert.pem}
+                - {key: server_ca-chain.cert.pem, path: server_ca-chain.cert.pem}
+                - {key: server_ca.key.pem, path: private/server_ca.key.pem}
+                - {key: client_ca.cert.pem, path: client_ca.cert.pem}
+                - {key: client.cert-and-key.pem, path: private/client.cert-and-key.pem}
+          - name: openstack-internal-ca
+            secret:
+              secretName: openstack-internal-ca
+    octavia_health_manager:
+      octavia_health_manager:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs
+            readOnly: true
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0444
+              items:
+                - {key: server_ca.cert.pem, path: server_ca.cert.pem}
+                - {key: server_ca-chain.cert.pem, path: server_ca-chain.cert.pem}
+                - {key: server_ca.key.pem, path: private/server_ca.key.pem}
+                - {key: client_ca.cert.pem, path: client_ca.cert.pem}
+                - {key: client.cert-and-key.pem, path: private/client.cert-and-key.pem}
+          - name: openstack-internal-ca
+            secret:
+              secretName: openstack-internal-ca
+    octavia_housekeeping:
+      octavia_housekeeping:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs
+            readOnly: true
+          - name: openstack-internal-ca
+            mountPath: /etc/ssl/certs/openstack-internal-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0444
+              items:
+                - {key: server_ca.cert.pem, path: server_ca.cert.pem}
+                - {key: server_ca-chain.cert.pem, path: server_ca-chain.cert.pem}
+                - {key: server_ca.key.pem, path: private/server_ca.key.pem}
+                - {key: client_ca.cert.pem, path: client_ca.cert.pem}
+                - {key: client.cert-and-key.pem, path: private/client.cert-and-key.pem}
+          - name: openstack-internal-ca
+            secret:
+              secretName: openstack-internal-ca
   affinity:
     anti:
       type:
@@ -111,8 +246,8 @@ endpoints:
         public: 443
 
 manifests:
-  daemonset_health_manager: false
-  daemonset_worker: false
+  daemonset_health_manager: true
+  daemonset_worker: true
   ingress_api: false
   job_image_repo_sync: false
   secret_credential_keys: false

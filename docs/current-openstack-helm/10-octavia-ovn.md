@@ -1,86 +1,152 @@
-# Octavia with the OVN Provider
+# Octavia with OVN and Amphora Providers
 
 ## Result
 
-Octavia is deployed with OVN as the default provider. The PoC deliberately
-does not deploy Amphora workers, health managers, management networks, or
-Amphora certificates. This matches the cloud's OVN networking backend and
-avoids operating guest load-balancer appliances until an Amphora-only feature
-is required.
+Octavia exposes both providers:
 
-The API, driver-agent, and housekeeping deployments each have two replicas
-with required hostname anti-affinity. One replica runs on each controller.
-MariaDB and RabbitMQ retain the durable control-plane state; the OVN Northbound
-database retains the programmed load-balancer state.
+- `ovn` is the default provider for efficient native OVN L4 load balancing.
+- `amphora` provides appliance-based load balancing and features not supplied
+  by the OVN provider.
+
+The API, driver-agent, housekeeping, worker, and health-manager control-plane
+roles each run on both controllers. The worker and health-manager are
+DaemonSets because their Neutron management ports and addresses are
+node-specific. MariaDB and RabbitMQ retain durable control-plane state.
 
 ## External interfaces
 
 | Interface | Address |
 | --- | --- |
 | Public Octavia API | `https://cloud.dcn.ssu.ac.kr/load-balancer` |
+| Internal OpenStack API Gateway | `https://api.internal.cloud.dcn.ssu.ac.kr` |
 | Skyline | `https://cloud.dcn.ssu.ac.kr/` |
 | Horizon fallback | `https://cloud.dcn.ssu.ac.kr/horizon/` |
-
-The public API route returns `401` without a Keystone token, which confirms
-that the Gateway route reaches Octavia without exposing an unauthenticated API.
 
 Skyline maps the `load-balancer` service to Octavia. Horizon uses the
 `octavia-dashboard` 2026.1 plugin in the digest-pinned custom Horizon image.
 
-## Site-specific runtime requirements
+## Amphora resources
 
-The OVN provider must receive all NB and SB clustered database endpoints, not
-one Kubernetes ClusterIP. A connection pinned to a follower can block provider
-initialization. `scripts/reconcile-octavia.sh` discovers the current
-EndpointSlice addresses and rewrites the HA remote lists before each upgrade.
+The idempotent
+`scripts/reconcile-octavia-amphora-resources.sh` creates or reconciles:
 
-Octavia API processes communicate with driver-agent processes through Unix
-sockets. The upstream chart's per-Pod `emptyDir` does not make those sockets
-visible to the API. The patched chart uses `/var/lib/octavia/run` as a
-node-local hostPath and mounts it at `/var/run/octavia` in the API and
-driver-agent Pods. Required anti-affinity ensures exactly one pair per
-controller. The host directory must be owned by UID/GID `42424`.
-
-Octavia's Neutron client is configured with `valid_interfaces = internal`.
-Without it, the client selects the self-signed public Gateway endpoint and
-fails certificate verification.
-
-## E2E validation
-
-The persistent validation resources are:
-
-| Resource | Value |
+| Resource | PoC value |
 | --- | --- |
-| Load balancer | `octavia-e2e-lb` |
-| Provider | `ovn` |
-| VIP | `10.42.0.152` |
-| Floating IP | `192.168.21.145` |
-| Listener | TCP port 80 |
-| Pool algorithm | `SOURCE_IP_PORT` |
-| Members | `octavia-backend-1`, `octavia-backend-2` |
+| Management network | `lb-mgmt-net` |
+| Management subnet | `172.31.255.0/24` |
+| Amphora flavor | `m1.amphora` (1 vCPU, 1 GiB RAM, 3 GiB disk) |
+| Security group | `lb-mgmt-sec-grp` |
+| Keypair | `octavia-key` |
+| Glance image tag | `amphora` |
+| Topology | `ACTIVE_STANDBY` |
 
-The backend security group permits TCP/80 from the public test clients.
-OVN preserves the original source address, so a rule limited only to the
-tenant subnet blocks public LB clients. Production rules should use the
-narrowest known client CIDRs rather than `0.0.0.0/0`.
+The committed image name
+`amphora-x64-haproxy-ubuntu-jammy-poc` identifies an upstream **test-only**
+image. It is acceptable only for this PoC. Production must build and validate
+an Amphora image with Octavia diskimage-builder that matches the deployed
+OpenStack release and the site's security baseline.
 
-The Cirros backends use config drives for user data because the current PoC
-metadata path did not deliver user data. Run the idempotent API and traffic
-check from an OpenStack client Pod:
+The Amphora server and client CA materials are stored only as a SOPS-encrypted
+Kubernetes Secret in
+`secrets/octavia-amphora-certs.secret.sops.yaml`. Never commit the decrypted
+private keys. The reconciliation wrapper decrypts them directly into
+`kubectl apply`.
+
+## Internal CA trust
+
+Octavia initially failed while resolving the image tagged `amphora` from the
+internal Glance endpoint. Waiting for Pods did not help: this was a persistent
+CA trust configuration omission.
+
+Octavia's Glance client uses the shared Keystone authentication session when
+the endpoint is discovered from the service catalog. A CA configured only in
+the `[glance]` section is therefore insufficient unless a Glance endpoint is
+explicitly overridden. The deployment now:
+
+1. copies only `ca.crt` from the internal Gateway CA Secret into the
+   `openstack` namespace;
+2. mounts it at `/etc/ssl/certs/openstack-internal-ca.crt`;
+3. sets `[service_auth] cafile` to that path; and
+4. also sets the service-specific CA paths for Glance, Nova, and Cinder.
+
+Both OpenSSL verification and Octavia worker's in-process
+`ImageManager.get_image_id_by_tag()` lookup must pass before an Amphora test.
+
+## Other site-specific fixes
+
+- The chart initializes each management interface with the fixed address of
+  its pre-created Neutron port. It skips DHCP after static initialization,
+  avoiding raw-socket failures inside the container.
+- Octavia uses an explicit RabbitMQ transport URL through the headless
+  service. The Octavia RabbitMQ credential is URL-safe and is stored only in
+  the SOPS-encrypted values file.
+- The worker and health-manager images are digest pinned.
+- The worker image extends the Airship 2026.1 image with the constrained
+  `redis` Python package required by the Taskflow Redis/Sentinel jobboard.
+- Taskflow persistence uses MariaDB and its jobboard uses the dedicated
+  `octavia-valkey` release. The release has three Ceph-backed Valkey nodes,
+  each with a Sentinel sidecar.
+- Valkey data endpoints require authentication. Sentinel discovery is not
+  authenticated because Octavia 2026.1/Taskflow intentionally does not pass
+  the data-store credential to Sentinel. Sentinel is exposed only through a
+  cluster-internal Service.
+
+## Jobboard HA boundary
+
+The Jobboard allows another worker to claim an unfinished flow after the
+original worker dies and its claim expires. RabbitMQ alone does not provide
+this behavior after a worker has acknowledged a request and started a
+Taskflow.
+
+The current three Sentinel voters are spread across only two Kubernetes nodes.
+This is useful for worker and Pod failure testing, but it cannot retain a
+majority after the loss of either arbitrary physical node. Production requires
+at least three independent failure domains with one voting member in each.
+The frozen deployment and its validation are under
+`deployment/prerequisites/storage/octavia-jobboard/`.
+
+Run the destructive in-flight recovery test only in a test project:
 
 ```bash
-kubectl -n openstack create configmap octavia-e2e-verify \
-  --from-file=verify-octavia-e2e.py=scripts/verify-octavia-e2e.py \
-  --dry-run=client -o yaml | kubectl apply -f -
+OCTAVIA_JOBBOARD_FAILOVER_TEST=YES \
+  scripts/verify-octavia-jobboard-failover.sh
 ```
 
-The accepted test returned both `backend-1` and `backend-2` through
-`http://192.168.21.145/`.
+The script refuses to accept the result if another process changes the
+Octavia Helm revision during the test.
 
-## Provider boundary
+The accepted live recovery test deleted the controller-1 worker while load
+balancer `8f192126-5fa2-44c6-a009-b7fb58f02ff7` was `PENDING_CREATE`.
+The controller-0 worker resumed the same flow after the claim expiry, and the
+load balancer reached `ACTIVE` / `ONLINE`. Exactly two Amphorae remained: one
+`MASTER` and one `BACKUP`, both `ALLOCATED`. The Jobboard remained enabled on
+both replacement workers and Sentinel reported all three voters usable.
 
-OVN is suitable for the current L4 VPC-style PoC. It does not implement every
-Octavia capability, including several statistics, flavor, availability-zone,
-and advanced L7 features. Add Amphora as an additional provider when those
-capabilities become requirements; do not replace OVN for basic native L4
-load balancing without a measured reason.
+## Accepted Amphora E2E test
+
+`scripts/verify-octavia-amphora-e2e.sh` reconciles and verifies an active/
+standby Amphora load balancer with an HTTP listener, round-robin pool, two
+members, and a Floating IP.
+
+The accepted live test produced:
+
+| Resource | Result |
+| --- | --- |
+| Load balancer | `amphora-e2e-lb`, `ACTIVE` / `ONLINE` |
+| Provider | `amphora` |
+| VIP | `10.42.0.77` |
+| Floating IP | `192.168.21.144` |
+| Amphorae | one `MASTER`, one `BACKUP`, both `ALLOCATED` |
+| Traffic | 8 requests: 4 to `backend-1`, 4 to `backend-2` |
+
+Both Amphora VMs currently land on `controller-0`, the only compute node in
+this PoC. Active/standby protects against an Amphora guest failure, but it
+does not provide compute-host fault tolerance until another compute node and
+appropriate scheduling policy are added.
+
+## Provider guidance
+
+Use OVN for ordinary native L4 load balancers and explicitly select Amphora
+where its feature set is required. Provider selection must remain visible in
+the VPC control-plane API and must not silently change an existing load
+balancer's semantics.

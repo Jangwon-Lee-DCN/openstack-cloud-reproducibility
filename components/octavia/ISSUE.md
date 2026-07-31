@@ -32,3 +32,27 @@
   independent delivery mechanism.
 - OVN preserves client source addresses, so tenant-only backend ingress does
   not admit public clients.
+
+## Amphora extension symptoms and root causes
+
+1. The Amphora worker could not resolve the image tagged `amphora` because TLS
+   verification failed against the internal Glance endpoint.
+2. Configuring a CA only under `[glance]` did not fix catalog-discovered
+   endpoints. The Glance client used Octavia's shared Keystone session, which
+   requires `[service_auth] cafile`.
+3. The chart expected DHCP on the Amphora management interfaces, but the
+   node-bound Neutron ports already had fixed addresses. The container could
+   not open the required raw DHCP socket.
+4. A chart-generated multi-host RabbitMQ URL was parsed incorrectly when the
+   password contained URL delimiter characters.
+5. Enabling Taskflow jobboard failed because the selected Airship Octavia image
+   lacks the optional Python Redis client.
+6. After publishing a custom image, worker Pods on the uncached controller
+   failed with `unauthorized` because the upstream worker and health-manager
+   DaemonSets did not render the configured image pull Secret.
+7. Sentinel discovery failed authentication even though the Valkey credential
+   was correctly configured. Octavia 2026.1/Taskflow intentionally does not
+   pass data-store credentials to Sentinel connections.
+
+These are persistent configuration or image defects. Waiting for all Octavia
+Pods to become Ready does not resolve them.

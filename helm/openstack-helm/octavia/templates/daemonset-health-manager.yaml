@@ -50,12 +50,17 @@ spec:
     spec:
 {{ tuple "octavia_health_manager" . | include "helm-toolkit.snippets.kubernetes_pod_priority_class" | indent 6 }}
 {{ tuple "octavia_health_manager" . | include "helm-toolkit.snippets.kubernetes_pod_runtime_class" | indent 6 }}
+{{ tuple $envAll "octavia" | include "helm-toolkit.snippets.kubernetes_image_pull_secrets" | indent 6 }}
       serviceAccountName: {{ $serviceAccountName }}
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       hostPID: true
       nodeSelector:
         {{ .Values.labels.health_manager.node_selector_key }}: {{ .Values.labels.health_manager.node_selector_value }}
+{{- with .Values.pod.tolerations.octavia_health_manager }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+{{- end }}
       initContainers:
 {{ tuple $envAll "health_manager" $mounts_octavia_health_manager_init | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
         - name: octavia-health-manager-get-port

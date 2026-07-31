@@ -21,6 +21,14 @@ PORTNAME=octavia-worker-port-$HOSTNAME
 
 HM_PORT_ID=$(openstack port show $PORTNAME -c id -f value)
 HM_PORT_MAC=$(openstack port show $PORTNAME -c mac_address -f value)
+HM_PORT_JSON=$(openstack port show $PORTNAME -f json)
+HM_PORT_IP=$(printf '%s' "$HM_PORT_JSON" | python3 -c \
+  'import json,sys; print(json.load(sys.stdin)["fixed_ips"][0]["ip_address"])')
+HM_SUBNET_ID=$(printf '%s' "$HM_PORT_JSON" | python3 -c \
+  'import json,sys; print(json.load(sys.stdin)["fixed_ips"][0]["subnet_id"])')
+HM_PREFIX=$(openstack subnet show "$HM_SUBNET_ID" -c cidr -f value | cut -d/ -f2)
 
 echo $HM_PORT_ID > /tmp/pod-shared/HM_PORT_ID
 echo $HM_PORT_MAC > /tmp/pod-shared/HM_PORT_MAC
+echo $HM_PORT_IP > /tmp/pod-shared/HM_PORT_IP
+echo $HM_PREFIX > /tmp/pod-shared/HM_PREFIX

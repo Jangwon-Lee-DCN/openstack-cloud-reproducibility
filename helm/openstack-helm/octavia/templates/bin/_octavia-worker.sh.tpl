@@ -25,7 +25,9 @@ request subnet-mask,broadcast-address,interface-mtu;
 do-forward-updates false;
 EOF
 
-  dhclient -v o-w0 -cf /tmp/dhclient.conf
+  if ! ip -4 address show dev o-w0 scope global | grep -q 'inet '; then
+    dhclient -v o-w0 -cf /tmp/dhclient.conf
+  fi
 
   exec octavia-worker \
         --config-file /etc/octavia/octavia.conf \

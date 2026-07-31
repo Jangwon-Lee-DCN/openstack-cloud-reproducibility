@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SNAPSHOT="${ROOT_DIR}/deploy/releases/octavia.values.sops.yaml"
 PACKAGE="${ROOT_DIR}/helm/packages/patched/octavia-2026.1.0.tgz"
-EXPECTED_SHA256=b3ef67f4ae2fcb53b217bf1b271ce32c31f9cda1ea33583ddd5a473e32380036
+EXPECTED_SHA256=a66340e7d7574c502d5615ff69a4dd85c57fa70d3de95913305283dde9d9a750
 REMOTE_CONTROLLER="${REMOTE_CONTROLLER:-cloud-controller-1}"
+AMPHORA_CERTS="${ROOT_DIR}/deploy/secrets/octavia-amphora-certs.secret.sops.yaml"
+JOBBOARD_INSTALL="${ROOT_DIR}/prerequisites/octavia-jobboard/scripts/install.sh"
 
 endpoint_remotes() {
   local service=$1
@@ -20,9 +22,17 @@ nb_remotes=$(endpoint_remotes ovn-ovsdb-nb 6641)
 sb_remotes=$(endpoint_remotes ovn-ovsdb-sb 6642)
 test -n "${nb_remotes}" && test -n "${sb_remotes}"
 
+"${JOBBOARD_INSTALL}"
+
 sudo -n install -d -o 42424 -g 42424 -m 0750 /var/lib/octavia/run
 ssh -o BatchMode=yes "${REMOTE_CONTROLLER}" \
   "sudo -n install -d -o 42424 -g 42424 -m 0750 /var/lib/octavia/run"
+
+sops -d "${AMPHORA_CERTS}" | kubectl apply -f -
+kubectl -n openstack-internal-gateway-system get secret \
+  openstack-internal-ca -o json |
+  python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({"apiVersion":"v1","kind":"Secret","metadata":{"name":"openstack-internal-ca","namespace":"openstack"},"type":"Opaque","data":{"ca.crt":d["data"]["ca.crt"]}}))' |
+  kubectl apply -f -
 
 secret_values=$(mktemp /tmp/octavia-values.XXXXXX.yaml)
 trap 'shred -u "${secret_values}"' EXIT

@@ -5,13 +5,23 @@
 2. Discover the current `ovn-ovsdb-nb` and `ovn-ovsdb-sb` EndpointSlice
    addresses. Never copy stale Pod IPs from an earlier cluster.
 3. Update `deploy/values/site/octavia.yaml` with all discovered remotes.
-4. Decrypt `deploy/secrets/octavia.values.sops.yaml` only to a mode-`0600`
+4. Install and verify `prerequisites/octavia-jobboard` before enabling
+   `jobboard_enabled`. Confirm Sentinel reports a reachable quorum and all
+   three Ceph-backed Pods are Ready.
+5. Apply `deploy/secrets/octavia-amphora-certs.secret.sops.yaml` by streaming
+   SOPS output directly to `kubectl`; never persist its private keys.
+6. Copy only `ca.crt` from the internal Gateway CA Secret into the `openstack`
+   namespace. The wrapper performs this without exporting any CA private key.
+7. Run `deploy/scripts/reconcile-octavia-amphora-resources.sh` to reconcile the
+   management network, node ports, security group, flavor, keypair, and image
+   tag. Replace the test-only image with a site-built image for production.
+8. Decrypt `deploy/secrets/octavia.values.sops.yaml` only to a mode-`0600`
    temporary file and destroy it after Helm exits.
-5. Upgrade the frozen patched Octavia chart with `--no-hooks` for ordinary
+9. Upgrade the frozen patched Octavia chart with `--no-hooks` for ordinary
    reconciliation. Run the initial chart hooks when databases, Keystone
    service records, or RabbitMQ users do not yet exist.
-6. Wait for two API, two driver-agent, and two housekeeping replicas, one of
-   each per controller.
-7. Confirm both controller hostPaths contain `status.sock`, `get.sock`, and
+10. Wait for two API, two driver-agent, two housekeeping, two worker, and two
+   health-manager instances, split across the controllers.
+11. Confirm both controller hostPaths contain `status.sock`, `get.sock`, and
    `stats.sock`.
-8. Run the checks in `VERIFY.md`.
+12. Run the checks in `VERIFY.md`.

@@ -18,6 +18,8 @@ set -ex
 
 HM_PORT_ID=$(cat /tmp/pod-shared/HM_PORT_ID)
 HM_PORT_MAC=$(cat /tmp/pod-shared/HM_PORT_MAC)
+HM_PORT_IP=$(cat /tmp/pod-shared/HM_PORT_IP)
+HM_PREFIX=$(cat /tmp/pod-shared/HM_PREFIX)
 
 ovs-vsctl --no-wait show
 
@@ -29,3 +31,5 @@ ovs-vsctl --may-exist add-port br-int o-w0 \
         -- set Interface o-w0 external-ids:skip_cleanup=true
 
 ip link set dev o-w0 address $HM_PORT_MAC
+ip address replace "$HM_PORT_IP/$HM_PREFIX" dev o-w0
+ip link set dev o-w0 up

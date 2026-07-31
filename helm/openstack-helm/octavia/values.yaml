@@ -617,6 +617,9 @@ endpoints:
         sentinel: 26379
 
 pod:
+  tolerations:
+    octavia_worker: []
+    octavia_health_manager: []
   probes:
     api:
       octavia-api:
