@@ -1,0 +1,7 @@
+conf:
+  octavia:
+    controller_worker:
+      # Provider-managed Amphora appliances must not belong to tenants.
+      amp_image_owner_id: b47511a2e2db40aaada92e722cafea51
+      amp_secgroup_list: a4e51036-158a-4c74-8498-88a8bf35d3a4
+      amp_ssh_key_name: ""

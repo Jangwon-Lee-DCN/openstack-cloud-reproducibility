@@ -25,11 +25,15 @@
 
 - Image ID: `1b77ad93-c477-4ba7-8098-f5215978dc01`
 - Name: `amphora-x64-haproxy-ubuntu-noble-2026.1-20260731`
-- Owner: `81e8c458d40e429aaa579aaafcd865b0`
+- Owner: `b47511a2e2db40aaada92e722cafea51`
 - Visibility: private
 - Backend: RBD
 - Glance checksum: `d570bcc49b2177be66fc5d4c263e0cff`
 - Selection tag: `amphora`
+
+The image and Amphora compute resources were subsequently moved to the
+Octavia service project. Requesting tenants own the Octavia API objects but do
+not own or see the implementation servers in their Nova server lists.
 
 ## Live acceptance test
 

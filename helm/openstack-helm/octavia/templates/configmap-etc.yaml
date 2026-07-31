@@ -58,19 +58,19 @@ limitations under the License.
 {{- end -}}
 
 {{- if empty .Values.conf.octavia.service_auth.project_name -}}
-{{- $_ := set .Values.conf.octavia.service_auth "project_name" .Values.endpoints.identity.auth.admin.project_name -}}
+{{- $_ := set .Values.conf.octavia.service_auth "project_name" .Values.endpoints.identity.auth.octavia.project_name -}}
 {{- end -}}
 {{- if empty .Values.conf.octavia.service_auth.project_domain_name -}}
-{{- $_ := set .Values.conf.octavia.service_auth "project_domain_name" .Values.endpoints.identity.auth.admin.project_domain_name -}}
+{{- $_ := set .Values.conf.octavia.service_auth "project_domain_name" .Values.endpoints.identity.auth.octavia.project_domain_name -}}
 {{- end -}}
 {{- if empty .Values.conf.octavia.service_auth.user_domain_name -}}
-{{- $_ := set .Values.conf.octavia.service_auth "user_domain_name" .Values.endpoints.identity.auth.admin.user_domain_name -}}
+{{- $_ := set .Values.conf.octavia.service_auth "user_domain_name" .Values.endpoints.identity.auth.octavia.user_domain_name -}}
 {{- end -}}
 {{- if empty .Values.conf.octavia.service_auth.username -}}
-{{- $_ := set .Values.conf.octavia.service_auth "username" .Values.endpoints.identity.auth.admin.username -}}
+{{- $_ := set .Values.conf.octavia.service_auth "username" .Values.endpoints.identity.auth.octavia.username -}}
 {{- end -}}
 {{- if empty .Values.conf.octavia.service_auth.password -}}
-{{- $_ := set .Values.conf.octavia.service_auth "password" .Values.endpoints.identity.auth.admin.password -}}
+{{- $_ := set .Values.conf.octavia.service_auth "password" .Values.endpoints.identity.auth.octavia.password -}}
 {{- end -}}
 
 {{- if empty .Values.conf.octavia.service_auth.memcached_servers -}}

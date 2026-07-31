@@ -3,8 +3,9 @@ set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SNAPSHOT="${ROOT_DIR}/deploy/releases/octavia.values.sops.yaml"
+SERVICE_PROJECT_VALUES="${ROOT_DIR}/deploy/values/site/octavia-service-project.yaml"
 PACKAGE="${ROOT_DIR}/helm/packages/patched/octavia-2026.1.0.tgz"
-EXPECTED_SHA256=a66340e7d7574c502d5615ff69a4dd85c57fa70d3de95913305283dde9d9a750
+EXPECTED_SHA256=396b38941b00d3fc62d79c14885ec71638bb2e20a96193bf509a5a47c4803038
 REMOTE_CONTROLLER="${REMOTE_CONTROLLER:-cloud-controller-1}"
 AMPHORA_CERTS="${ROOT_DIR}/deploy/secrets/octavia-amphora-certs.secret.sops.yaml"
 JOBBOARD_INSTALL="${ROOT_DIR}/prerequisites/octavia-jobboard/scripts/install.sh"
@@ -57,6 +58,7 @@ test "${actual_sha256}" = "${EXPECTED_SHA256}"
 helm upgrade --install octavia "${PACKAGE}" \
   --namespace openstack \
   -f "${secret_values}" \
+  -f "${SERVICE_PROJECT_VALUES}" \
   --no-hooks \
   --wait \
   --timeout 10m

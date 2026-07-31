@@ -61,6 +61,8 @@ instance.
 - SSH is disabled; Octavia communicates with the Amphora agent over its mTLS
   management API.
 - The image is private in Glance and owned by the Octavia service project.
+- Amphora compute resources are created with `octavia@service` credentials in
+  the service project, never in the requesting tenant project.
 - Image selection uses the `amphora` tag and the configured owner ID.
 - Existing Amphorae are not silently replaced. Rotate them with controlled
   failover after a new image passes an ACTIVE_STANDBY traffic test.

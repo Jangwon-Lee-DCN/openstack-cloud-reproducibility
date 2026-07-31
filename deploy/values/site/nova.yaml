@@ -30,7 +30,6 @@ conf:
     "os_compute_api:limits": "role:admin or role:monitoring"
     "os_compute_api:limits:other_project": "role:admin or role:monitoring"
     "os_compute_api:os-hypervisors:list-detail": "role:admin or role:monitoring"
-    "os_compute_api:servers:detail": "role:admin or role:monitoring"
     "os_compute_api:servers:detail:get_all_tenants": "role:admin or role:monitoring"
     "os_compute_api:os-simple-tenant-usage:list": "role:admin or role:monitoring"
   nova:
