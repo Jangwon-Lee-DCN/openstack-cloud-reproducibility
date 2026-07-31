@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-neutron-drift
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  neutron-drift.json: |
+    {"title":"VPC Neutron Drift Audit","uid":"vpc-neutron-drift","schemaVersion":39,"refresh":"1m","panels":[{"id":1,"type":"stat","title":"CRM / Neutron differences","description":"Read-only results published by audit-vpc-neutron-drift.sh","gridPos":{"x":0,"y":0,"w":24,"h":7},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"legendFormat":"{{project_namespace}} {{type}}","expr":"sum by (project_namespace,type) (vpc_neutron_drift_resources) or vector(0)"}]}],"time":{"from":"now-24h","to":"now"}}
