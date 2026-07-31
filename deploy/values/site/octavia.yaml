@@ -15,8 +15,8 @@ images:
     ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     octavia_db_sync: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
-    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
-    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:44eea4b421d619d442b868b958fb0b8dabfa8e649c35f81ea41662ff5390bd49
+    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:44eea4b421d619d442b868b958fb0b8dabfa8e649c35f81ea41662ff5390bd49
     octavia_housekeeping: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
   pull_policy: IfNotPresent
 
