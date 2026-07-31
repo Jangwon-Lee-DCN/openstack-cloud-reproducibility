@@ -95,6 +95,18 @@ addresses through each server port (the client has no `floating ip list
 --server` option), and the network verifier automatically uses the node's
 administrative kubeconfig when invoked remotely as root.
 
+The recreated cluster also passed the failure suite independently: stopping
+primary BIND left authoritative and forwarded queries available from the
+secondary; stopping Keepalived on the VIP owner moved `10.77.0.250` to the next
+controller while `/readyz` remained available from every node; and rebooting a
+non-owner controller returned its node, stacked etcd member, Cilium agent,
+kubelet, CRI-O, HAProxy, and Keepalived to healthy state in 74 seconds. The
+post-reboot network test again passed all nine Pod-IP paths and all three
+ClusterIP paths. Final consistency checks found exactly one VIP owner, no
+failed systemd units, no etcd alarms, all three etcd members started, and a
+healthy Cilium status. Kubeadm reported one year remaining on leaf certificates
+and nine years on the cluster certificate authorities at rehearsal time.
+
 ## Destroy
 
 ```bash
