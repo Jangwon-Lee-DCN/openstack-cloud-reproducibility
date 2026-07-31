@@ -30,6 +30,24 @@
       changed_when: false
       check_mode: false
 
+    - name: Inspect hardware virtualization for production compute nodes
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: compute_kvm
+      when:
+        - deployment_profile == 'production'
+        - "'compute' in (node_roles | default([]))"
+
+    - name: Require KVM on production compute nodes
+      ansible.builtin.assert:
+        that: compute_kvm.stat.exists | default(false)
+        fail_msg: >-
+          A production compute node requires /dev/kvm. Enable CPU virtualization
+          in firmware and expose it to the operating system before joining it.
+      when:
+        - deployment_profile == 'production'
+        - "'compute' in (node_roles | default([]))"
+
     - name: Inspect declared Ceph device
       ansible.builtin.command: "lsblk -dn -o TYPE,FSTYPE,MOUNTPOINTS {{ ceph_device }}"
       when: ceph_device is defined

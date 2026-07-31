@@ -4,7 +4,7 @@ set -euo pipefail
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 ansible_root="$root/automation/ansible"
 
-for command in ansible-playbook ansible-lint yamllint; do
+for command in ansible-playbook ansible-lint awk grep tar yamllint; do
   command -v "$command" >/dev/null || {
     echo "missing automation validation command: $command" >&2
     exit 1
@@ -25,5 +25,19 @@ yamllint -d \
 bash -n bin/*.sh ../bin/*.sh ../lab/*.sh
 ALLOW_DIRTY_REBUILD_INPUTS=${ALLOW_DIRTY_REBUILD_INPUTS:-1} \
   "$root/automation/bin/verify-inputs.sh"
+
+role_tasks="$ansible_root/roles/cluster_baseline/tasks/main.yml"
+nova_chart="$root/helm/packages/patched/nova-2026.1.0.tgz"
+ovn_chart="$root/helm/packages/patched/ovn-2026.1.0.tgz"
+ovs_chart="$root/helm/packages/upstream/openvswitch-2026.1.0.tgz"
+
+grep -q 'openstack-compute-node=enabled' "$role_tasks"
+grep -q 'openvswitch=enabled' "$role_tasks"
+tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
+  awk '/node_selector_key: openstack-compute-node/{found=1} END{exit !found}'
+tar -xOf "$ovn_chart" --wildcards '*/values.yaml' | \
+  awk '/node_selector_key: openstack-network-node/{found=1} END{exit !found}'
+tar -xOf "$ovs_chart" --wildcards '*/values.yaml' | \
+  awk '/node_selector_key: openvswitch/{found=1} END{exit !found}'
 
 echo "rebuild automation validation passed"

@@ -75,6 +75,42 @@
   loop: "{{ groups['control_plane'] }}"
   changed_when: true
 
+- name: Apply canonical Nova and OVS labels to compute nodes
+  ansible.builtin.command: >-
+    kubectl label node {{ item }}
+    openstack-compute-node=enabled
+    openvswitch=enabled
+    --overwrite
+  loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
+  when: "'compute' in (hostvars[item].node_roles | default([]))"
+  changed_when: true
+
+- name: Apply canonical OVN gateway labels
+  ansible.builtin.command: >-
+    kubectl label node {{ item }}
+    openstack-network-gateway=enabled
+    openstack-network-node=enabled
+    openvswitch=enabled
+    l3-agent=enabled
+    --overwrite
+  loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
+  when: "'ovn_gateway' in (hostvars[item].node_roles | default([]))"
+  changed_when: true
+
+- name: Apply canonical Cinder volume labels
+  ansible.builtin.command: >-
+    kubectl label node {{ item }} openstack-cinder-volume=enabled --overwrite
+  loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
+  when: "'cinder' in (hostvars[item].node_roles | default([]))"
+  changed_when: true
+
+- name: Apply canonical object-storage labels
+  ansible.builtin.command: >-
+    kubectl label node {{ item }} openstack-object-storage=enabled --overwrite
+  loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
+  when: "'object_storage' in (hostvars[item].node_roles | default([]))"
+  changed_when: true
+
 - name: Remove the control-plane scheduling taint from compute-capable controllers
   ansible.builtin.command: >-
     kubectl taint node {{ item }} node-role.kubernetes.io/control-plane:NoSchedule-

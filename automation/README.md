@@ -74,6 +74,8 @@ The copy-and-run operator procedure is in
 [the operator guide](../docs/fresh-server-rebuild-operator-guide.md). The
 authoritative design, gates, rollback points, and acceptance tests are in
 [the rebuild runbook](../docs/fresh-server-rebuild-runbook.md).
+Use [the node expansion guide](../docs/node-expansion-operator-guide.md) to add
+control-plane members or worker-based OpenStack compute nodes.
 
 `verify-inputs.sh` rejects a dirty checkout by default and validates every
 locked chart checksum and metadata field. Set `ALLOW_DIRTY_REBUILD_INPUTS=1`

@@ -221,3 +221,6 @@ This process creates a clean, empty cloud. It does not restore tenant data.
 Restoring retained Ceph, MariaDB, etcd, RGW, secrets, images, volumes, or
 load-balancer state requires a consistent backup and a separate recovery plan.
 Never point the clean-build procedure at retained production disks.
+
+For post-build control-plane and compute capacity expansion, follow
+[`node-expansion-operator-guide.md`](node-expansion-operator-guide.md).
