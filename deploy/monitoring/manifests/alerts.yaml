@@ -15,6 +15,7 @@ spec:
           labels: {severity: critical}
           annotations:
             summary: OpenStack exporter is unavailable
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackPublicAPIProbeFailed
           expr: probe_success{job="openstack-public-api"} == 0
           for: 5m
@@ -22,36 +23,42 @@ spec:
           annotations:
             summary: OpenStack public API probe failed
             description: "Target {{ $labels.instance }} has failed for five minutes."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackFloatingIPProbeFailed
           expr: probe_success{job="openstack-acceptance-floating-ip"} == 0
           for: 10m
           labels: {severity: warning}
           annotations:
             summary: Acceptance-test floating IP is unreachable
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackRabbitMQMetricsDown
           expr: min(up{job="rabbitmq"}) == 0 or absent(rabbitmq_identity_info)
           for: 5m
           labels: {severity: critical}
           annotations:
             summary: RabbitMQ member metrics report down
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackMariaDBExporterDown
           expr: mysql_up == 0
           for: 5m
           labels: {severity: critical}
           annotations:
             summary: MariaDB exporter cannot query Galera
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackSyntheticTestFailed
           expr: max(openstack_synthetic_success) < 1
           for: 15m
           labels: {severity: critical}
           annotations:
             summary: Scheduled OpenStack resource lifecycle test failed
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackSyntheticTestStale
           expr: time() - max(openstack_synthetic_last_run_timestamp_seconds) > 28800
           for: 15m
           labels: {severity: warning}
           annotations:
             summary: No successful synthetic test report in eight hours
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
     - name: platform.hardware
       rules:
         - alert: ControllerCPUTemperatureHigh
@@ -61,6 +68,7 @@ spec:
           annotations:
             summary: Controller CPU temperature is high
             description: "CPU temperature on {{ $labels.instance }} has exceeded 90°C for five minutes."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#controller-temperature
         - alert: ControllerCPUTemperatureCritical
           expr: max by (instance) (node_hwmon_temp_celsius{chip="platform_coretemp_0"}) > 100
           for: 1m
@@ -68,6 +76,7 @@ spec:
           annotations:
             summary: Controller CPU temperature is near thermal shutdown
             description: "CPU temperature on {{ $labels.instance }} has exceeded 100°C. The hardware critical threshold is approximately 107°C."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#controller-temperature
     - name: vpc-control-plane.operations
       rules:
         - alert: VPCControllerReconcileErrors
@@ -77,6 +86,7 @@ spec:
           annotations:
             summary: VPC controller reconciliation is failing
             description: "Controller {{ $labels.controller }} has returned errors for ten minutes."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCControllerReconcileLatencyHigh
           expr: histogram_quantile(0.99, sum by (le, controller) (rate(vpc_reconcile_duration_seconds_bucket[10m]))) > 10
           for: 15m
@@ -84,18 +94,21 @@ spec:
           annotations:
             summary: VPC controller reconciliation latency is high
             description: "Controller {{ $labels.controller }} p99 reconcile latency exceeds 10 seconds."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCSecurityGroupExternalPortViolation
           expr: increase(vpc_security_group_external_port_violations_total[10m]) > 0
           labels: {severity: warning}
           annotations:
             summary: VPC Security Group was found on an external port
             description: "Security Group {{ $labels.security_group }} in {{ $labels.project_namespace }} was detached from an out-of-VPC port."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCElasticIPAssociationFailures
           expr: increase(vpc_elastic_ip_association_failures_total[10m]) > 0
           labels: {severity: warning}
           annotations:
             summary: Elastic IP association failed
             description: "Elastic IP operations failed with reason {{ $labels.reason }} in {{ $labels.project_namespace }}."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCElasticIPPoolQuotaLow
           expr: vpc_elastic_ip_pool_quota_remaining < 3
           for: 15m
@@ -103,6 +116,7 @@ spec:
           annotations:
             summary: Elastic IP pool quota is nearly exhausted
             description: "Pool {{ $labels.pool }} in {{ $labels.project_namespace }} has only {{ $value }} project quota slots remaining."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCElasticIPPoolQuotaExhausted
           expr: vpc_elastic_ip_pool_quota_remaining == 0
           for: 5m
@@ -110,6 +124,7 @@ spec:
           annotations:
             summary: Elastic IP pool quota is exhausted
             description: "Pool {{ $labels.pool }} in {{ $labels.project_namespace }} has no project floating-IP quota remaining."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCProjectCredentialBindingMissing
           expr: |
             kube_namespace_labels{namespace=~"vpc-[0-9a-f]{32}"}
@@ -120,6 +135,7 @@ spec:
           annotations:
             summary: VPC project credential binding is missing
             description: "Namespace {{ $labels.namespace }} has no openstack-credentials Secret."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCControllerRolloutUnavailable
           expr: kube_deployment_status_replicas_unavailable{namespace="vpc-control-plane-system",deployment=~"vpc-control-plane-controller-manager|vpc-facade"} > 0
           for: 10m
@@ -127,9 +143,11 @@ spec:
           annotations:
             summary: VPC control-plane rollout has unavailable replicas
             description: "Deployment {{ $labels.deployment }} has unavailable replicas for ten minutes."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCNeutronConflictResponses
           expr: increase(vpc_neutron_conflicts_total[10m]) > 0
           labels: {severity: warning}
           annotations:
             summary: VPC controller received Neutron HTTP 409
             description: "{{ $labels.controller }} operation {{ $labels.operation }} received a conflict response."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane

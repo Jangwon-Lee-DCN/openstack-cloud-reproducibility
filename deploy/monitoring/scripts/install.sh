@@ -8,6 +8,19 @@ for command_name in kubectl helm sops jq curl; do
   command -v "${command_name}" >/dev/null
 done
 
+kubectl apply -f "${ROOT}/manifests/alertmanager-webhook-audit.yaml"
+kubectl -n monitoring rollout status deployment/alertmanager-webhook-audit \
+  --timeout=300s
+
+# Preserve the existing kube-prometheus-stack installation and change only
+# Alertmanager routing. External Slack/SMTP receivers are intentionally not
+# configured; see docs/alert-delivery.md.
+helm upgrade kube-prometheus-stack \
+  prometheus-community/kube-prometheus-stack --version 87.18.1 \
+  -n monitoring --reuse-values \
+  -f "${ROOT}/values/alertmanager-routing.yaml" \
+  --wait --timeout 10m
+
 # Restore Git-safe credentials before chart reconciliation.
 sops --decrypt "${ROOT}/secrets/mariadb-exporter.secret.sops.yaml" |
   kubectl apply -f -

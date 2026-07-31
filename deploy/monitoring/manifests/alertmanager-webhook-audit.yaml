@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-webhook-audit
+  namespace: monitoring
+data:
+  nginx.conf: |
+    worker_processes 1;
+    pid /var/run/nginx.pid;
+    events { worker_connections 128; }
+    http {
+      access_log /dev/stdout combined;
+      error_log /dev/stderr warn;
+      server {
+        listen 8080;
+        location = /healthz { return 200 "ok\n"; }
+        location = /critical { return 204; }
+        location = /warning { return 204; }
+        location = /test { return 204; }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-webhook-audit
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: alertmanager-webhook-audit}
+  template:
+    metadata:
+      labels: {app: alertmanager-webhook-audit}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nginx
+          image: docker.io/library/nginx@sha256:1881968aff6f7cdcc4b888c00a11f4ce241ad7ec957e0cb4a9e19e93a3ff87ea
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true}
+            - {name: cache, mountPath: /var/cache/nginx}
+            - {name: run, mountPath: /var/run}
+      volumes:
+        - name: config
+          configMap: {name: alertmanager-webhook-audit}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-webhook-audit
+  namespace: monitoring
+spec:
+  selector: {app: alertmanager-webhook-audit}
+  ports:
+    - {name: http, port: 8080, targetPort: http}
