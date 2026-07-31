@@ -202,3 +202,12 @@ one-compute, three-storage inventory test. It verifies the init/control-plane/
 worker join target sets, every HAProxy API backend, positive and negative KVM
 gates, and the canonical selectors in the pinned Nova, OVN, and Open vSwitch
 charts. Run it before accepting an inventory or expansion-automation change.
+
+The 2026-07-31 rehearsal also exercised the real path by growing a live
+three-member kubeadm/stacked-etcd cluster to four Ubuntu nodes. The new member
+survived a reboot, all four etcd endpoints remained healthy, phase 20 reran with
+zero changes, and the four-by-four Pod network plus ClusterIP test passed.
+It subsequently added a fifth Ubuntu VM as a compute-only Kubernetes worker.
+The node stayed outside etcd, received only the compute/OVS canonical labels,
+passed the five-by-five network test, survived a reboot, and converged on a
+second phase-20 run.

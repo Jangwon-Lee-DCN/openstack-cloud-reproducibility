@@ -24,6 +24,18 @@ yamllint -d \
 
 bash -n bin/*.sh ../bin/*.sh ../lab/*.sh
 bin/verify-expansion-contract.sh
+
+set +e
+low_count_output=$(UBUNTU_IMAGE_BASE_URL=x LAB_NODE_COUNT=2 \
+  ../lab/remote.sh status 2>&1)
+low_count_rc=$?
+high_control_output=$(UBUNTU_IMAGE_BASE_URL=x LAB_NODE_COUNT=5 \
+  LAB_CONTROL_PLANE_COUNT=6 ../lab/remote.sh status 2>&1)
+high_control_rc=$?
+set -e
+[[ $low_count_rc -eq 2 && $low_count_output == *"between 3 and 5"* ]]
+[[ $high_control_rc -eq 2 && $high_control_output == *"between 3 and LAB_NODE_COUNT"* ]]
+
 ALLOW_DIRTY_REBUILD_INPUTS=${ALLOW_DIRTY_REBUILD_INPUTS:-1} \
   "$root/automation/bin/verify-inputs.sh"
 

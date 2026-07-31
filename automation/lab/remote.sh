@@ -14,6 +14,25 @@ image_name=ubuntu-24.04-rebuild-lab
 image_file=ubuntu-24.04-server-cloudimg-amd64.img
 api_vip=10.77.0.250
 base_url=${UBUNTU_IMAGE_BASE_URL%/}
+node_count=${LAB_NODE_COUNT:-3}
+control_plane_count=${LAB_CONTROL_PLANE_COUNT:-$node_count}
+
+[[ $node_count =~ ^[0-9]+$ ]] || {
+  echo "LAB_NODE_COUNT must be an integer" >&2
+  exit 2
+}
+((node_count >= 3 && node_count <= 5)) || {
+  echo "LAB_NODE_COUNT must be between 3 and 5" >&2
+  exit 2
+}
+[[ $control_plane_count =~ ^[0-9]+$ ]] || {
+  echo "LAB_CONTROL_PLANE_COUNT must be an integer" >&2
+  exit 2
+}
+((control_plane_count >= 3 && control_plane_count <= node_count)) || {
+  echo "LAB_CONTROL_PLANE_COUNT must be between 3 and LAB_NODE_COUNT" >&2
+  exit 2
+}
 
 wait_server() {
   local server=$1 status
@@ -85,7 +104,7 @@ create_lab() {
       --ingress --ethertype IPv4 --remote-group "$security_group" >/dev/null
   fi
 
-  for index in 0 1 2; do
+  for index in $(seq 0 "$((node_count - 1))"); do
     server=${prefix}-${index}
     if ! openstack server show "$server" >/dev/null 2>&1; then
       openstack server create "$server" --image "$image_name" \
@@ -115,14 +134,14 @@ create_lab() {
     done < <(openstack port list --server "$server" -f value -c ID)
     if [[ "$has_floating_ip" == 0 ]]; then
       floating_ip=$(openstack floating ip create public -f value -c floating_ip_address)
-      openstack server add floating ip "$server" "$floating_ip"
+      openstack floating ip set --port "$management_port" "$floating_ip"
     fi
   done
   status_lab
 }
 
 status_lab() {
-  openstack server list --name "^${prefix}-[0-2]$" --name-lookup-one-by-one \
+  openstack server list --name "^${prefix}-[0-9]+$" --name-lookup-one-by-one \
     -c Name -c Status -c Networks -c Flavor -f table
   openstack hypervisor stats show -f yaml
 }
@@ -131,7 +150,7 @@ inventory_lab() {
   local index server management_port node_ip floating_ip dns_line roles
 
   printf '%s\n' '---' 'all:' '  children:' '    control_plane:' '      hosts:'
-  for index in 0 1 2; do
+  for index in $(seq 0 "$((control_plane_count - 1))"); do
     server=${prefix}-${index}
     openstack server show "$server" >/dev/null
     management_port=$(openstack port list --server "$server" --network "$network" \
@@ -157,11 +176,35 @@ inventory_lab() {
     printf '          node_roles: %s\n' "$roles"
     [[ -n "$dns_line" ]] && printf '%s\n' "$dns_line"
   done
-  printf '%s\n' '    workers:' '      hosts: {}' '    ceph_nodes:' '      hosts: {}'
+  printf '%s\n' '    workers:'
+  if ((control_plane_count == node_count)); then
+    printf '%s\n' '      hosts: {}'
+  else
+    printf '%s\n' '      hosts:'
+    for index in $(seq "$control_plane_count" "$((node_count - 1))"); do
+      server=${prefix}-${index}
+      openstack server show "$server" >/dev/null
+      management_port=$(openstack port list --server "$server" --network "$network" \
+        -f value -c ID | head -1)
+      node_ip=$(openstack port show "$management_port" -f json -c fixed_ips | \
+        python3 -c 'import json,sys; print(json.load(sys.stdin)["fixed_ips"][0]["ip_address"])')
+      floating_ip=$(openstack floating ip list --port "$management_port" \
+        -f value -c 'Floating IP Address' | head -1)
+      test -n "$node_ip"
+      test -n "$floating_ip"
+      printf '        %s:\n' "$server"
+      printf '          ansible_host: %s\n' "$floating_ip"
+      printf '          node_ip: %s\n' "$node_ip"
+      printf '%s\n' '          node_roles: [compute]'
+    done
+  fi
+  printf '%s\n' '    ceph_nodes:' '      hosts: {}'
 }
 
 destroy_lab() {
-  for index in 0 1 2; do
+  # Always scan the full supported range so a caller cannot orphan a node by
+  # forgetting which count was used during an earlier expansion rehearsal.
+  for index in $(seq 0 4); do
     server=${prefix}-${index}
     if openstack server show "$server" >/dev/null 2>&1; then
       while read -r port_id; do

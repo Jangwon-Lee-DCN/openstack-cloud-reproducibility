@@ -35,6 +35,8 @@ fi
 
 kubectl -n "$namespace" exec -i "$pod" -- env \
   "LAB_PUBLIC_KEY=$public_key" \
+  "LAB_NODE_COUNT=${LAB_NODE_COUNT:-3}" \
+  "LAB_CONTROL_PLANE_COUNT=${LAB_CONTROL_PLANE_COUNT:-${LAB_NODE_COUNT:-3}}" \
   "DELETE_LAB_IMAGE=${DELETE_LAB_IMAGE:-0}" \
   "UBUNTU_IMAGE_BASE_URL=${UBUNTU_IMAGE_BASE_URL:-https://cloud-images.ubuntu.com/releases/noble/release}" \
   bash -s -- "$action" < "$root/remote.sh"

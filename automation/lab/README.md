@@ -35,6 +35,37 @@ cd automation/lab
 LAB_PUBLIC_KEY_FILE=~/.ssh/id_ed25519_rebuild_lab.pub ./run.sh create
 ```
 
+The default is three nodes. To rehearse an in-place control-plane expansion,
+preserve the existing lab and increase the count; creation is idempotent and
+adds only missing numbered nodes:
+
+```bash
+LAB_NODE_COUNT=4 \
+LAB_PUBLIC_KEY_FILE=~/.ssh/id_ed25519_rebuild_lab.pub \
+./run.sh create
+LAB_NODE_COUNT=4 ./run.sh inventory \
+  > ../ansible/inventory/local/hosts.yml
+```
+
+`LAB_NODE_COUNT` accepts three through five. Pass the current count to
+`inventory`; `destroy` always scans the complete supported range to avoid
+orphaning a node when the original count is forgotten.
+
+To add a fifth VM as a worker-based compute rehearsal while retaining four
+control-plane members:
+
+```bash
+LAB_NODE_COUNT=5 \
+LAB_PUBLIC_KEY_FILE=~/.ssh/id_ed25519_rebuild_lab.pub \
+./run.sh create
+LAB_NODE_COUNT=5 LAB_CONTROL_PLANE_COUNT=4 ./run.sh inventory \
+  > ../ansible/inventory/local/hosts.yml
+```
+
+`LAB_CONTROL_PLANE_COUNT` defaults to the total count and accepts values from
+three through `LAB_NODE_COUNT`. Higher-numbered nodes are emitted under
+`workers` with `node_roles: [compute]`.
+
 `create.sh` downloads the official Ubuntu 24.04 release cloud image and
 verifies it against the same directory's published `SHA256SUMS` before Glance
 upload. Override `UBUNTU_IMAGE_BASE_URL` only with another reviewed, immutable
@@ -106,6 +137,29 @@ ClusterIP paths. Final consistency checks found exactly one VIP owner, no
 failed systemd units, no etcd alarms, all three etcd members started, and a
 healthy Cilium status. Kubeadm reported one year remaining on leaf certificates
 and nine years on the cluster certificate authorities at rehearsal time.
+
+The expansion rehearsal then raised `LAB_NODE_COUNT` from three to four without
+recreating the existing instances. The generated inventory added
+`rebuild-lab-3`; phases `00`, `10`, `15`, `20`, `30`, and the safe checks in
+`35` joined it as a real stacked-etcd control-plane member. Existing members
+were skipped by the join role, while HAProxy and BIND learned the new node.
+All four etcd endpoints were healthy and the network verifier passed sixteen
+Pod-IP paths plus all four ClusterIP paths. The new member rebooted and returned
+its node, etcd Pod, and Cilium agent in 75 seconds, and a second phase-20 run
+reported zero changes on all four members. Four etcd members still tolerate
+only one failure; this topology validates expansion mechanics rather than an
+HA improvement over three members.
+
+A fifth VM was then emitted under `workers` with `node_roles: [compute]`. It
+joined through the worker role without entering etcd, remained untainted, and
+received `openstack-compute-node=enabled` and `openvswitch=enabled` without the
+OVN gateway label. The provider-interface safety gate passed, all twenty-five
+Pod-IP paths and all five ClusterIP paths succeeded, and the worker returned
+Ready with Cilium after a 32-second reboot. Phase 20 then converged with zero
+changes on all five nodes. This run also found a multi-port OpenStack client
+ambiguity: Floating IP creation now binds explicitly to the management port
+instead of asking the client to choose between management and address-less
+provider ports.
 
 ## Destroy
 
