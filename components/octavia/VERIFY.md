@@ -77,3 +77,43 @@ Accepted PoC result: load balancer
 `8f192126-5fa2-44c6-a009-b7fb58f02ff7` resumed on the controller-0 worker
 after the active controller-1 worker was deleted. It reached `ACTIVE` /
 `ONLINE` with exactly one `MASTER` and one `BACKUP` Amphora, both `ALLOCATED`.
+
+## OVN provider pending-state recovery
+
+An OVN operation can finish in Northbound DB while its final status callback
+is lost during an API/driver-agent rollout. Audit OVN load balancers that have
+remained `PENDING_*` for more than 15 minutes:
+
+```bash
+deploy/scripts/recover-octavia-ovn-pending.sh
+```
+
+The audit is read-only and exits non-zero when operator review is required.
+Inspect the named LB and its OVN rows first. Targeted recovery is explicit and
+never changes Octavia's database directly:
+
+```bash
+deploy/scripts/recover-octavia-ovn-pending.sh <load-balancer-id>
+OCTAVIA_OVN_PENDING_RECOVERY=YES \
+  deploy/scripts/recover-octavia-ovn-pending.sh <load-balancer-id>
+```
+
+The script refuses a non-OVN target, a state other than `PENDING_*`, a target
+younger than the threshold, an unstable driver-agent Deployment, or an active
+Helm operation. It invokes the provider's ID-targeted sync, which reconciles
+OVN and sends status through Octavia's driver status socket. Acceptance
+requires `ACTIVE`; a direct database `UPDATE` is not an accepted recovery.
+
+## Octavia/OVN state audit
+
+Run the wider, read-only state comparison and optionally publish its bounded
+Prometheus counters:
+
+```bash
+deploy/monitoring/scripts/audit-octavia-state.sh octavia-state-audit.json
+```
+
+This detects long `PENDING_*` operations, orphaned cross-router ownership,
+dangling UUID-named OVN LB rows, and empty policy/route nexthops. See
+`deploy/monitoring/docs/octavia-state-audit.md`; findings do not authorize
+automatic OVN deletion.

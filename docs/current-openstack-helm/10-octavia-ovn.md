@@ -144,9 +144,39 @@ this PoC. Active/standby protects against an Amphora guest failure, but it
 does not provide compute-host fault tolerance until another compute node and
 appropriate scheduling policy are added.
 
+## OVN operation recovery
+
+The OVN provider has no Taskflow jobboard for API-to-provider operations. If a
+driver-agent rollout loses the final status callback after OVN has accepted a
+change, Octavia can remain in `PENDING_*`. Use
+`deploy/scripts/recover-octavia-ovn-pending.sh` to audit operations older than
+15 minutes. Explicit recovery runs the provider's single-ID sync and reports
+the reconstructed hierarchy through the normal status socket; it never writes
+Octavia database rows directly and blocks while Helm or driver-agent is
+rolling out.
+
 ## Provider guidance
 
-Use OVN for ordinary native L4 load balancers and explicitly select Amphora
-where its feature set is required. Provider selection must remain visible in
-the VPC control-plane API and must not silently change an existing load
-balancer's semantics.
+The raw Octavia API still exposes an explicit provider, but the VPC control
+plane computes it from intent: native TCP/UDP/SCTP with `SOURCE_IP_PORT`
+selects OVN, while HTTP-family listeners or
+`ROUND_ROBIN`/`LEAST_CONNECTIONS` select Amphora. The CR does not expose a
+free-form provider knob. Selection is recorded in status, and a spec edit that
+would require changing an existing Octavia LB's immutable provider is refused
+instead of silently recreating the LB and changing its VIP.
+
+TCP has live coverage across local, VpcPeering, and real TransitGateway
+members; Amphora HTTP has live traffic coverage. Cross-VPC UDP/SCTP and the
+Amphora TLS variants remain explicit test gaps. IPv6 is not a platform claim
+until the VPC and transit models become dual-stack.
+
+## State observability
+
+`deploy/monitoring/scripts/audit-octavia-state.sh` compares the live Octavia
+API and OVN NB database for long `PENDING_*` operations, orphaned
+cross-router ownership, dangling UUID-named OVN LB rows, and empty nexthops.
+It is read-only and can publish bounded metrics to Pushgateway. The
+Octavia audit section in the consolidated `OpenStack Platform Operations`
+Grafana dashboard and the `octavia.state-audit` PrometheusRule group are
+deployed from `deploy/monitoring/manifests`; response guidance is in
+`deploy/monitoring/docs/octavia-state-audit.md`.

@@ -25,3 +25,14 @@
 11. Confirm both controller hostPaths contain `status.sock`, `get.sock`, and
    `stats.sock`.
 12. Run the checks in `VERIFY.md`.
+13. Keep `[service_auth] valid_interfaces = internal` and mount the internal
+    CA in `octavia-driver-agent`. The OVN sync utility uses this session to
+    read a targeted Octavia object; without it the SDK selects the public
+    endpoint or fails TLS verification.
+14. After rollout, audit long-lived OVN provider operations with
+    `deploy/scripts/recover-octavia-ovn-pending.sh`. Recovery must be scoped to
+    one ID and must not run while the Deployment or Helm release is changing.
+15. Run `deploy/monitoring/scripts/audit-octavia-state.sh` every 15 minutes from
+    the operations runner with `PUSHGATEWAY_URL` set. The audit also checks
+    cross-router ownership, dangling OVN LB rows, and empty nexthops; it is
+    intentionally read-only.

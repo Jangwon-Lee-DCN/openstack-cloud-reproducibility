@@ -7,7 +7,9 @@ current user owns it; otherwise it remains until its finite expiry.
 
 ## Observe
 
-- Grafana: **VPC Alertmanager Operations**, credential panels.
+- Grafana: credential panels will live in the dedicated VPC control-plane
+  dashboard when that dashboard is rebuilt. Until then, use the Prometheus
+  metrics and alerts below rather than the deleted prototype dashboard.
 - Expiry: `vpc_project_credential_expiry_timestamp_seconds`.
 - Results: `vpc_project_credential_rotations_total{outcome,reason}`.
 - Metadata anomalies:

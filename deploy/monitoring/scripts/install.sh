@@ -84,9 +84,6 @@ kubectl apply \
   -f "${ROOT}/manifests/native-service-monitors.yaml" \
   -f "${ROOT}/manifests/blackbox-probes.yaml" \
   -f "${ROOT}/manifests/dashboard.yaml" \
-  -f "${ROOT}/manifests/vpc-control-plane-dashboard.yaml" \
-  -f "${ROOT}/manifests/alertmanager-operations-dashboard.yaml" \
-  -f "${ROOT}/manifests/neutron-drift-dashboard.yaml" \
   -f "${ROOT}/manifests/alerts.yaml" \
   -f "${ROOT}/manifests/synthetic-test.yaml" \
   -f "${ROOT}/manifests/tempo-bucket.yaml"

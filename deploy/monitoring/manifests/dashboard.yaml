@@ -1,29 +1,389 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-dashboard-openstack-overview
+  name: grafana-dashboard-openstack-platform
   namespace: monitoring
   labels:
     grafana_dashboard: "1"
 data:
-  openstack-overview.json: |
+  openstack-platform.json: |
     {
-      "annotations":{"list":[]},
-      "editable":true,
-      "panels":[
-        {"type":"stat","title":"Public API targets up","targets":[{"expr":"sum(probe_success{job=\"openstack-public-api\"})","refId":"A"}],"gridPos":{"h":7,"w":6,"x":0,"y":0}},
-        {"type":"stat","title":"Floating IP reachable","targets":[{"expr":"max(probe_success{job=\"openstack-acceptance-floating-ip\"})","refId":"A"}],"gridPos":{"h":7,"w":6,"x":6,"y":0}},
-        {"type":"stat","title":"MariaDB reachable","targets":[{"expr":"max(mysql_up)","refId":"A"}],"gridPos":{"h":7,"w":6,"x":12,"y":0}},
-        {"type":"stat","title":"Synthetic lifecycle","targets":[{"expr":"max(openstack_synthetic_success)","refId":"A"}],"gridPos":{"h":7,"w":6,"x":18,"y":0}},
-        {"type":"timeseries","title":"API probe latency","targets":[{"expr":"probe_duration_seconds{job=\"openstack-public-api\"}","legendFormat":"{{instance}}","refId":"A"}],"gridPos":{"h":9,"w":12,"x":0,"y":7}},
-        {"type":"timeseries","title":"OpenStack resource counts","targets":[{"expr":"{__name__=~\"openstack_.*_total\"}","legendFormat":"{{__name__}}","refId":"A"}],"gridPos":{"h":9,"w":12,"x":12,"y":7}}
+      "uid": "openstack-platform-operations",
+      "title": "OpenStack Platform Operations",
+      "description": "Operator landing page: incident state, public API reachability, OpenStack workloads, database/message bus health, capacity, and active alerts.",
+      "tags": ["openstack", "platform", "operations"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "graphTooltip": 1,
+      "editable": true,
+      "links": [
+        {"title": "Prometheus", "url": "/prometheus/", "type": "link", "targetBlank": true},
+        {"title": "Alertmanager", "url": "/alertmanager/", "type": "link", "targetBlank": true}
       ],
-      "schemaVersion":41,
-      "tags":["OpenStack","PoC"],
-      "templating":{"list":[]},
-      "time":{"from":"now-6h","to":"now"},
-      "title":"OpenStack Platform Overview",
-      "uid":"openstack-platform-overview",
-      "version":1
+      "time": {"from": "now-6h", "to": "now"},
+      "timepicker": {"refresh_intervals": ["10s", "30s", "1m", "5m"]},
+      "templating": {
+        "list": [
+          {
+            "name": "severity",
+            "label": "Alert severity",
+            "type": "custom",
+            "query": "critical,warning,info",
+            "current": {"text": "All", "value": "$__all"},
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true
+          }
+        ]
+      },
+      "annotations": {
+        "list": [
+          {
+            "name": "Firing alerts",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "enable": true,
+            "expr": "ALERTS{alertstate=\"firing\",severity=~\"$severity\"}",
+            "iconColor": "red",
+            "tagKeys": "alertname,severity",
+            "titleFormat": "{{alertname}}"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "row",
+          "title": "Incident summary — answer this first",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Critical alerts",
+          "description": "Firing critical alerts across the platform. Click Alertmanager above for ownership and silence workflow.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "sum(ALERTS{alertstate=\"firing\",severity=\"critical\"}) or vector(0)"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 0, "y": 1, "w": 4, "h": 5}
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Warning alerts",
+          "description": "Firing warning alerts across the platform.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "sum(ALERTS{alertstate=\"firing\",severity=\"warning\"}) or vector(0)"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 4, "y": 1, "w": 4, "h": 5}
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Public APIs reachable",
+          "description": "Percentage of blackbox-probed public OpenStack endpoints currently reachable.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "avg(probe_success{job=\"openstack-public-api\"})"}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.99}, {"color": "green", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 8, "y": 1, "w": 4, "h": 5}
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Unavailable workloads",
+          "description": "OpenStack Deployments with unavailable replicas plus StatefulSets short of desired ready replicas.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "sum(kube_deployment_status_replicas_unavailable{namespace=\"openstack\"}) + sum(clamp_min(kube_statefulset_status_replicas{namespace=\"openstack\"} - kube_statefulset_status_replicas_ready{namespace=\"openstack\"}, 0))"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 12, "y": 1, "w": 4, "h": 5}
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Synthetic lifecycle",
+          "description": "Latest end-to-end OpenStack resource lifecycle test and report freshness.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "max(openstack_synthetic_success)", "legendFormat": "result"},
+            {"refId": "B", "expr": "time() - max(openstack_synthetic_last_run_timestamp_seconds)", "legendFormat": "age seconds"}
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0}, "overrides": [{"matcher": {"id": "byName", "options": "result"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"0": {"text": "FAILED", "color": "red"}, "1": {"text": "PASSED", "color": "green"}}}]}]}, {"matcher": {"id": "byName", "options": "age seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 14400}, {"color": "red", "value": 28800}]}}]}]},
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 16, "y": 1, "w": 4, "h": 5}
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "Acceptance floating IP",
+          "description": "External data-plane reachability of the acceptance floating IP.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "max(probe_success{job=\"openstack-acceptance-floating-ip\"})"}],
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "UNREACHABLE", "color": "red"}, "1": {"text": "REACHABLE", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 20, "y": 1, "w": 4, "h": 5}
+        },
+        {
+          "id": 10,
+          "type": "row",
+          "title": "Public API and service availability",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 6, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 11,
+          "type": "state-timeline",
+          "title": "Public endpoint state",
+          "description": "Every public endpoint probe. Red identifies the exact externally unreachable API path.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "probe_success{job=\"openstack-public-api\"}", "legendFormat": "{{instance}}"}],
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "min": 0, "max": 1}, "overrides": []},
+          "options": {"alignValue": "left", "legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "mergeValues": true, "rowHeight": 0.8, "showValue": "never", "tooltip": {"mode": "single", "sort": "none"}},
+          "gridPos": {"x": 0, "y": 7, "w": 14, "h": 10}
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Public API probe latency",
+          "description": "End-to-end TLS and HTTP probe duration by public endpoint; failed probes are visible in the state panel.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "probe_duration_seconds{job=\"openstack-public-api\"}", "legendFormat": "{{instance}}"}],
+          "fieldConfig": {"defaults": {"unit": "s", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false}}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"x": 14, "y": 7, "w": 10, "h": 10}
+        },
+        {
+          "id": 13,
+          "type": "state-timeline",
+          "title": "OpenStack exporter service checks",
+          "description": "Service-specific exporter checks for Nova, Neutron, Cinder, Glance, Keystone, Placement, Octavia, Heat, Gnocchi and Ironic.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "{__name__=~\"openstack_.*_up\"}", "legendFormat": "{{__name__}}"}],
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "min": 0, "max": 1}, "overrides": []},
+          "options": {"alignValue": "left", "legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "mergeValues": true, "rowHeight": 0.8, "showValue": "never", "tooltip": {"mode": "single", "sort": "none"}},
+          "gridPos": {"x": 0, "y": 17, "w": 24, "h": 10}
+        },
+        {
+          "id": 20,
+          "type": "row",
+          "title": "Kubernetes workload health",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 27, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 21,
+          "type": "bargauge",
+          "title": "Deployment readiness",
+          "description": "Ready/desired replicas for every OpenStack Deployment. Values below 100% immediately identify the affected service.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "max by (deployment) (kube_deployment_status_replicas_ready{namespace=\"openstack\"}) / clamp_min(max by (deployment) (kube_deployment_status_replicas{namespace=\"openstack\"}), 1)", "legendFormat": "{{deployment}}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.99}, {"color": "green", "value": 1}]}}, "overrides": []},
+          "options": {"displayMode": "lcd", "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}, "minVizHeight": 10, "minVizWidth": 0, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true, "sizing": "auto", "valueMode": "color"},
+          "gridPos": {"x": 0, "y": 28, "w": 14, "h": 16}
+        },
+        {
+          "id": 22,
+          "type": "bargauge",
+          "title": "StatefulSet readiness",
+          "description": "Ready/desired replicas for OVN databases, MariaDB, RabbitMQ, Memcached, Valkey and conductors.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "max by (statefulset) (kube_statefulset_status_replicas_ready{namespace=\"openstack\"}) / clamp_min(max by (statefulset) (kube_statefulset_status_replicas{namespace=\"openstack\"}), 1)", "legendFormat": "{{statefulset}}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.99}, {"color": "green", "value": 1}]}}, "overrides": []},
+          "options": {"displayMode": "lcd", "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}, "minVizHeight": 10, "minVizWidth": 0, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true, "sizing": "auto", "valueMode": "color"},
+          "gridPos": {"x": 14, "y": 28, "w": 10, "h": 8}
+        },
+        {
+          "id": 23,
+          "type": "timeseries",
+          "title": "Top OpenStack pod CPU",
+          "description": "Top 10 OpenStack containers by current CPU consumption, excluding pause containers.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "topk(10, sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"openstack\",container!=\"\",image!=\"\"}[5m])))", "legendFormat": "{{pod}}"}],
+          "fieldConfig": {"defaults": {"unit": "cores", "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"x": 14, "y": 36, "w": 10, "h": 8}
+        },
+        {
+          "id": 30,
+          "type": "row",
+          "title": "Database and message bus",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 44, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 31,
+          "type": "stat",
+          "title": "MariaDB exporters",
+          "description": "Number of healthy MariaDB exporter targets.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "sum(mysql_up)", "legendFormat": "healthy"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 2}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 0, "y": 45, "w": 4, "h": 5}
+        },
+        {
+          "id": 32,
+          "type": "stat",
+          "title": "RabbitMQ nodes",
+          "description": "RabbitMQ nodes currently exporting identity metrics.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "count(rabbitmq_identity_info)", "legendFormat": "nodes"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 2}, {"color": "green", "value": 3}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 4, "y": 45, "w": 4, "h": 5}
+        },
+        {
+          "id": 33,
+          "type": "timeseries",
+          "title": "MariaDB workload and pressure",
+          "description": "Connected/running threads and aborted connections. Spikes often precede API latency or timeout symptoms.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "max(mysql_global_status_threads_connected)", "legendFormat": "threads connected"},
+            {"refId": "B", "expr": "max(mysql_global_status_threads_running)", "legendFormat": "threads running"},
+            {"refId": "C", "expr": "sum(rate(mysql_global_status_aborted_connects[5m]))", "legendFormat": "aborted connects/s"}
+          ],
+          "fieldConfig": {"defaults": {"min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"x": 8, "y": 45, "w": 8, "h": 9}
+        },
+        {
+          "id": 34,
+          "type": "timeseries",
+          "title": "RabbitMQ queue pressure",
+          "description": "Ready and unacknowledged messages aggregated across queues.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "sum(rabbitmq_queue_messages_ready)", "legendFormat": "ready"},
+            {"refId": "B", "expr": "sum(rabbitmq_queue_messages_unacked)", "legendFormat": "unacked"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"x": 16, "y": 45, "w": 8, "h": 9}
+        },
+        {
+          "id": 35,
+          "type": "timeseries",
+          "title": "RabbitMQ message rate",
+          "description": "Cluster message ingress, delivery and redelivery rates.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "sum(rate(rabbitmq_global_messages_received_total[5m]))", "legendFormat": "received/s"},
+            {"refId": "B", "expr": "sum(rate(rabbitmq_global_messages_delivered_total[5m]))", "legendFormat": "delivered/s"},
+            {"refId": "C", "expr": "sum(rate(rabbitmq_global_messages_redelivered_total[5m]))", "legendFormat": "redelivered/s"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"x": 0, "y": 50, "w": 8, "h": 9}
+        },
+        {
+          "id": 40,
+          "type": "row",
+          "title": "Cloud capacity and inventory",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 59, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 41,
+          "type": "gauge",
+          "title": "Placement capacity utilization",
+          "description": "Aggregate compute inventory usage reported by Placement for vCPU, memory and local disk.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "max(openstack_placement_resource_usage{resourcetype=\"VCPU\"}) / clamp_min(max(openstack_placement_resource_total{resourcetype=\"VCPU\"}), 1)", "legendFormat": "vCPU"},
+            {"refId": "B", "expr": "max(openstack_placement_resource_usage{resourcetype=\"MEMORY_MB\"}) / clamp_min(max(openstack_placement_resource_total{resourcetype=\"MEMORY_MB\"}), 1)", "legendFormat": "memory"},
+            {"refId": "C", "expr": "max(openstack_placement_resource_usage{resourcetype=\"DISK_GB\"}) / clamp_min(max(openstack_placement_resource_total{resourcetype=\"DISK_GB\"}), 1)", "legendFormat": "local disk"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []},
+          "options": {"minVizHeight": 75, "minVizWidth": 75, "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true, "sizing": "auto"},
+          "gridPos": {"x": 0, "y": 60, "w": 8, "h": 9}
+        },
+        {
+          "id": 42,
+          "type": "stat",
+          "title": "Network resource anomalies",
+          "description": "Resources reported in non-active or structurally invalid states by the OpenStack exporter.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "max(openstack_neutron_routers_not_active) or vector(0)", "legendFormat": "routers not active"},
+            {"refId": "B", "expr": "max(openstack_neutron_ports_lb_not_active) or vector(0)", "legendFormat": "LB ports not active"},
+            {"refId": "C", "expr": "max(openstack_neutron_ports_no_ips) or vector(0)", "legendFormat": "ports without IP"},
+            {"refId": "D", "expr": "max(openstack_neutron_floating_ips_associated_not_active) or vector(0)", "legendFormat": "associated FIPs not active"}
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 8, "y": 60, "w": 8, "h": 9}
+        },
+        {
+          "id": 43,
+          "type": "stat",
+          "title": "Cloud inventory",
+          "description": "Current cloud resource totals. These are inventory signals, not health indicators.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "max(openstack_nova_total_vms)", "legendFormat": "VMs"},
+            {"refId": "B", "expr": "max(openstack_neutron_networks)", "legendFormat": "networks"},
+            {"refId": "C", "expr": "max(openstack_neutron_routers)", "legendFormat": "routers"},
+            {"refId": "D", "expr": "max(openstack_neutron_ports)", "legendFormat": "ports"},
+            {"refId": "E", "expr": "max(openstack_neutron_floating_ips)", "legendFormat": "floating IPs"},
+            {"refId": "F", "expr": "max(openstack_cinder_volumes)", "legendFormat": "volumes"},
+            {"refId": "G", "expr": "max(openstack_glance_images)", "legendFormat": "images"},
+            {"refId": "H", "expr": "max(openstack_loadbalancer_total_loadbalancers)", "legendFormat": "load balancers"}
+          ],
+          "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 16, "y": 60, "w": 8, "h": 9}
+        },
+        {
+          "id": 50,
+          "type": "row",
+          "title": "Active incidents and platform drift",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 69, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 51,
+          "type": "table",
+          "title": "Firing alerts",
+          "description": "Current firing alerts filtered by severity. Use Alertmanager for complete annotations, ownership and silencing.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "ALERTS{alertstate=\"firing\",severity=~\"$severity\"}", "format": "table", "instant": true}],
+          "fieldConfig": {"defaults": {}, "overrides": []},
+          "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+          "gridPos": {"x": 0, "y": 70, "w": 16, "h": 11}
+        },
+        {
+          "id": 52,
+          "type": "stat",
+          "title": "Octavia/OVN audit",
+          "description": "Read-only findings: long PENDING, orphaned cross-router ownership, dangling OVN LB rows, and invalid nexthops.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "octavia_state_audit_issues", "legendFormat": "{{type}}"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 16, "y": 70, "w": 8, "h": 6}
+        },
+        {
+          "id": 53,
+          "type": "stat",
+          "title": "Octavia audit age",
+          "description": "Collection is stale after 30 minutes. Zero findings are meaningful only while this remains fresh.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "time() - octavia_state_audit_last_success_timestamp_seconds", "legendFormat": "age"}],
+          "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 900}, {"color": "red", "value": 1800}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 16, "y": 76, "w": 8, "h": 5}
+        }
+      ]
     }
-

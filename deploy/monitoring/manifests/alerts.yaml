@@ -167,3 +167,45 @@ spec:
             summary: VPC Neutron drift audit is stale
             description: "No successful drift report for {{ $labels.project_namespace }} in more than one hour."
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/neutron-drift-audit.md
+    - name: octavia.state-audit
+      rules:
+        - alert: OctaviaLoadBalancerLongPending
+          expr: octavia_state_audit_issues{type="long_pending"} > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: Octavia load balancer is stuck in PENDING state
+            description: "{{ $value }} load balancer(s) have exceeded the configured PENDING_CREATE/UPDATE/DELETE threshold."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/octavia-state-audit.md
+        - alert: OctaviaCrossRouterOwnershipOrphaned
+          expr: octavia_state_audit_issues{type="orphaned_cross_router_ownership"} > 0
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: OVN cross-router state refers to a missing Octavia load balancer
+            description: "{{ $value }} managed policy or route row(s) have ownership whose load balancer no longer exists."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/octavia-state-audit.md
+        - alert: OctaviaOVNLoadBalancerRowDangling
+          expr: octavia_state_audit_issues{type="dangling_ovn_load_balancer_rows"} > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: OVN Load_Balancer row has no matching Octavia load balancer
+            description: "{{ $value }} UUID-named OVN Load_Balancer row(s) have no matching OVN-provider Octavia object."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/octavia-state-audit.md
+        - alert: OctaviaCrossRouterNexthopInvalid
+          expr: octavia_state_audit_issues{type="invalid_nexthops"} > 0
+          for: 1m
+          labels: {severity: critical}
+          annotations:
+            summary: Managed OVN cross-router policy or route has no nexthop
+            description: "{{ $value }} Octavia-owned OVN row(s) have empty policy nexthops or route nexthop."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/octavia-state-audit.md
+        - alert: OctaviaStateAuditStale
+          expr: absent(octavia_state_audit_last_success_timestamp_seconds) or time() - octavia_state_audit_last_success_timestamp_seconds > 1800
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: Octavia state audit result is missing or stale
+            description: The read-only Octavia/OVN state audit has not published successfully in 30 minutes.
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/octavia-state-audit.md
