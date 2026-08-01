@@ -29,3 +29,9 @@
       args:
         chdir: "{{ repro_repo_path }}"
       changed_when: false
+    - name: Verify native OpenStack and VPC IAM persona boundaries
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-iam-dcn-personas.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      when: enable_federated_iam | default(false) | bool
+      changed_when: false

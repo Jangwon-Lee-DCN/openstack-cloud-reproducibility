@@ -43,3 +43,6 @@ services_repo_ref: 13b7806e76b60c5f49865b4a428df7fe32c2af9e
 allow_poc_quorum: false
 confirm_ceph_device_wipe: false
 confirm_provider_bridge_change: false
+# Enable only after the production IdP, MFA, break-glass, and recovery policy
+# have been approved and the encrypted Keycloak secrets are available.
+enable_federated_iam: false

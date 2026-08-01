@@ -29,6 +29,46 @@
   ansible.builtin.command: "{{ services_repo_path }}/deployment/prerequisites/security/cert-manager/scripts/install.sh"
   changed_when: true
 
+- name: Install the pinned Keycloak operator
+  ansible.builtin.command: >-
+    kubectl apply -k
+    {{ services_repo_path }}/deployment/prerequisites/identity/keycloak
+  when: enable_federated_iam | default(false) | bool
+  changed_when: true
+
+- name: Create the Keycloak application namespace
+  ansible.builtin.command: >-
+    kubectl apply -f
+    {{ services_repo_path }}/deployment/prerequisites/identity/keycloak/manifests/namespace.yaml
+  when: enable_federated_iam | default(false) | bool
+  changed_when: true
+
+- name: Reconcile encrypted Keycloak secrets without writing plaintext to disk
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for secret in "{{ services_repo_path }}"/deployment/prerequisites/identity/keycloak/secrets/*.sops.yaml; do
+      sops --decrypt "$secret" | kubectl apply -f -
+    done
+  args:
+    executable: /bin/bash
+  no_log: true
+  when: enable_federated_iam | default(false) | bool
+  changed_when: true
+
+- name: Reconcile the Keycloak instance and Gateway route
+  ansible.builtin.command: kubectl apply -f {{ item }}
+  loop:
+    - "{{ services_repo_path }}/deployment/prerequisites/identity/keycloak/manifests/keycloak.yaml"
+    - "{{ services_repo_path }}/deployment/prerequisites/identity/keycloak/manifests/routes.yaml"
+  when: enable_federated_iam | default(false) | bool
+  changed_when: true
+
+- name: Wait for the Keycloak instance to become ready
+  ansible.builtin.command: >-
+    kubectl -n keycloak wait --for=condition=Ready keycloak/keycloak --timeout=15m
+  when: enable_federated_iam | default(false) | bool
+  changed_when: false
+
 - name: Render the temporary PoC self-signed ClusterIssuer
   ansible.builtin.copy:
     dest: /tmp/dcn-selfsigned-clusterissuer.yaml

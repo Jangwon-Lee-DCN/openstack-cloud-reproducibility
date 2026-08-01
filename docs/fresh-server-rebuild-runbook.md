@@ -168,7 +168,9 @@ Dependency order is:
 5. Harbor backed by retained RGW storage;
 6. Prometheus, Alertmanager, Grafana, Loki/Alloy, Hubble integration;
 7. Octavia Valkey/Sentinel jobboard;
-8. optional Gitea, Keycloak federation, CAPI/CAPO/ORC, and Magnum GitOps.
+8. optional Gitea, CAPI/CAPO/ORC, and Magnum GitOps. When
+   `enable_federated_iam=true`, Keycloak is installed in this phase before
+   Keystone federation and persona reconciliation in Phase 7.
 
 Run each component's own `preflight.sh`, `install.sh`, and `verify.sh`. The
 Ansible role automates components whose accepted scripts are present. BIND is
@@ -210,9 +212,11 @@ containers; the reconciler handles readiness explicitly.
 
 The Ansible phase then installs Designate/PowerDNS, CAPI/CAPO/ORC, the add-on
 provider, the workload-chart repository, and Magnum before final full-stack
-verification. Reconcile Amphora resources, optional Keycloak federation,
-Horizon/Skyline extensions, and the VPC control plane/dashboard from their
-pinned repositories after their independent acceptance gates.
+verification. With federated IAM enabled it also idempotently reconciles the
+seven Keycloak/Keystone personas and scoped role assignments. Reconcile
+Amphora resources, Horizon/Skyline extensions, and the VPC control
+plane/dashboard from their pinned repositories after their independent
+acceptance gates.
 
 ## Phase 8 — Acceptance and failure tests
 
@@ -231,6 +235,11 @@ image upload, VM boot, metadata, security groups, isolated overlapping VPC
 CIDRs, SNAT/Floating IP Internet access, Cinder attach/mount/write/reboot,
 Heat, Designate, Barbican, OVN and Amphora load balancers, Ironic API, and a
 one-control-plane/one-worker Magnum cluster.
+
+The automated IAM acceptance creates disposable users for admin, operator,
+member, reader, network-operator, and security-operator groups. It verifies
+native OpenStack policy plus ordinary VPC writes, Peering/TGW mutations, and
+NACL/Flow Log mutations through the public Gateway, then deletes the users.
 
 For production, repeat while draining or powering off each controller and
 storage node individually. Record RTO/RPO and alert delivery. A two-member

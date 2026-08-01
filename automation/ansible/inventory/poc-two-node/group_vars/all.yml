@@ -49,3 +49,4 @@ services_repo_ref: 13b7806e76b60c5f49865b4a428df7fe32c2af9e
 allow_poc_quorum: true
 confirm_ceph_device_wipe: false
 confirm_provider_bridge_change: false
+enable_federated_iam: true
