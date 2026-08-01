@@ -151,6 +151,37 @@ spec:
             summary: VPC controller received Neutron HTTP 409
             description: "{{ $labels.controller }} operation {{ $labels.operation }} received a conflict response."
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
+        - alert: VPCNetworkInterfaceOperationStuck
+          expr: vpc_network_interface_long_running == 1
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: Network interface operation is stuck
+            description: "Attachment {{ $labels.attachment }} in {{ $labels.project_namespace }} remains {{ $labels.state }}."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
+        - alert: VPCNetworkInterfaceAttachmentFailures
+          expr: increase(vpc_network_interface_attachment_failures_total[10m]) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: Network interface attachment operation failed
+            description: "Nova {{ $labels.operation }} failed with reason {{ $labels.reason }}."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
+        - alert: VPCNetworkInterfaceBindingSlow
+          expr: histogram_quantile(0.95, sum by (le) (rate(vpc_network_interface_binding_delay_seconds_bucket[15m]))) > 30
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: Network interface binding is slow
+            description: "The p95 Nova-to-Neutron binding latency exceeds 30 seconds."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
+        - alert: VPCNetworkInterfaceOrphanDetected
+          expr: vpc_network_interface_orphans > 0
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: Orphan network interface resource detected
+            description: "{{ $labels.project_namespace }} has {{ $value }} orphan {{ $labels.kind }} resources."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
         - alert: VPCNeutronDriftPersistent
           expr: sum by (project_namespace) (vpc_neutron_drift_resources) > 0
           for: 30m

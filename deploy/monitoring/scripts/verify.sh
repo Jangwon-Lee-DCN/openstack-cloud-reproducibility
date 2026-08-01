@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+python3 "$(dirname "$0")/test-dashboard-json.py"
+
 kubectl -n openstack get deployment prometheus-openstack-exporter
 kubectl -n monitoring get deployment \
   prometheus-blackbox-exporter prometheus-mysql-exporter \
@@ -26,6 +28,8 @@ for query in \
   'up{job="rabbitmq"}' \
   'up{namespace="vpc-control-plane-system",service=~"vpc-control-plane-controller-manager-metrics-service|vpc-facade"}' \
   'vpc_reconcile_duration_seconds_count or vector(0)' \
+  'vpc_network_interface_attachment_operation_seconds_count or vector(0)' \
+  'vpc_network_interface_orphans or vector(0)' \
   'openstack_synthetic_success'; do
   result="$(curl --fail --silent --get \
     --data-urlencode "query=${query}" \

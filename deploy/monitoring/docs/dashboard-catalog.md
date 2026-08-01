@@ -24,3 +24,17 @@ Dashboard ConfigMaps are loaded through the Grafana sidecar and have stable
 UIDs. The consolidated manifest is
 `deploy/monitoring/manifests/openstack-service-dashboards.yaml`; the platform
 landing page is `deploy/monitoring/manifests/dashboard.yaml`.
+## VPC Control Plane / Network Interfaces
+
+This dashboard is the operational view for managed ENIs. Its chained project
+namespace, VPC, Subnet, and Network Interface variables come from
+`vpc_network_interface_info`. It includes a 24-hour attachment success SLO,
+current report-only drift, automatic repair activity, failure-reason links to
+Loki, and request-ID/trace correlation links to Tempo.
+
+The Tempo link uses TraceQL attribute `span."request.id"`; the VPC facade's HTTP
+instrumentation attaches its `X-Request-ID` to that span attribute and exports
+through the cluster Tempo distributor. Run
+`deploy/monitoring/scripts/test-dashboard-json.py` to reject
+invalid embedded JSON, duplicate dashboard/panel IDs, or removal of the
+Prometheus/Loki/Tempo correlation contract before applying ConfigMaps.
