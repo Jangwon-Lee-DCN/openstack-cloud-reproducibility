@@ -52,6 +52,11 @@ changing the primary/secondary DNS design.
 Run the inventory and host gates, then rerun the idempotent phases against the
 complete inventory:
 
+Increment `dns_zone_serial` before Phase 15 whenever the inventory changes a
+forward or reverse record. Phase 15 rejects a changed zone with a stale serial,
+keeps the deployed zone untouched, requests secondary retransfer, and verifies
+every inventory node against both authoritative servers.
+
 ```bash
 cd /srv/openstack-cloud-reproducibility/automation/ansible
 
@@ -139,7 +144,7 @@ l3-agent=enabled
 Do not add the host to `ceph_nodes` unless it owns a separately reviewed Ceph
 device. A compute-only expansion does not require `confirm_ceph_device_wipe`.
 
-Run:
+Increment `dns_zone_serial` for the new worker record, then run:
 
 ```bash
 cd /srv/openstack-cloud-reproducibility/automation/ansible

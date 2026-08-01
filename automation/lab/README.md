@@ -167,13 +167,20 @@ the management default route on `ens3`, and kept `ens8` free of addresses and
 routes. A second run reported zero changes. After another reboot the Netplan,
 SSH path, kubelet, CRI-O, and Kubernetes Ready state all persisted.
 
+The five-node health check exposed a stale-secondary case after inventory
+growth reused the previous SOA serial. The DNS role now renders candidates,
+refuses to replace a live zone unless `dns_zone_serial` increases, requests a
+secondary retransfer, and verifies every inventory node on both authoritative
+servers. A negative test changed a candidate with the deployed serial and
+confirmed that the live zone and registry record remained untouched.
+
 ## Destroy
 
 ```bash
 ./run.sh destroy
 ```
 
-The destroy action targets only exact `rebuild-lab-*` names. It removes the
-three servers, their Floating IPs, router interfaces, subnet, network, security
-group, keypair, and flavor. The shared Ubuntu image is retained by default;
+The destroy action targets only the supported exact numbered `rebuild-lab-*`
+names. It removes the servers, their Floating IPs, router interfaces, subnet,
+network, security group, keypair, and flavor. The shared Ubuntu image is retained by default;
 set `DELETE_LAB_IMAGE=1` to remove it as well.
