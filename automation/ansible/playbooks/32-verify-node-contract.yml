@@ -1,0 +1,64 @@
+---
+- name: Compare the live Kubernetes topology with the declared inventory
+  hosts: "control_plane[0]"
+  become: true
+  gather_facts: false
+  vars:
+    expected_nodes: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique | sort }}"
+    expected_etcd_nodes: "{{ groups['control_plane'] | unique | sort }}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Read live Kubernetes nodes
+      ansible.builtin.command: kubectl get nodes -o json
+      register: live_nodes_command
+      changed_when: false
+
+    - name: Read live stacked-etcd Pods
+      ansible.builtin.command: >-
+        kubectl --namespace kube-system get pods
+        --selector component=etcd,tier=control-plane -o json
+      register: live_etcd_command
+      changed_when: false
+
+    - name: Decode live topology
+      ansible.builtin.set_fact:
+        live_nodes: "{{ (live_nodes_command.stdout | from_json)['items'] }}"
+        live_etcd_pods: "{{ (live_etcd_command.stdout | from_json)['items'] }}"
+
+    - name: Reject missing or undeclared Kubernetes nodes
+      ansible.builtin.assert:
+        that:
+          - live_nodes | map(attribute='metadata.name') | sort == expected_nodes
+        fail_msg: >-
+          Kubernetes nodes differ from inventory. Expected {{ expected_nodes }}, got
+          {{ live_nodes | map(attribute='metadata.name') | sort }}.
+
+    - name: Reject stacked-etcd membership drift
+      ansible.builtin.assert:
+        that:
+          - live_etcd_pods | map(attribute='spec.nodeName') | sort == expected_etcd_nodes
+        fail_msg: >-
+          Stacked-etcd nodes differ from control_plane. Expected {{ expected_etcd_nodes }}, got
+          {{ live_etcd_pods | map(attribute='spec.nodeName') | sort }}.
+
+    - name: Validate each declared node role contract
+      ansible.builtin.assert:
+        that:
+          - live_node.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first == 'True'
+          - item not in groups['control_plane'] or live_node.metadata.labels['openstack-control-plane'] | default('') == 'enabled'
+          - "'compute' not in declared_roles or live_node.metadata.labels['openstack-compute-node'] | default('') == 'enabled'"
+          - "'compute' not in declared_roles or live_node.metadata.labels['openvswitch'] | default('') == 'enabled'"
+          - "'ovn_gateway' not in declared_roles or live_node.metadata.labels['openstack-network-gateway'] | default('') == 'enabled'"
+          - "'ovn_gateway' not in declared_roles or live_node.metadata.labels['openstack-network-node'] | default('') == 'enabled'"
+          - "'ovn_gateway' not in declared_roles or live_node.metadata.labels['l3-agent'] | default('') == 'enabled'"
+          - "'cinder' not in declared_roles or live_node.metadata.labels['openstack-cinder-volume'] | default('') == 'enabled'"
+          - "'object_storage' not in declared_roles or live_node.metadata.labels['openstack-object-storage'] | default('') == 'enabled'"
+          - item in groups['control_plane'] or 'node-role.kubernetes.io/control-plane' not in live_node.metadata.labels
+        fail_msg: "Live labels, readiness, or control-plane placement violate the inventory contract for {{ item }}."
+      vars:
+        declared_roles: "{{ hostvars[item].node_roles | default([]) }}"
+        live_node: "{{ live_nodes | selectattr('metadata.name', 'equalto', item) | first }}"
+      loop: "{{ expected_nodes }}"
+      loop_control:
+        label: "{{ item }}"

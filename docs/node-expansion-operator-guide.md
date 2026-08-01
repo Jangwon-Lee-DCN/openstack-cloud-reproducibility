@@ -88,6 +88,7 @@ ansible-playbook -i inventory/local/hosts.yml \
 Validate membership and availability:
 
 ```bash
+ansible-playbook -i inventory/local/hosts.yml playbooks/32-verify-node-contract.yml
 kubectl --kubeconfig artifacts/admin.conf get nodes -o wide
 kubectl --kubeconfig artifacts/admin.conf -n kube-system get pods -o wide
 
@@ -177,6 +178,7 @@ ansible-playbook -i inventory/local/hosts.yml playbooks/60-verify.yml
 Acceptance requires more than a Ready Kubernetes node. Confirm:
 
 ```bash
+ansible-playbook -i inventory/local/hosts.yml playbooks/32-verify-node-contract.yml
 kubectl --kubeconfig artifacts/admin.conf get node compute-2 --show-labels
 openstack hypervisor list
 openstack compute service list --service nova-compute
@@ -207,6 +209,10 @@ one-compute, three-storage inventory test. It verifies the init/control-plane/
 worker join target sets, every HAProxy API backend, positive and negative KVM
 gates, and the canonical selectors in the pinned Nova, OVN, and Open vSwitch
 charts. Run it before accepting an inventory or expansion-automation change.
+The same validation runs in GitHub Actions whenever automation, pinned chart,
+or operator-guide inputs change. Phase 32 is a read-only live drift gate: it
+requires the exact declared Kubernetes node set, control-plane-only stacked
+etcd membership, Ready status, and every role's canonical OpenStack labels.
 
 The 2026-07-31 rehearsal also exercised the real path by growing a live
 three-member kubeadm/stacked-etcd cluster to four Ubuntu nodes. The new member
