@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-vpc-iam-audit
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  vpc-iam-audit.json: |
+    {
+      "uid":"vpc-iam-audit",
+      "title":"VPC IAM / OPA Audit",
+      "description":"Authorization decisions, OPA enforcement, fail-open events, and searchable structured audit records.",
+      "tags":["vpc","iam","opa","audit"],
+      "timezone":"browser",
+      "schemaVersion":39,
+      "version":1,
+      "refresh":"30s",
+      "time":{"from":"now-6h","to":"now"},
+      "templating":{"list":[
+        {"name":"authorization_class","label":"Authorization class","type":"custom","query":"read,project-write,network-sharing,security-policy","includeAll":true,"allValue":".*","multi":true,"current":{"text":"All","value":"$__all"}},
+        {"name":"outcome","label":"Outcome","type":"custom","query":"allowed,denied,failed,allow,deny,fail-open","includeAll":true,"allValue":".*","multi":true,"current":{"text":"All","value":"$__all"}},
+        {"name":"project_id","label":"Project ID","type":"textbox","query":".*","current":{"text":".*","value":".*"}},
+        {"name":"request_id","label":"Request ID","type":"textbox","query":".*","current":{"text":".*","value":".*"}}
+      ]},
+      "panels":[
+        {"id":1,"type":"stat","title":"Authorization denials (1h)","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(increase(vpc_facade_authorization_requests_total{authorization_class=~\"$authorization_class\",outcome=\"denied\"}[1h])) or vector(0)"}],"fieldConfig":{"defaults":{"decimals":0,"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":1},{"color":"red","value":20}]}},"overrides":[]},"options":{"colorMode":"background","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false}},"gridPos":{"x":0,"y":0,"w":6,"h":5}},
+        {"id":2,"type":"stat","title":"OPA fail-open events (1h)","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(increase(vpc_opa_enforcement_decisions_total{authorization_class=~\"$authorization_class\",outcome=\"fail-open\"}[1h])) or vector(0)"}],"fieldConfig":{"defaults":{"decimals":0,"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"red","value":1}]}},"overrides":[]},"options":{"colorMode":"background","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false}},"gridPos":{"x":6,"y":0,"w":6,"h":5}},
+        {"id":3,"type":"timeseries","title":"Facade authorization outcomes","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (authorization_class,outcome) (rate(vpc_facade_authorization_requests_total{authorization_class=~\"$authorization_class\"}[5m]))","legendFormat":"{{authorization_class}} / {{outcome}}"}],"fieldConfig":{"defaults":{"unit":"reqps","min":0},"overrides":[]},"options":{"legend":{"displayMode":"table","placement":"bottom","calcs":["lastNotNull"]}},"gridPos":{"x":12,"y":0,"w":12,"h":10}},
+        {"id":4,"type":"timeseries","title":"OPA enforcement decisions","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (authorization_class,outcome) (rate(vpc_opa_enforcement_decisions_total{authorization_class=~\"$authorization_class\"}[5m]))","legendFormat":"{{authorization_class}} / {{outcome}}"}],"fieldConfig":{"defaults":{"unit":"reqps","min":0},"overrides":[]},"options":{"legend":{"displayMode":"table","placement":"bottom","calcs":["lastNotNull"]}},"gridPos":{"x":0,"y":5,"w":12,"h":5}},
+        {"id":5,"type":"logs","title":"OPA authorization decisions","datasource":{"type":"loki","uid":"loki"},"targets":[{"expr":"{namespace=\"vpc-control-plane-system\"} |= \"VPC OPA authorization decision\" | json | authorization_class=~\"$authorization_class\" | outcome=~\"$outcome\" | project_id=~\"$project_id\" | request_id=~\"$request_id\"","refId":"A"}],"options":{"dedupStrategy":"none","enableLogDetails":true,"showTime":true,"sortOrder":"Descending","wrapLogMessage":true},"gridPos":{"x":0,"y":10,"w":24,"h":10}},
+        {"id":6,"type":"logs","title":"Completed facade request audit","datasource":{"type":"loki","uid":"loki"},"targets":[{"expr":"{namespace=\"vpc-control-plane-system\"} |= \"VPC API request completed\" | json | authorization_class=~\"$authorization_class\" | outcome=~\"$outcome\" | project_id=~\"$project_id\" | request_id=~\"$request_id\"","refId":"A"}],"options":{"dedupStrategy":"none","enableLogDetails":true,"showTime":true,"sortOrder":"Descending","wrapLogMessage":true},"gridPos":{"x":0,"y":20,"w":24,"h":10}}
+      ]
+    }

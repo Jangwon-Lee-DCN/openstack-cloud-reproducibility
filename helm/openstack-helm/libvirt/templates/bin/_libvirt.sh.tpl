@@ -131,7 +131,9 @@ if [ -n "${LIBVIRT_CEPH_CINDER_SECRET_UUID}" ] || [ -n "${LIBVIRT_EXTERNAL_CEPH_
 </secret>
 EOF
     virsh secret-define --file ${tmpsecret}
+    set +x
     virsh secret-set-value --secret "${sec_uuid}" --base64 "${sec_ceph_keyring}"
+    set -x
   }
 
   if [ -z "${CEPH_CINDER_KEYRING}" ] && [ -n "${CEPH_CINDER_USER}" ] ; then
@@ -153,6 +155,37 @@ EOF
   kill $LIBVIRTD_PID
   tail --pid=$LIBVIRTD_PID -f /dev/null
 
+fi
+
+# A host reboot can restart libvirtd without recreating the Kubernetes Pod, so
+# init containers are not a reliable place to restore libvirt's in-memory Ceph
+# secret. Reconcile it from the mounted keyring for the lifetime of the main
+# container. This also repairs an accidental `virsh secret-undefine` without
+# restarting libvirt or disrupting existing guests.
+function reconcile_virsh_libvirt_secrets {
+  if ! virsh connect >/dev/null 2>&1; then
+    return
+  fi
+  if [ -n "${CEPH_CINDER_USER}" ] && [ -n "${LIBVIRT_CEPH_CINDER_SECRET_UUID}" ] &&
+     ! virsh secret-list | awk 'NR > 2 {print $1}' | grep -Fxq "${LIBVIRT_CEPH_CINDER_SECRET_UUID}"; then
+    echo "WARNING: restoring missing libvirt Ceph secret ${LIBVIRT_CEPH_CINDER_SECRET_UUID}" 1>&2
+    create_virsh_libvirt_secret "${CEPH_CINDER_USER}" "${LIBVIRT_CEPH_CINDER_SECRET_UUID}" "${CEPH_CINDER_KEYRING}"
+  fi
+  if [ -n "${LIBVIRT_EXTERNAL_CEPH_CINDER_SECRET_UUID}" ] &&
+     ! virsh secret-list | awk 'NR > 2 {print $1}' | grep -Fxq "${LIBVIRT_EXTERNAL_CEPH_CINDER_SECRET_UUID}"; then
+    echo "WARNING: restoring missing external libvirt Ceph secret ${LIBVIRT_EXTERNAL_CEPH_CINDER_SECRET_UUID}" 1>&2
+    create_virsh_libvirt_secret "${LIBVIRT_EXTERNAL_CEPH_CINDER_USER}" "${LIBVIRT_EXTERNAL_CEPH_CINDER_SECRET_UUID}" "${EXTERNAL_CEPH_CINDER_KEYRING}"
+  fi
+}
+
+function watch_virsh_libvirt_secrets {
+  while sleep 30; do
+    reconcile_virsh_libvirt_secrets
+  done
+}
+
+if [ -n "${LIBVIRT_CEPH_CINDER_SECRET_UUID}" ] || [ -n "${LIBVIRT_EXTERNAL_CEPH_CINDER_SECRET_UUID}" ]; then
+  watch_virsh_libvirt_secrets &
 fi
 
 # NOTE(vsaienko): changing CGROUP is required as restart of the pod will cause domains restarts
