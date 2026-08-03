@@ -33,8 +33,11 @@ kubectl -n openstack rollout status daemonset/libvirt-libvirt-default \
   --timeout=180s
 ```
 
-Fresh-server automation must install this local pinned chart, not fetch an
-unpatched public libvirt package.
+Fresh-server automation installs
+`helm/packages/patched/libvirt-2026.1.0-dcn1.tgz` through `release-lock.yaml`.
+The original upstream package remains unchanged under `helm/packages/upstream`.
+The lock checksum and `helm/packages/patched/SHA256SUMS` must both match before
+reconciliation; do not fetch an unpatched public libvirt package.
 
 ## VERIFY
 
