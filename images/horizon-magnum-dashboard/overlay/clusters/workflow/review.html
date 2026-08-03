@@ -1,0 +1,50 @@
+<div class="magnum-review">
+  <div class="alert alert-info">
+    <span class="fa fa-code-fork"></span>
+    This request is validated by Magnum, rendered into a CAPI package, committed to the deployment repository and reconciled by Argo CD.
+  </div>
+  <div class="row">
+    <section class="col-md-6">
+      <h4>Cluster identity</h4>
+      <dl class="dl-horizontal">
+        <dt>Name</dt><dd>{$ model.name || 'Not set' $}</dd>
+        <dt>Profile</dt><dd>{$ model.cluster_template_id || 'Not set' $}</dd>
+        <dt>Availability zone</dt><dd>{$ model.availability_zone || 'Not set' $}</dd>
+        <dt>SSH key</dt><dd>{$ model.keypair || 'Not set' $}</dd>
+      </dl>
+    </section>
+    <section class="col-md-6">
+      <h4>Capacity and recovery</h4>
+      <dl class="dl-horizontal">
+        <dt>Control planes</dt><dd>{$ model.master_count $} × {$ model.master_flavor_id || 'Not set' $}</dd>
+        <dt>Workers</dt><dd>{$ model.node_count $} × {$ model.flavor_id || 'Not set' $}</dd>
+        <dt>Autoscaling</dt><dd>{$ model.auto_scaling_enabled ? (model.min_node_count + '–' + model.max_node_count) : 'Disabled' $}</dd>
+        <dt>Auto healing</dt><dd>{$ model.auto_healing_enabled ? 'Enabled' : 'Disabled' $}</dd>
+      </dl>
+    </section>
+  </div>
+  <div class="row">
+    <section class="col-md-6">
+      <h4>Network contract</h4>
+      <dl class="dl-horizontal">
+        <dt>Cluster network</dt><dd>{$ model.create_network ? 'Create isolated network' : model.fixed_network $}</dd>
+        <dt>API endpoint</dt><dd>{$ model.master_lb_enabled ? 'Octavia load balancer' : 'Experimental direct endpoint' $}</dd>
+        <dt>External access</dt><dd>{$ model.master_lb_floating_ip_enabled ? 'Floating IP' : 'Private only' $}</dd>
+        <dt>Allowed CIDRs</dt><dd>{$ model.api_master_lb_allowed_cidrs || 'Unrestricted — review before production use' $}</dd>
+      </dl>
+    </section>
+    <section class="col-md-6">
+      <h4>Expected outputs</h4>
+      <ul class="magnum-output-list">
+        <li>CAPI Cluster, KubeadmControlPlane and MachineDeployment</li>
+        <li>Nova control-plane and worker instances with Neutron ports</li>
+        <li>Octavia API VIP and optional floating IP</li>
+        <li>CCM, Cinder CSI, CNI, metrics and node health add-ons</li>
+      </ul>
+    </section>
+  </div>
+  <div class="alert alert-warning" ng-if="model.master_lb_floating_ip_enabled && !model.api_master_lb_allowed_cidrs">
+    <span class="fa fa-warning"></span>
+    The Kubernetes API will be internet-routable without a CIDR restriction. Restrict it for production workloads.
+  </div>
+</div>

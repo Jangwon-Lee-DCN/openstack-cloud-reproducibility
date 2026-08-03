@@ -1,0 +1,14 @@
+<div ng-controller="horizon.dashboard.container-infra.clusters.DrawerController as drawerCtrl" class="magnum-cluster-drawer">
+  <div class="row">
+    <dl class="col-md-3"><dt>Provisioning</dt><dd><span class="label" ng-class="{'label-success': item.status === 'CREATE_COMPLETE' || item.status === 'UPDATE_COMPLETE', 'label-danger': item.status.indexOf('FAILED') !== -1, 'label-info': item.status.indexOf('PROGRESS') !== -1}">{$ item.status $}</span></dd></dl>
+    <dl class="col-md-3"><dt>Workload health</dt><dd>{$ item.health_status|noValue $}</dd></dl>
+    <dl class="col-md-3"><dt>Topology</dt><dd>{$ item.master_count $} control plane / {$ item.node_count $} worker</dd></dl>
+    <dl class="col-md-3"><dt>Kubernetes</dt><dd>{$ item.coe_version|noValue $}</dd></dl>
+  </div>
+  <div class="row">
+    <dl class="col-md-6"><dt>Kubernetes API</dt><dd><code>{$ item.api_address|noValue $}</code></dd></dl>
+    <dl class="col-md-6"><dt>Deployment profile</dt><dd><a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ item.cluster_template_id $}">{$ item.cluster_template_id $}</a></dd></dl>
+  </div>
+  <div class="alert alert-danger" ng-if="item.status_reason"><strong>Latest reconcile message:</strong> {$ item.status_reason $}</div>
+  <ol class="magnum-mini-flow"><li>Magnum</li><li>Git package</li><li>Argo CD</li><li>CAPI/CAPO</li><li>OpenStack resources</li></ol>
+</div>

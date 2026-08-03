@@ -12,6 +12,7 @@ ADD https://tarballs.openstack.org/magnum-ui/magnum_ui-18.0.0-py3-none-any.whl /
 ADD https://tarballs.openstack.org/python-magnumclient/python_magnumclient-4.10.0-py3-none-any.whl /tmp/python_magnumclient.whl
 ADD https://tarballs.openstack.org/python-heatclient/python_heatclient-5.1.0-py3-none-any.whl /tmp/python_heatclient.whl
 COPY openstack_vpc_dashboard.whl /tmp/openstack_vpc_dashboard.whl
+COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
 
 RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
     && echo "5937bb7c901f59142d97afc14dd7e48b9e80ea679e9c25d214d5eb88b632716c  /tmp/designate_dashboard.whl" | sha256sum -c - \
@@ -33,6 +34,17 @@ RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp
     && cp /var/lib/openstack/lib/python3.12/site-packages/magnum_ui/enabled/_23*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && sed -i 's/\$gray-lighter/#eeeeee/g' /var/lib/openstack/lib/python3.12/site-packages/magnum_ui/static/dashboard/container-infra/clusters/clusters.scss \
     && rm -f /tmp/*.whl
+
+ENV MAGNUM_UI_STATIC=/var/lib/openstack/lib/python3.12/site-packages/magnum_ui/static/dashboard/container-infra
+COPY magnum-ui/overlay/clusters/panel.html ${MAGNUM_UI_STATIC}/clusters/panel.html
+COPY magnum-ui/overlay/clusters/workflow/ ${MAGNUM_UI_STATIC}/clusters/workflow/
+COPY magnum-ui/overlay/clusters/details/ ${MAGNUM_UI_STATIC}/clusters/details/
+COPY magnum-ui/overlay/clusters/platform.scss ${MAGNUM_UI_STATIC}/clusters/_platform.scss
+RUN python3 /tmp/enhance_magnum_ui.py \
+    && sed -i '$a @import "platform";' ${MAGNUM_UI_STATIC}/clusters/clusters.scss \
+    && rm -f /tmp/enhance_magnum_ui.py \
+    && grep -q 'Create Kubernetes Cluster' ${MAGNUM_UI_STATIC}/clusters/create/create.service.js \
+    && grep -q 'Argo CD' ${MAGNUM_UI_STATIC}/clusters/workflow/review.html
 
 # Local Octavia workflow patches and self-service Identity integration are
 # copied from this repository; the VPC wheel is built from its separately

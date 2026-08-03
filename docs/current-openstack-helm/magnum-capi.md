@@ -97,6 +97,31 @@ Both scenarios use exactly one control-plane and one worker VM:
 | LB | OVN Octavia VIP with public floating IP | Supported/default topology |
 | no-LB | Floating IP directly on the control-plane port | Experimental comparison only |
 
+## Horizon contract
+
+Project > Container Infra > Clusters is tailored to this deployment rather
+than presenting the upstream Heat-oriented vocabulary. Cluster creation keeps
+the public Magnum API schema unchanged and exposes the following flow:
+
+1. choose the deployment profile, availability zone and SSH key;
+2. size control-plane and worker groups, including autoscaling bounds;
+3. select an isolated or existing Neutron network and the Kubernetes API
+   endpoint exposure;
+4. select CAPI machine-health remediation and optional add-ons;
+5. review the exact topology, access policy and expected OpenStack/CAPI outputs
+   before submission.
+
+The supported Octavia API endpoint, one control plane and one worker are the
+UI defaults for the acceptance topology. A public API without allowed CIDRs is
+explicitly flagged. The details view reports workload access, compute capacity,
+effective labels, health and the Magnum -> Git -> Argo CD -> CAPI/CAPO flow;
+legacy Heat stack fields are not treated as the source of truth.
+
+The UI overlay is maintained under `images/horizon-magnum-dashboard`. Its
+patcher asserts the exact upstream 18.0.0 source shape and fails the image build
+if a future wheel cannot be patched completely. The same overlay is included
+by the empty-Harbor `horizon-complete` build.
+
 Run the per-cluster verifier after every add-on HelmRelease reaches
 `Deployed`:
 

@@ -1,0 +1,22 @@
+<div ng-controller="ClusterOverviewController as ctrl" class="magnum-overview">
+  <header class="magnum-detail-hero">
+    <div><span class="magnum-eyebrow">MANAGED KUBERNETES CLUSTER</span><h2>{$ ctrl.cluster.name|noName $}</h2><code>{$ ctrl.cluster.id $}</code></div>
+    <div class="magnum-state"><strong>{$ ctrl.cluster.status $}</strong><span>{$ ctrl.cluster.health_status|noValue $}</span></div>
+  </header>
+  <div class="alert alert-danger" ng-if="ctrl.cluster.status_reason"><strong>Reconcile message:</strong> {$ ctrl.cluster.status_reason $}</div>
+  <section class="magnum-detail-section">
+    <h3>Provisioning flow</h3>
+    <ol class="magnum-flow compact">
+      <li><span>1</span><strong>Magnum</strong><small>Request accepted</small></li><li><span>2</span><strong>Git</strong><small>Desired state rendered</small></li><li><span>3</span><strong>Argo CD</strong><small>Package reconciled</small></li><li><span>4</span><strong>CAPI/CAPO</strong><small>Machines provisioned</small></li><li><span>5</span><strong>Workload</strong><small>Add-ons ready</small></li>
+    </ol>
+  </section>
+  <div class="row">
+    <section class="col-md-6 magnum-detail-section"><h3>Access and network</h3><dl class="dl-horizontal"><dt>Kubernetes API</dt><dd><code>{$ ctrl.cluster.api_address|noValue $}</code></dd><dt>Control planes</dt><dd><span ng-repeat="addr in ctrl.cluster.master_addresses">{$ addr $}<br></span><span ng-if="!ctrl.cluster.master_addresses.length">Pending</span></dd><dt>Workers</dt><dd><span ng-repeat="addr in ctrl.cluster.node_addresses">{$ addr $}<br></span><span ng-if="!ctrl.cluster.node_addresses.length">Pending</span></dd><dt>API load balancer</dt><dd>{$ ctrl.cluster.master_lb_enabled ? 'Enabled (supported)' : 'Disabled (experimental)' $}</dd></dl></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Compute capacity</h3><dl class="dl-horizontal"><dt>Control planes</dt><dd>{$ ctrl.cluster.master_count $} × {$ ctrl.cluster.master_flavor_id|noValue $}</dd><dt>Workers</dt><dd>{$ ctrl.cluster.node_count $} × {$ ctrl.cluster.flavor_id|noValue $}</dd><dt>Kubernetes</dt><dd>{$ ctrl.cluster.coe_version|noValue $}</dd><dt>Image</dt><dd>{$ ctrl.cluster_template.image_id|noValue $}</dd></dl></section>
+  </div>
+  <div class="row">
+    <section class="col-md-6 magnum-detail-section"><h3>Deployment profile</h3><dl class="dl-horizontal"><dt>Name</dt><dd><a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ ctrl.cluster_template.id $}">{$ ctrl.cluster_template.name|noName $}</a></dd><dt>Template ID</dt><dd><code>{$ ctrl.cluster_template.id $}</code></dd><dt>COE</dt><dd>{$ ctrl.cluster_template.coe $}</dd><dt>Created</dt><dd>{$ ctrl.cluster.created_at|date:'medium' $}</dd><dt>Last reconciled</dt><dd>{$ ctrl.cluster.updated_at|date:'medium'|noValue $}</dd></dl></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Driver and add-on contract</h3><ul class="magnum-output-list"><li>Cluster API with OpenStack infrastructure provider</li><li>Git-backed desired state reconciled by Argo CD</li><li>OpenStack CCM and Cinder CSI</li><li>CNI, metrics-server and node-problem-detector baseline</li></ul></section>
+  </div>
+  <section class="magnum-detail-section"><h3>Effective labels</h3><div class="magnum-labels"><span ng-repeat="(key, value) in ctrl.cluster.labels"><strong>{$ key $}</strong>={$ value $}</span><em ng-if="ctrl.objLen(ctrl.cluster.labels) === 0">No labels reported</em></div></section>
+</div>

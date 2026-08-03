@@ -1,0 +1,27 @@
+<hz-resource-panel resource-type-name="OS::Magnum::Cluster">
+  <div class="magnum-platform-header" ng-controller="horizon.dashboard.container-infra.clusters.clusterStatsController as ctrl">
+    <div class="magnum-platform-title">
+      <div>
+        <span class="magnum-eyebrow">MANAGED KUBERNETES</span>
+        <h2>Kubernetes Clusters</h2>
+        <p>Create and operate VM-based Kubernetes clusters through Magnum, Cluster API and OpenStack.</p>
+      </div>
+      <div class="magnum-quota-card">
+        <strong>{$ ctrl.stats.clusters || 0 $}</strong>
+        <span>of {$ ctrl.quota.clusters || '—' $} clusters used</span>
+      </div>
+    </div>
+    <ol class="magnum-flow" aria-label="Provisioning flow">
+      <li><span>1</span><strong>Request</strong><small>Magnum validates input</small></li>
+      <li><span>2</span><strong>Desired state</strong><small>Rendered package enters Git</small></li>
+      <li><span>3</span><strong>Reconcile</strong><small>Argo CD applies CAPI objects</small></li>
+      <li><span>4</span><strong>Infrastructure</strong><small>CAPO creates Nova, Neutron and Octavia resources</small></li>
+      <li><span>5</span><strong>Ready</strong><small>Add-ons and workload API become healthy</small></li>
+    </ol>
+    <div class="alert alert-info magnum-contract-note">
+      <span class="fa fa-info-circle"></span>
+      The supported endpoint uses an Octavia load balancer. A direct control-plane floating IP is an experimental single-control-plane mode.
+    </div>
+  </div>
+  <hz-resource-table resource-type-name="OS::Magnum::Cluster" track-by="trackBy"></hz-resource-table>
+</hz-resource-panel>

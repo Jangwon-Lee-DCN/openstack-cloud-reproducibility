@@ -129,11 +129,13 @@ done
 # layer chain. The wheel must be rebuilt from the locked dashboard checkout.
 (cd "$VPC_DASHBOARD_REPO" && python3 -m build && make verify-wheel)
 horizon_context="$WORK_DIR/horizon-complete"
-mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice"
+mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui"
 cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
 cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
 cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$horizon_context/octavia-workflow/"
 cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
+cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
+cp -a "$REPO_ROOT/images/horizon-magnum-dashboard/overlay" "$horizon_context/magnum-ui/overlay"
 build_context horizon-complete "$horizon_context" "$REGISTRY/horizon:source-$BUILD_ID"
 
 # Build this last so concurrent application development cannot accidentally be

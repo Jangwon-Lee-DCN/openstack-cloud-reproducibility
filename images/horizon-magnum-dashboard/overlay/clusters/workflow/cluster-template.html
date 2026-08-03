@@ -1,0 +1,21 @@
+<div ng-controller="horizon.dashboard.container-infra.clusters.workflow.clusterTemplateController as ctrl">
+  <div class="magnum-profile-card" ng-if="ctrl.clusterTemplate.id">
+    <div class="magnum-profile-heading">
+      <div><span class="magnum-eyebrow">SELECTED DEPLOYMENT PROFILE</span><h4>{$ ctrl.clusterTemplate.name|noName $}</h4></div>
+      <span class="label label-primary">{$ ctrl.clusterTemplate.coe $}</span>
+    </div>
+    <div class="row">
+      <dl class="col-sm-6">
+        <dt>Kubernetes image</dt><dd>{$ ctrl.clusterTemplate.image_id $}</dd>
+        <dt>Default control-plane flavor</dt><dd>{$ ctrl.clusterTemplate.master_flavor_id|noValue $}</dd>
+        <dt>Default worker flavor</dt><dd>{$ ctrl.clusterTemplate.flavor_id|noValue $}</dd>
+      </dl>
+      <dl class="col-sm-6">
+        <dt>Network driver</dt><dd>{$ ctrl.clusterTemplate.network_driver|noValue $}</dd>
+        <dt>Volume driver</dt><dd>{$ ctrl.clusterTemplate.volume_driver|noValue $}</dd>
+        <dt>TLS</dt><dd>{$ ctrl.clusterTemplate.tls_disabled ? 'Disabled' : 'Enabled' $}</dd>
+      </dl>
+    </div>
+    <a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ ctrl.clusterTemplate.id $}" ng-click="cancel()">Inspect complete profile</a>
+  </div>
+</div>
