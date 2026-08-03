@@ -17,7 +17,7 @@ conductor="$(kubectl -n "${namespace}" get pod \
   -l application=magnum,component=conductor \
   -o jsonpath='{.items[0].metadata.name}')"
 kubectl -n "${namespace}" exec "${conductor}" -- sh -lc \
-  'python -c "import importlib.metadata as m; assert \"k8s_capi_helm_v1\" in [x.name for x in m.entry_points(group=\"magnum.drivers\")]; assert m.version(\"magnum-capi-helm\") == \"1.4.0\""'
+  'python -c "import importlib.metadata as m; names=[x.name for x in m.entry_points(group=\"magnum.drivers\")]; assert \"k8s_capi_helm_v1\" in names; assert \"k8s_capi_gitops_v1\" in names; assert m.version(\"magnum-capi-helm\") == \"1.4.0\"; assert m.version(\"magnum-capi-gitops\") == \"0.1.0\""'
 kubectl -n "${namespace}" exec "${conductor}" -- \
   helm --kubeconfig /etc/magnum/kubeconfig.conf list -A >/dev/null
 

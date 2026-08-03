@@ -6,9 +6,12 @@ Run:
 deploy/scripts/verify-magnum.sh
 ```
 
-It verifies two ready API replicas, two ready conductor replicas, PDBs, the
-`k8s_capi_helm_v1` driver, management-cluster Helm access, Gateway route
+It verifies two ready API replicas, two ready conductor replicas, PDBs, both
+the `k8s_capi_helm_v1` and `k8s_capi_gitops_v1` drivers, management-cluster Helm access, Gateway route
 acceptance, and an authentication-enforced HTTP 401 from the internal API.
+
+The Phase 50 GitOps reconciler additionally verifies Argo CD, Porch repository
+sync, the deployment ApplicationSet, and two ready repository-writer replicas.
 
 An authenticated `openstack coe cluster template list` must also complete.
 

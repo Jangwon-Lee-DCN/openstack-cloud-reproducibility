@@ -9,6 +9,8 @@
     SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
     REPRO_ROOT: "{{ repro_repo_path }}"
     VERIFY_AFTER_RECONCILE: "0"
+    MAGNUM_CAPI_GITOPS_REPO_PATH: "{{ magnum_capi_gitops_repo_path }}"
+    MAGNUM_CAPI_GITOPS_REVISION: "{{ magnum_capi_gitops_repo_ref }}"
   tasks:
     - name: Require the fetched administrative kubeconfig
       ansible.builtin.stat:
@@ -77,6 +79,13 @@
 
     - name: Install Magnum with CAPI integration
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-magnum.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      changed_when: true
+
+    - name: Reconcile Magnum CAPI GitOps platform
+      ansible.builtin.command: >-
+        {{ repro_repo_path }}/deploy/scripts/install-magnum-capi-gitops.sh
       args:
         chdir: "{{ repro_repo_path }}"
       changed_when: true
