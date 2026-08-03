@@ -12,6 +12,24 @@ capacity and audited operator actions.
   allocated. Check the project quota and remove only confirmed unused Ports.
 - A Horizon `subnet-addresses-exhausted` reason is independent of the project
   Port quota: expand the subnet/VPC design or select another subnet.
+- `VPCSubnetIPAddressCapacityLow` warns at ten available addresses.
+- `VPCSubnetIPAddressExhaustionPredicted` uses six hours of allocation history
+  and warns when linear growth reaches the subnet total within 24 hours. Treat
+  it as planning evidence rather than an automatic resize instruction.
+
+## Audit retention
+
+The facade emits one structured `VPC ENI audit event` for every ENI mutation,
+including user/project/request IDs but never tokens or request bodies. Promtail
+sends these records to Loki, so they remain queryable after the CR is deleted.
+The Grafana durable-audit panel is the primary operator view; CR annotations are
+only the bounded, low-latency copy used by the facade audit API.
+The reproducible Loki overlay sets retention to 30 days:
+
+```sh
+helm upgrade loki grafana/loki --namespace monitoring --version 7.1.0 \
+  --reuse-values -f deploy/monitoring/values/loki-retention.yaml
+```
 
 ## Orphan response
 

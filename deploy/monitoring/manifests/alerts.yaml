@@ -198,6 +198,22 @@ spec:
             summary: Network interface Port quota is exhausted
             description: "{{ $labels.project_namespace }} cannot allocate another managed ENI Port."
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/eni-operations.md
+        - alert: VPCSubnetIPAddressCapacityLow
+          expr: vpc_subnet_ip_capacity{kind="available"} <= 10
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: Subnet IP capacity is nearly exhausted
+            description: "Subnet {{ $labels.subnet }} in {{ $labels.project_namespace }} has {{ $value }} addresses available for workloads and ENIs."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/eni-operations.md
+        - alert: VPCSubnetIPAddressExhaustionPredicted
+          expr: predict_linear(vpc_subnet_ip_capacity{kind="used"}[6h], 86400) >= on(project_namespace,subnet) vpc_subnet_ip_capacity{kind="total"}
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: Subnet IP exhaustion is predicted within 24 hours
+            description: "Recent allocation growth predicts exhaustion of {{ $labels.subnet }} in {{ $labels.project_namespace }} within one day."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/eni-operations.md
         - alert: VPCNeutronDriftPersistent
           expr: sum by (project_namespace) (vpc_neutron_drift_resources) > 0
           for: 30m

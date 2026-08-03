@@ -1,0 +1,7 @@
+# Overlay used with the existing Loki release and --reuse-values.
+# ENI audit events survive CR deletion and remain searchable for 30 days.
+loki:
+  limits_config:
+    retention_period: 720h
+    reject_old_samples: true
+    reject_old_samples_max_age: 720h
