@@ -24,6 +24,32 @@ Dashboard ConfigMaps are loaded through the Grafana sidecar and have stable
 UIDs. The consolidated manifest is
 `deploy/monitoring/manifests/openstack-service-dashboards.yaml`; the platform
 landing page is `deploy/monitoring/manifests/dashboard.yaml`.
+## Identity & access denials (HTTP 403), on OpenStack Platform Operations
+
+Added to the platform landing page rather than as a separate dashboard, to
+match the existing convention that cross-service alert/incident state
+lives there. Backs the `OpenStackAPIAccessDenied` Loki ruler alert (see
+`deploy/scripts/../../prerequisites/observability/logging` in
+`openstack-cloud-services` for the alert rule itself, and
+`docs/proposals/iam-hardening/README.md`'s "Baseline hardening" section
+in `openstack-cloud-services` for the full writeup) with the dashboard the
+alert's own description was missing: 1h/24h denial counts, distinct
+source-IP and denied-path counts, a 5-minute-bucket time series matching
+the alert's own query, and three breakdown panels (top denied paths, top
+source IPs, denials by pod) plus a raw log panel for drilling into the
+exact request behind any spike.
+
+All panels use the Loki datasource with `{namespace="openstack"} |= " 403 "`
+as the base selector -- deliberately a generic access-log status-code
+match (Apache/WSGI combined log format), not a per-service exception
+message, so it covers every OpenStack service uniformly. The per-path and
+per-IP breakdown panels additionally parse the combined log format with a
+LogQL `regexp` stage (`client_ip`, `method`, `path`, `status` capture
+groups) to enable the `sum by (path)` / `sum by (client_ip)` aggregations
+-- every query in this section was run directly against live Loki and
+confirmed to return real data before being committed, not just checked
+for JSON/LogQL syntax validity.
+
 ## VPC Control Plane / Network Interfaces
 
 This dashboard is the operational view for managed ENIs. Its chained project

@@ -14,7 +14,7 @@ data:
       "tags": ["openstack", "platform", "operations"],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "refresh": "30s",
       "graphTooltip": 1,
       "editable": true,
@@ -384,6 +384,129 @@ data:
           "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 900}, {"color": "red", "value": 1800}]}}, "overrides": []},
           "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
           "gridPos": {"x": 16, "y": 76, "w": 8, "h": 5}
+        },
+        {
+          "id": 60,
+          "type": "row",
+          "title": "Identity & access denials (HTTP 403)",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 82, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 61,
+          "type": "stat",
+          "title": "403 denials (1h)",
+          "description": "HTTP 403 responses logged by any OpenStack service in the openstack namespace, last hour. Backs the OpenStackAPIAccessDenied alert (see Loki ruler rule openstack-policy-denials).",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "sum(count_over_time({namespace=\"openstack\"} |= \" 403 \" [1h]))"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 50}]}}, "overrides": []},
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 0, "y": 83, "w": 6, "h": 5}
+        },
+        {
+          "id": 62,
+          "type": "stat",
+          "title": "403 denials (24h)",
+          "description": "Same signal over a 24-hour window, for trend context beyond the 1h alerting window.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "sum(count_over_time({namespace=\"openstack\"} |= \" 403 \" [24h]))"}],
+          "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 6, "y": 83, "w": 6, "h": 5}
+        },
+        {
+          "id": 63,
+          "type": "stat",
+          "title": "Distinct source IPs denied (1h)",
+          "description": "Count of distinct client IPs that received at least one 403 in the last hour. A sudden jump can indicate credential stuffing or a broken automation client, not just one misconfigured caller.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "count(sum by (client_ip) (count_over_time({namespace=\"openstack\"} |= \" 403 \" | regexp `^(?P<client_ip>\\\\S+) \\\\S+ \\\\S+ \\\\[[^\\\\]]+\\\\] \"(?P<method>\\\\S+) (?P<path>\\\\S+) \\\\S+\" (?P<status>\\\\d+)` [1h])))"}],
+          "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 12, "y": 83, "w": 6, "h": 5}
+        },
+        {
+          "id": 64,
+          "type": "stat",
+          "title": "Distinct denied paths (1h)",
+          "description": "Count of distinct API paths that returned a 403 in the last hour.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "count(sum by (path) (count_over_time({namespace=\"openstack\"} |= \" 403 \" | regexp `^(?P<client_ip>\\\\S+) \\\\S+ \\\\S+ \\\\[[^\\\\]]+\\\\] \"(?P<method>\\\\S+) (?P<path>\\\\S+) \\\\S+\" (?P<status>\\\\d+)` [1h])))"}],
+          "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+          "gridPos": {"x": 18, "y": 83, "w": 6, "h": 5}
+        },
+        {
+          "id": 65,
+          "type": "timeseries",
+          "title": "403 denials over time",
+          "description": "5-minute buckets of HTTP 403 responses across the openstack namespace. The same query the OpenStackAPIAccessDenied alert evaluates.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "sum(count_over_time({namespace=\"openstack\"} |= \" 403 \" [5m]))", "legendFormat": "403s"}],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0, "custom": {"drawStyle": "bars", "fillOpacity": 30, "lineWidth": 1}}, "overrides": []},
+          "options": {"legend": {"calcs": ["lastNotNull", "max", "sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "gridPos": {"x": 0, "y": 88, "w": 24, "h": 9}
+        },
+        {
+          "id": 70,
+          "type": "row",
+          "title": "Denial breakdown (1h)",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 97, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 71,
+          "type": "bargauge",
+          "title": "Top denied paths",
+          "description": "API paths with the most HTTP 403 responses in the last hour.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "topk(10, sum by (path) (count_over_time({namespace=\"openstack\"} |= \" 403 \" | regexp `^(?P<client_ip>\\\\S+) \\\\S+ \\\\S+ \\\\[[^\\\\]]+\\\\] \"(?P<method>\\\\S+) (?P<path>\\\\S+) \\\\S+\" (?P<status>\\\\d+)` [1h])))", "instant": true}],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true},
+          "gridPos": {"x": 0, "y": 98, "w": 8, "h": 9}
+        },
+        {
+          "id": 72,
+          "type": "bargauge",
+          "title": "Top source IPs",
+          "description": "Client IPs with the most HTTP 403 responses in the last hour. Cross-check against known service/exporter IPs before assuming malicious intent -- a misconfigured internal client (e.g. an exporter with stale credentials) is the more common cause.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "topk(10, sum by (client_ip) (count_over_time({namespace=\"openstack\"} |= \" 403 \" | regexp `^(?P<client_ip>\\\\S+) \\\\S+ \\\\S+ \\\\[[^\\\\]]+\\\\] \"(?P<method>\\\\S+) (?P<path>\\\\S+) \\\\S+\" (?P<status>\\\\d+)` [1h])))", "instant": true}],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true},
+          "gridPos": {"x": 8, "y": 98, "w": 8, "h": 9}
+        },
+        {
+          "id": 73,
+          "type": "bargauge",
+          "title": "Denials by pod",
+          "description": "Which service's pods are logging the 403s -- the fastest way to tell 'one exporter is misconfigured' from 'this is spread across the platform'.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "topk(10, sum by (pod) (count_over_time({namespace=\"openstack\"} |= \" 403 \" [1h])))", "instant": true}],
+          "fieldConfig": {"defaults": {"decimals": 0, "min": 0}, "overrides": []},
+          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true},
+          "gridPos": {"x": 16, "y": 98, "w": 8, "h": 9}
+        },
+        {
+          "id": 80,
+          "type": "row",
+          "title": "Raw denial log",
+          "collapsed": false,
+          "gridPos": {"x": 0, "y": 107, "w": 24, "h": 1},
+          "panels": []
+        },
+        {
+          "id": 81,
+          "type": "logs",
+          "title": "Recent policy denials",
+          "description": "Raw log lines for every HTTP 403 in the openstack namespace. Use this to see the exact request (method, path, user agent) behind any spike above.",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "targets": [{"refId": "A", "expr": "{namespace=\"openstack\"} |= \" 403 \""}],
+          "fieldConfig": {"defaults": {}, "overrides": []},
+          "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": true, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+          "gridPos": {"x": 0, "y": 108, "w": 24, "h": 10}
         }
       ]
     }
