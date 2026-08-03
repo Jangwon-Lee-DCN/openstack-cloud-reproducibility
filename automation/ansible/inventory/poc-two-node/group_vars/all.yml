@@ -45,7 +45,9 @@ external_allocation_end: 192.168.21.200
 
 services_repo_path: /home/ubuntu/openstack-cloud-services
 repro_repo_path: /home/ubuntu/openstack-cloud-reproducibility
-services_repo_ref: 13b7806e76b60c5f49865b4a428df7fe32c2af9e
+magnum_capi_gitops_repo_path: /home/ubuntu/magnum-capi-gitops
+services_repo_ref: 713c26d02f928bea14334f9920d532bf1ebc48ff
+magnum_capi_gitops_repo_ref: 649ff039119a0af2b718b821afd7b2fbda206cb1
 allow_poc_quorum: true
 confirm_ceph_device_wipe: false
 confirm_provider_bridge_change: false

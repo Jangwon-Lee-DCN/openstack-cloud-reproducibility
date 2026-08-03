@@ -42,6 +42,9 @@ git clone \
 git clone \
   https://github.com/Jangwon-Lee-DCN/openstack-cloud-services.git \
   /srv/openstack-cloud-services
+git clone \
+  https://github.com/Jangwon-Lee-DCN/magnum-capi-gitops.git \
+  /srv/magnum-capi-gitops
 
 cd /srv/openstack-cloud-reproducibility/automation/ansible
 mkdir -p inventory/local/group_vars

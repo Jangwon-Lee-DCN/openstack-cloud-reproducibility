@@ -31,9 +31,12 @@ require editing the playbooks. Do not copy PoC replica counts into production.
    image build definitions, encrypted release values, and verification tools.
 2. `openstack-cloud-services` supplies platform prerequisite manifests and
    site integration. Its Git commit is pinned in the Ansible inventory.
-3. The age private identity, institutional CA keys, SSH private keys, database
+3. `magnum-capi-gitops` supplies the GitOps-enabled Magnum adapter contract,
+   pinned Argo CD/Porch inputs, internal repository seed, ApplicationSet, and
+   repository writer. Its Git commit is pinned in the Ansible inventory.
+4. The age private identity, institutional CA keys, SSH private keys, database
    backups, Ceph keyrings, and break-glass credentials remain outside Git.
-4. Mirror all container images and source archives into Harbor before an
+5. Mirror all container images and source archives into Harbor before an
    isolated rebuild. A Git checkout alone is not an offline backup.
 
 Record SHA-256 checksums of both repository bundles and the offline secret
@@ -69,6 +72,7 @@ sudo apt-get update
 sudo apt-get install -y ansible-core git openssh-client
 git clone https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility.git
 git clone https://github.com/Jangwon-Lee-DCN/openstack-cloud-services.git
+git clone https://github.com/Jangwon-Lee-DCN/magnum-capi-gitops.git
 cd openstack-cloud-reproducibility/automation/ansible
 cp -a inventory/poc-two-node inventory/local
 ```
@@ -211,7 +215,9 @@ Do not use Helm `--wait` for charts whose post-install hooks unblock API init
 containers; the reconciler handles readiness explicitly.
 
 The Ansible phase then installs Designate/PowerDNS, CAPI/CAPO/ORC, the add-on
-provider, the workload-chart repository, and Magnum before final full-stack
+provider, workload-chart repository, GitOps-enabled Magnum, Argo CD, Porch,
+the seeded internal lifecycle repository, ApplicationSet, and repository
+writer before final full-stack
 verification. With federated IAM enabled it also idempotently reconciles the
 seven Keycloak/Keystone personas and scoped role assignments. Reconcile
 Amphora resources, Horizon/Skyline extensions, and the VPC control
