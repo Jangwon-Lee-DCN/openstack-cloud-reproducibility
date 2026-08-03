@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: horizon-project-selfservice-dashboard-image-build
+  namespace: openstack
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      hostAliases:
+        - ip: 192.168.21.4
+          hostnames: [registry.dcn.ssu.ac.kr]
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        # Kaniko's dir:// context provider copies ConfigMap-mounted files
+        # literally, including the `file -> ..data/file` symlink structure
+        # a ConfigMap volume produces -- it doesn't resolve them, so a COPY
+        # in the Dockerfile ends up copying a dangling symlink into the
+        # image (hit and diagnosed for project-facade's own build, see
+        # docs/proposals/iam-hardening/README.md). A single flat file per
+        # subPath mount worked around that there; this build has a real
+        # multi-directory package tree, so instead the whole context ships
+        # as one tarball in the ConfigMap and this init container extracts
+        # it into a plain emptyDir first -- real files, no symlinks, no
+        # subPath juggling per source file.
+        - name: extract-context
+          image: busybox:1.36
+          command: ["sh", "-c", "tar xzf /context-tar/context.tar.gz -C /workspace"]
+          volumeMounts:
+            - name: context-tar
+              mountPath: /context-tar
+              readOnly: true
+            - name: context
+              mountPath: /workspace
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+          args:
+            - --context=dir:///workspace
+            - --dockerfile=/workspace/Dockerfile
+            - --destination=registry.dcn.ssu.ac.kr/openstack/horizon:2026.1-project-selfservice-poc11
+            - --digest-file=/dev/termination-log
+            - --skip-tls-verify
+            - --snapshot-mode=redo
+          volumeMounts:
+            - name: context
+              mountPath: /workspace
+              readOnly: true
+            - name: registry-auth
+              mountPath: /kaniko/.docker
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+      volumes:
+        - name: context-tar
+          configMap:
+            name: horizon-project-selfservice-dashboard-image-build
+        - name: context
+          emptyDir: {}
+        - name: registry-auth
+          secret:
+            secretName: telemetry-harbor-push
+            items:
+              - key: .dockerconfigjson
+                path: config.json

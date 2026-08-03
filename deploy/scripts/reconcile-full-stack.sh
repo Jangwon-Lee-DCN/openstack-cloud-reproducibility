@@ -136,6 +136,19 @@ install_release ceilometer
 kubectl apply -f "$REPO_ROOT/deploy/manifests/ceilometer-pdb.yaml"
 install_release aodh
 kubectl apply -f "$REPO_ROOT/deploy/manifests/openstack-public-routes.yaml"
+kubectl apply -f "$REPO_ROOT/deploy/manifests/keystone-oidc-federation-routes.yaml"
+"$REPO_ROOT/deploy/scripts/fix-keystone-fernet-permissions.sh"
+
+# project-facade: self-service project lifecycle API (see
+# docs/proposals/iam-hardening/README.md, "New permission tier"). Its
+# service credential (deploy/secrets/project-facade-keystone.secret.sops.yaml)
+# and the Keystone-side project-creator role/group
+# (deploy/scripts/reconcile-iam-dcn.sh) are provisioned separately, not
+# here -- this only applies the already-built API service itself.
+sops -d "$REPO_ROOT/deploy/secrets/project-facade-keystone.secret.sops.yaml" | kubectl apply -f -
+kubectl apply -f "$REPO_ROOT/deploy/manifests/project-facade.yaml"
+kubectl apply -f "$REPO_ROOT/deploy/manifests/project-facade-routes.yaml"
+kubectl -n openstack rollout status deployment/project-facade --timeout=5m
 
 "$REPO_ROOT/deploy/scripts/verify-barbican.sh"
 if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then

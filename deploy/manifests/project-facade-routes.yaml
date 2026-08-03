@@ -1,0 +1,37 @@
+# Public HTTPRoute for the project-facade self-service project lifecycle
+# API (see docs/proposals/iam-hardening/README.md, "New permission tier:
+# self-service project lifecycle"). A separate HTTPRoute object rather
+# than an addition to openstack-public-routes.yaml because that object is
+# already at the Gateway API's hard 16-rules-per-object limit (same reason
+# keystone-oidc-federation-routes.yaml is separate).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: project-facade-routes
+  namespace: openstack
+spec:
+  hostnames:
+    - cloud.dcn.ssu.ac.kr
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: openstack-public-gateway
+      namespace: openstack-gateway-system
+      sectionName: https
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: project-facade
+          port: 8080
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /project-facade
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /

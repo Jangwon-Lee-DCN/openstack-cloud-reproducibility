@@ -1,0 +1,71 @@
+# Explicit Exact-match routes for Keystone's OIDC federation endpoints,
+# separate from the shared openstack-public-routes.yaml HTTPRoute for two
+# reasons: (1) that object is already at the Gateway API's hard 16-rules-
+# per-object limit; (2) these three paths must NOT go through the generic
+# `/identity` PathPrefix + URLRewrite(strip-prefix) rule -- mod_auth_openidc
+# bookmarks its own self-perceived request URI (post-prefix-strip) as the
+# "return to this URL after login" target, so if the gateway stripped
+# `/identity` before Apache ever saw it, the post-login redirect comes back
+# WITHOUT the prefix and no longer matches any route into Keystone at all
+# (it falls through to the root `/` catch-all, which is Skyline, not
+# Keystone -- observed live: a bare-path bookmark rendered Skyline's own
+# frontend shell instead of completing federation). These three rules
+# forward with the `/identity` prefix intact, matching the corresponding
+# `/identity`-prefixed <Location> blocks in wsgi-keystone.conf.
+#
+# See docs/proposals/iam-hardening/README.md ("OIDC Relying Party fix",
+# "Attempt 3 ... RESOLVED", and the WebSSO dashboard-login section) for the
+# full diagnosis of each of the three paths below:
+#   - oidc-callback: mod_auth_openidc's own OIDCRedirectURI target.
+#   - .../protocols/openid/auth: the CLI/API-style federated auth trigger
+#     (OS-FEDERATION identity_providers auth endpoint).
+#   - .../protocols/openid/websso: the browser dashboard-login trigger used
+#     by Horizon's WEBSSO_CHOICES "DCN Keycloak SSO" option -- added later
+#     than the other two once real Horizon browser login (as opposed to the
+#     already-verified CLI/curl flow) was exercised and hit this same class
+#     of bug on a path nobody had routed with the prefix preserved yet.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keystone-oidc-federation-routes
+  namespace: openstack
+spec:
+  hostnames:
+    - cloud.dcn.ssu.ac.kr
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: openstack-public-gateway
+      namespace: openstack-gateway-system
+      sectionName: https
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: keystone-api
+          port: 5000
+          weight: 1
+      matches:
+        - path:
+            type: Exact
+            value: /identity/v3/OS-FEDERATION/oidc-callback
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: keystone-api
+          port: 5000
+          weight: 1
+      matches:
+        - path:
+            type: Exact
+            value: /identity/v3/OS-FEDERATION/identity_providers/keycloak-dcn/protocols/openid/auth
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: keystone-api
+          port: 5000
+          weight: 1
+      matches:
+        - path:
+            type: Exact
+            value: /identity/v3/auth/OS-FEDERATION/identity_providers/keycloak-dcn/protocols/openid/websso

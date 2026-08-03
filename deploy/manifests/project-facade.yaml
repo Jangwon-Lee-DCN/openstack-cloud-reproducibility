@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-facade
+  namespace: openstack
+  labels:
+    application: project-facade
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      application: project-facade
+      component: api
+  template:
+    metadata:
+      labels:
+        application: project-facade
+        component: api
+    spec:
+      imagePullSecrets:
+        - name: telemetry-harbor-push
+      containers:
+        - name: project-facade
+          image: registry.dcn.ssu.ac.kr/openstack/project-facade@sha256:0604ce04acb18007997f2b2564f56c33b78e54061cb052aa4ff2586dae07da89
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - secretRef:
+                name: project-facade-keystone
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 20
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-facade
+  namespace: openstack
+  labels:
+    application: project-facade
+    component: api
+spec:
+  selector:
+    application: project-facade
+    component: api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

@@ -9,15 +9,18 @@ set -euo pipefail
 # PATCH is idempotent by construction (same input always produces the same
 # stored rules).
 #
-# Seven personas as of 2026-08-01, extended from the original four per
+# Eight personas as of 2026-08-03, extended from the original four per
 # "Coordinated implementation direction for the VPC platform" in the IAM
 # hardening doc: admins/operators/members/readers (project-scoped, as
 # before) plus domain-admins (domain-scoped -- see DOMAIN_PERSONA_ROLES),
 # network-operators and security-operators (project-scoped, carrying new
 # custom marker roles that VPC-facade OPA policy is meant to consult --
 # see that doc section for what each should authorize; Keystone itself
-# enforces nothing extra for them). cloud-admin (system-scope) is
-# deliberately not implemented here -- see the same doc section for why.
+# enforces nothing extra for them), and project-creators (domain-scoped
+# marker role consulted only by the `project-facade` service -- see "New
+# permission tier: self-service project lifecycle" in the IAM hardening
+# doc). cloud-admin (system-scope) is deliberately not implemented here --
+# see the same doc section for why.
 #
 # Requires: kubectl access to both the `keycloak` and `openstack` namespaces,
 # and direct network reachability to their ClusterIP Services (this script
@@ -133,7 +136,7 @@ fi
 # for security-operator). Ensuring they exist here only makes them
 # assignable; it grants no OpenStack-service-level capability by itself.
 echo "== ensuring custom roles exist =="
-for role_name in network-operator security-operator; do
+for role_name in network-operator security-operator project-creator; do
   existing=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/roles?name=${role_name}" | jq -r '.roles[0].id // empty')
   if [[ -z "${existing}" ]]; then
     curl -sf -X POST -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
@@ -164,8 +167,24 @@ declare -A PERSONA_ROLES=(
 # domain-admins gets a domain-scoped role assignment (below), not a
 # project-scoped one from PERSONA_ROLES -- handled as its own array so the
 # generic project-scoped loop doesn't need a special case.
+#
+# openstack-project-creators (new) -- self-service project lifecycle,
+# scoped to this Keystone domain only. Grants the custom `project-creator`
+# marker role at DOMAIN scope; it authorizes nothing in Keystone or any
+# OpenStack service policy by itself (same "marker role" pattern as
+# network-operator/security-operator). The `project-facade` service is the
+# only thing that consults it: it checks the caller's domain-scoped
+# effective roles for `project-creator` before creating a project under
+# this domain on their behalf, then grants them `admin` on the project
+# they just created (their own project, not this domain's `dcn` admin
+# project, which is separately protected -- see the
+# `options.immutable=true` fix applied directly to the `dcn` project, "New
+# permission tier: self-service project lifecycle" in the IAM hardening
+# doc). Deliberately NOT the same group as openstack-domain-admins --
+# project-creator must never imply domain-wide admin.
 declare -A DOMAIN_PERSONA_ROLES=(
   [openstack-domain-admins]="admin"
+  [openstack-project-creators]="project-creator"
 )
 
 echo "== ensuring Keycloak groups =="
@@ -246,13 +265,120 @@ MAPPING_RULES=$(cat <<EOF
   {"local": [{"user": {"name": "{0}"}}, {"group": {"name": "openstack-network-operators", "domain": {"name": "${DOMAIN}"}}}],
    "remote": [{"type": "OIDC-preferred_username"}, {"type": "OIDC-groups", "any_one_of": ["openstack-network-operators"]}]},
   {"local": [{"user": {"name": "{0}"}}, {"group": {"name": "openstack-security-operators", "domain": {"name": "${DOMAIN}"}}}],
-   "remote": [{"type": "OIDC-preferred_username"}, {"type": "OIDC-groups", "any_one_of": ["openstack-security-operators"]}]}
+   "remote": [{"type": "OIDC-preferred_username"}, {"type": "OIDC-groups", "any_one_of": ["openstack-security-operators"]}]},
+  {"local": [{"user": {"name": "{0}"}}, {"group": {"name": "openstack-project-creators", "domain": {"name": "${DOMAIN}"}}}],
+   "remote": [{"type": "OIDC-preferred_username"}, {"type": "OIDC-groups", "any_one_of": ["openstack-project-creators"]}]}
 ]
 EOF
 )
 curl -sf -X PATCH -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
   -d "{\"mapping\": {\"rules\": ${MAPPING_RULES}}}" \
   "${OS_AUTH_URL}/OS-FEDERATION/mappings/keycloak-dcn" >/dev/null
-echo "keycloak-dcn mapping reconciled to the seven-persona design"
+echo "keycloak-dcn mapping reconciled to the eight-persona design"
+
+# Optional: let staff sign in with their own dcn.ssu.ac.kr company Google
+# account instead of a Keycloak-local password. This only brokers Google as
+# an additional login method INTO Keycloak -- Keystone's OIDC federation
+# to Keycloak (protocol keycloak-dcn) is unchanged and doesn't know or care
+# which upstream IdP the user authenticated through. Skipped entirely (not
+# an error) until `google-idp-oauth` exists, since the OAuth client can only
+# be created by hand in Google Cloud Console (Workspace-admin action, see
+# docs/proposals/iam-hardening/README.md "Google Workspace SSO" for the
+# exact redirect URI and consent-screen settings this depends on).
+GOOGLE_CLIENT_ID=$(kubectl -n keycloak get secret google-idp-oauth -o jsonpath='{.data.client-id}' 2>/dev/null | base64 -d || true)
+GOOGLE_CLIENT_SECRET=$(kubectl -n keycloak get secret google-idp-oauth -o jsonpath='{.data.client-secret}' 2>/dev/null | base64 -d || true)
+if [[ -z "${GOOGLE_CLIENT_ID}" || -z "${GOOGLE_CLIENT_SECRET}" ]]; then
+  echo "== google-idp-oauth secret not found in the keycloak namespace -- skipping Google IdP setup =="
+else
+  echo "== ensuring Google identity provider (broker) on the dcn realm =="
+  # hostedDomain restricts login server-side to dcn.ssu.ac.kr accounts --
+  # Keycloak validates the ID token's own "hd" claim against this, it isn't
+  # just an auth-request hint the user could strip. trustEmail is safe
+  # because Google itself only issues verified-email tokens.
+  google_idp_config=$(python3 -c "
+import json
+print(json.dumps({
+  'alias': 'google',
+  'providerId': 'google',
+  'enabled': True,
+  'trustEmail': True,
+  'storeToken': False,
+  'firstBrokerLoginFlowAlias': 'first broker login',
+  'config': {
+    'clientId': '''${GOOGLE_CLIENT_ID}''',
+    'clientSecret': '''${GOOGLE_CLIENT_SECRET}''',
+    'hostedDomain': 'dcn.ssu.ac.kr',
+    'syncMode': 'IMPORT',
+  },
+}))
+")
+  existing_idp=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${KC_TOKEN}" \
+    "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances/google")
+  if [[ "${existing_idp}" == "200" ]]; then
+    curl -sf -X PUT -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+      -d "${google_idp_config}" "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances/google" >/dev/null
+    echo "updated Google identity provider config"
+  else
+    curl -sf -X POST -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+      -d "${google_idp_config}" "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances" >/dev/null
+    echo "created Google identity provider"
+  fi
+
+  echo "== ensuring Google logins auto-join openstack-members =="
+  # Hardcoded-group mapper, not a claim-based one: Google has no concept of
+  # our Keystone personas, so every dcn.ssu.ac.kr Google login lands in the
+  # baseline "member" persona by default; an admin promotes specific people
+  # into openstack-operators/-readers/-network-operators/-security-operators/
+  # -domain-admins by hand afterward, the same as any other Keycloak group
+  # membership change (Path A's existing group-drives-role design applies
+  # unchanged once the user is in a group).
+  existing_mapper=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+    "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances/google/mappers" \
+    | jq -r '.[] | select(.name=="auto-assign-openstack-members") | .id')
+  if [[ -z "${existing_mapper}" ]]; then
+    curl -sf -X POST -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+      -d '{
+        "name": "auto-assign-openstack-members",
+        "identityProviderAlias": "google",
+        "identityProviderMapper": "oidc-hardcoded-group-idp-mapper",
+        "config": {"syncMode": "INHERIT", "group": "/openstack-members"}
+      }' "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances/google/mappers" >/dev/null
+    echo "created auto-assign-openstack-members mapper"
+  else
+    echo "auto-assign-openstack-members mapper already present (${existing_mapper})"
+  fi
+
+  echo "== ensuring Google logins auto-join openstack-project-creators =="
+  # Matches the original ask directly: "dcn.ssu.ac.kr domain users" (not a
+  # separately-elevated subset) should be able to self-service create their
+  # own project. A second hardcoded-group mapper on the same IdP, same
+  # INHERIT pattern as openstack-members above -- every new Google login
+  # lands in both groups from the start. Confirmed live (2026-08-03) that
+  # this needed to be explicit: a real user who completed first-broker-
+  # login before this mapper existed got openstack-members only, and their
+  # project-facade "Create Project" click was correctly denied
+  # ("missing project-creator role on this domain") -- exactly the
+  # designed behavior for someone without the role, not a bug, but not
+  # the originally intended default either. This mapper only fixes it
+  # going forward for *new* first-time Google logins; INHERIT sync does
+  # not retroactively re-run for users who already completed their first
+  # broker login, so anyone in that situation needs a one-time manual
+  # group add (see the same section in the IAM hardening doc).
+  existing_mapper2=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+    "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances/google/mappers" \
+    | jq -r '.[] | select(.name=="auto-assign-openstack-project-creators") | .id')
+  if [[ -z "${existing_mapper2}" ]]; then
+    curl -sf -X POST -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+      -d '{
+        "name": "auto-assign-openstack-project-creators",
+        "identityProviderAlias": "google",
+        "identityProviderMapper": "oidc-hardcoded-group-idp-mapper",
+        "config": {"syncMode": "INHERIT", "group": "/openstack-project-creators"}
+      }' "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/identity-provider/instances/google/mappers" >/dev/null
+    echo "created auto-assign-openstack-project-creators mapper"
+  else
+    echo "auto-assign-openstack-project-creators mapper already present (${existing_mapper2})"
+  fi
+fi
 
 echo "== done =="
