@@ -16,12 +16,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
-# Local addition (see docs/proposals/iam-hardening/README.md, "New
-# permission tier: self-service project lifecycle"): one extra route,
-# `create_selfservice`, added to the stock URL list below unchanged. Kept
-# as a full copy of the upstream file (rather than trying to monkeypatch
-# urlpatterns from outside it) so a diff against the real upstream file
-# shows exactly this one addition.
+# Local additions (see docs/proposals/iam-hardening/README.md, "New
+# permission tier: self-service project lifecycle"): `create_selfservice`
+# and, added later, `manage_members_selfservice`/
+# `manage_members_selfservice_add` -- appended to the stock URL list below
+# unchanged. Kept as a full copy of the upstream file (rather than trying
+# to monkeypatch urlpatterns from outside it) so a diff against the real
+# upstream file shows exactly these additions.
 
 from django.urls import re_path
 
@@ -42,4 +43,10 @@ urlpatterns = [
             views.DetailProjectView.as_view(), name='detail'),
     re_path(r'^(?P<tenant_id>[^/]+)/update_quotas/$',
             views.UpdateQuotasView.as_view(), name='update_quotas'),
+    re_path(r'^(?P<project_id>[^/]+)/manage_members_selfservice/$',
+            selfservice_views.ManageMembersSelfServiceView.as_view(),
+            name='manage_members_selfservice'),
+    re_path(r'^(?P<project_id>[^/]+)/manage_members_selfservice/add$',
+            selfservice_views.AddMemberView.as_view(),
+            name='manage_members_selfservice_add'),
 ]

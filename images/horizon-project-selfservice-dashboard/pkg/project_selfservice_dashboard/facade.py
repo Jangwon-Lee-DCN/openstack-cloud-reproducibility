@@ -75,3 +75,45 @@ def delete_project(request, project_id):
         raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
     if r.status_code not in (204, 404):
         raise FacadeError(_error_message(r))
+
+
+def list_members(request, project_id):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/members",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["members"]
+
+
+def add_member(request, project_id, username, role):
+    try:
+        r = requests.post(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/members",
+            headers=_headers(request),
+            json={"username": username, "role": role},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 201:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
+def remove_member(request, project_id, user_id):
+    try:
+        r = requests.delete(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/members/{user_id}",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code not in (204, 404):
+        raise FacadeError(_error_message(r))

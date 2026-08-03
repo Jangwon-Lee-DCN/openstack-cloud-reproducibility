@@ -1,9 +1,17 @@
+from types import SimpleNamespace
+
+from django.urls import reverse
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from horizon import exceptions
 from horizon import forms as horizon_forms
+from horizon import messages
+from horizon import tables as horizon_tables
 
+from . import facade
 from . import forms
+from . import tables
 
 
 class CreateProjectSelfServiceView(horizon_forms.ModalFormView):
@@ -23,3 +31,56 @@ class CreateProjectSelfServiceView(horizon_forms.ModalFormView):
     page_title = _("Create Project (Self-Service)")
     submit_label = _("Create Project")
     submit_url = reverse_lazy("horizon:identity:projects:create_selfservice")
+
+
+class ManageMembersSelfServiceView(horizon_tables.DataTableView):
+    """Reached from a "Manage Members (Self-Service)" row action added to
+    the same stock table. Lists the calling project's members and lets its
+    admin add/remove them -- project-facade re-checks the caller is admin
+    on this exact project (and refuses to remove its last admin) on every
+    request, independent of anything this view shows or hides.
+    """
+
+    table_class = tables.MembersTable
+    page_title = _("Project Members")
+
+    def get_data(self):
+        project_id = self.kwargs["project_id"]
+        try:
+            members = facade.list_members(self.request, project_id)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve project members."))
+            return []
+        # DataTable.get_object_id() (used for every row action) does
+        # datum.id via plain attribute access -- a dict works fine for
+        # ordinary Column lookups (Column.get_raw_data() special-cases
+        # Mapping objects) but not for that, so use a simple attribute-
+        # holding object instead of a dict here.
+        return [
+            SimpleNamespace(id=m["user_id"], username=m["username"], roles=", ".join(sorted(m["roles"])))
+            for m in members
+        ]
+
+
+class AddMemberView(horizon_forms.ModalFormView):
+    form_class = forms.AddMemberForm
+    template_name = "project_selfservice/add_member.html"
+    page_title = _("Add Member")
+    submit_label = _("Add Member")
+
+    def get_success_url(self):
+        return reverse("horizon:identity:projects:manage_members_selfservice", args=[self.kwargs["project_id"]])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:manage_members_selfservice_add", args=[self.kwargs["project_id"]]
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        return {"project_id": self.kwargs["project_id"]}

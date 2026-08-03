@@ -1,4 +1,4 @@
-ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:7423b7c2d97db24481b511cd8518b4051f26367b1678cdd8c9e39437109e2142
+ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:9a88203fa3d83eb8c1efb6885156f2ef1ea1dab1048c4afba2d1655033c28183
 FROM ${HORIZON_BASE}
 
 USER root

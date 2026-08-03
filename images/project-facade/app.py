@@ -9,6 +9,32 @@ flag set (used to protect a domain's designated admin project, e.g. `dcn`
 in the `dcn` domain -- see docs/proposals/iam-hardening/README.md, "New
 permission tier: self-service project lifecycle").
 
+Also lets that same project admin manage who else has access to their own
+project (add/remove members, admin/member/reader) -- the natural next
+step once a project can be self-service-created at all: someone who owns
+a project needs to be able to invite teammates into it without asking a
+platform admin every time. Same authorization boundary as update/delete
+(caller must be project-scoped admin on that exact project); additionally
+refuses to remove a project's last remaining admin, so a project can never
+be locked out of its own self-service management.
+
+DELETE also refuses to remove a project that still has active Nova/
+Cinder/Neutron resources (instances, volumes, networks, routers, floating
+IPs) -- Keystone's own project delete has no idea these exist and would
+silently orphan them. Checking this requires a *project-scoped* token for
+the target project (Nova's policy for listing servers hard-requires
+`scope_types: ['project']`; a domain-scoped token, even with the `admin`
+role, fails that scope check regardless of role -- confirmed live), which
+this service's own domain-scoped credential cannot obtain on its own. So
+immediately before the check, project-facade grants its own service user
+a direct `admin` role on the target project (the same Keystone grant
+mechanism it already uses for the project's human owner), uses that to
+mint a project-scoped token for the resource check, and revokes its own
+grant again immediately if the delete is blocked -- so the elevated access
+exists for the span of one request, never as a standing grant. If the
+delete proceeds, no revoke is needed: Keystone's project delete removes
+every role assignment on it anyway.
+
 This service holds its own Keystone service-account credential
 (domain-scoped `admin` on exactly the domain it administers -- see
 OS_DOMAIN_NAME below, not system-scope) and performs every Keystone write
@@ -41,11 +67,20 @@ OS_USER_DOMAIN_NAME = os.environ["OS_USER_DOMAIN_NAME"]
 # attempted, since the service credential has no rights there anyway.
 OS_DOMAIN_NAME = os.environ.get("OS_DOMAIN_NAME", "dcn")
 
+# Internal cluster Service DNS for the pre-delete resource check -- same
+# in-cluster addressing convention as OS_AUTH_URL above, overridable for
+# environments where these differ.
+NOVA_URL = os.environ.get("NOVA_ENDPOINT", "http://nova-api.openstack.svc.cluster.local:8774/v2.1")
+CINDER_URL = os.environ.get("CINDER_ENDPOINT", "http://cinder-api.openstack.svc.cluster.local:8776/v3")
+NEUTRON_URL = os.environ.get("NEUTRON_ENDPOINT", "http://neutron-server.openstack.svc.cluster.local:9696/v2.0")
+
 PROJECT_CREATOR_ROLE = "project-creator"
 ADMIN_ROLE = "admin"
+ALLOWED_MEMBER_ROLES = {"admin", "member", "reader"}
 
 _service_token_cache = {"token": None, "expires_at": 0.0}
 _role_id_cache = {}
+_own_user_id_cache = {"id": None}
 
 
 def _parse_expires_at(expires_at_str):
@@ -115,6 +150,78 @@ def role_id_by_name(role_name):
     if role_id:
         _role_id_cache[role_name] = role_id
     return role_id
+
+
+def _own_user_id():
+    if _own_user_id_cache["id"]:
+        return _own_user_id_cache["id"]
+    token = get_service_token()
+    r = requests.get(
+        f"{OS_AUTH_URL}/auth/tokens",
+        headers={"X-Auth-Token": token, "X-Subject-Token": token},
+        timeout=10,
+    )
+    r.raise_for_status()
+    user_id = r.json()["token"]["user"]["id"]
+    _own_user_id_cache["id"] = user_id
+    return user_id
+
+
+def _get_project_scoped_token(project_id):
+    body = {
+        "auth": {
+            "identity": {
+                "methods": ["password"],
+                "password": {
+                    "user": {
+                        "name": OS_USERNAME,
+                        "domain": {"name": OS_USER_DOMAIN_NAME},
+                        "password": OS_PASSWORD,
+                    }
+                },
+            },
+            "scope": {"project": {"id": project_id}},
+        }
+    }
+    r = requests.post(f"{OS_AUTH_URL}/auth/tokens", json=body, timeout=10)
+    r.raise_for_status()
+    return r.headers["X-Subject-Token"]
+
+
+def _active_resource_blockers(project_id):
+    """Returns a list of human-readable strings describing anything on
+    this project that a Keystone-only project delete would silently
+    orphan (empty list means the project is safe to delete). Requires a
+    project-scoped token -- see the module docstring for why."""
+    headers = {"X-Auth-Token": _get_project_scoped_token(project_id)}
+    blockers = []
+
+    r = requests.get(f"{NOVA_URL}/servers/detail", headers=headers, timeout=10)
+    r.raise_for_status()
+    count = len(r.json()["servers"])
+    if count:
+        blockers.append(f"{count} instance(s)")
+
+    r = requests.get(f"{CINDER_URL}/volumes/detail", headers=headers, timeout=10)
+    r.raise_for_status()
+    count = len(r.json()["volumes"])
+    if count:
+        blockers.append(f"{count} volume(s)")
+
+    for resource, label in (
+        ("networks", "network(s)"),
+        ("routers", "router(s)"),
+        ("floatingips", "floating IP(s)"),
+    ):
+        r = requests.get(
+            f"{NEUTRON_URL}/{resource}", headers=headers, params={"project_id": project_id}, timeout=10
+        )
+        r.raise_for_status()
+        count = len(r.json()[resource])
+        if count:
+            blockers.append(f"{count} {label}")
+
+    return blockers
 
 
 def _user_group_ids(user_id):
@@ -329,10 +436,166 @@ def delete_project(project_id):
     if err:
         return err
 
+    admin_role_id = role_id_by_name(ADMIN_ROLE)
+    own_user_id = _own_user_id()
+
+    grant = requests.put(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{own_user_id}/roles/{admin_role_id}",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    grant.raise_for_status()
+
+    def _revoke_own_grant():
+        rr = requests.delete(
+            f"{OS_AUTH_URL}/projects/{project_id}/users/{own_user_id}/roles/{admin_role_id}",
+            headers=keystone_headers(),
+            timeout=10,
+        )
+        if rr.status_code not in (204, 404):
+            rr.raise_for_status()
+
+    try:
+        blockers = _active_resource_blockers(project_id)
+    except requests.RequestException:
+        _revoke_own_grant()
+        log.exception("resource check failed for project=%s", project_id)
+        return jsonify(error="could not verify the project has no active resources; try again"), 502
+
+    if blockers:
+        _revoke_own_grant()
+        log.warning("denied delete project=%s: still has %s", project_id, ", ".join(blockers))
+        return (
+            jsonify(error=f"cannot delete: project still has {', '.join(blockers)}; remove them first"),
+            409,
+        )
+
     r = requests.delete(f"{OS_AUTH_URL}/projects/{project_id}", headers=keystone_headers(), timeout=10)
     if r.status_code not in (204, 404):
         r.raise_for_status()
     log.info("deleted project=%s by=%s(%s)", project_id, ident[1], ident[0])
+    return "", 204
+
+
+def _find_user_by_name(name, domain_id):
+    r = requests.get(
+        f"{OS_AUTH_URL}/users",
+        headers=keystone_headers(),
+        params={"name": name, "domain_id": domain_id},
+        timeout=10,
+    )
+    r.raise_for_status()
+    users = r.json()["users"]
+    return users[0] if users else None
+
+
+@app.route("/v1/projects/<project_id>/members", methods=["GET"])
+def list_members(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, err = _authorize_project_admin(caller_token, project_id)
+    if err:
+        return err
+
+    r = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"scope.project.id": project_id, "effective": "true", "include_names": "true"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    members = {}
+    for a in r.json()["role_assignments"]:
+        if "user" not in a:
+            continue  # group-derived grant, not a directly addable/removable member
+        uid = a["user"]["id"]
+        entry = members.setdefault(uid, {"user_id": uid, "username": a["user"]["name"], "roles": []})
+        entry["roles"].append(a["role"]["name"])
+    return jsonify(members=list(members.values())), 200
+
+
+@app.route("/v1/projects/<project_id>/members", methods=["POST"])
+def add_member(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, err = _authorize_project_admin(caller_token, project_id)
+    if err:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    username = (body.get("username") or "").strip()
+    role_name = (body.get("role") or "member").strip()
+    if not username:
+        return jsonify(error="'username' is required"), 400
+    if role_name not in ALLOWED_MEMBER_ROLES:
+        return jsonify(error=f"'role' must be one of {sorted(ALLOWED_MEMBER_ROLES)}"), 400
+
+    project = _load_target_project(project_id)
+    target_user = _find_user_by_name(username, project["domain_id"])
+    if not target_user:
+        return jsonify(error=f"no user named '{username}' found in this domain"), 404
+
+    role_id = role_id_by_name(role_name)
+    r = requests.put(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{role_id}",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    r.raise_for_status()
+    log.info(
+        "added member project=%s user=%s(%s) role=%s by=%s(%s)",
+        project_id, username, target_user["id"], role_name, ident[1], ident[0],
+    )
+    return jsonify(user_id=target_user["id"], username=username, role=role_name), 201
+
+
+@app.route("/v1/projects/<project_id>/members/<user_id>", methods=["DELETE"])
+def remove_member(project_id, user_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, err = _authorize_project_admin(caller_token, project_id)
+    if err:
+        return err
+
+    admin_role_id = role_id_by_name(ADMIN_ROLE)
+
+    # Refuse to strip the project's last admin, effective (including any
+    # group-derived) grants included -- otherwise a project could be
+    # locked out of its own self-service management entirely, with no
+    # break-glass path back in short of a platform admin.
+    r = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"scope.project.id": project_id, "role.id": admin_role_id, "effective": "true"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    admin_user_ids = {a["user"]["id"] for a in r.json()["role_assignments"] if "user" in a}
+    if user_id in admin_user_ids and len(admin_user_ids) <= 1:
+        return jsonify(error="cannot remove the last admin of this project"), 409
+
+    # Direct (non-effective) assignments only -- these are exactly what
+    # DELETE .../roles/{role_id} can actually revoke; a role held only via
+    # group membership isn't removable through this per-user endpoint.
+    r2 = requests.get(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{user_id}/roles",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    r2.raise_for_status()
+    for role in r2.json()["roles"]:
+        rr = requests.delete(
+            f"{OS_AUTH_URL}/projects/{project_id}/users/{user_id}/roles/{role['id']}",
+            headers=keystone_headers(),
+            timeout=10,
+        )
+        if rr.status_code not in (204, 404):
+            rr.raise_for_status()
+
+    log.info("removed member project=%s user=%s by=%s(%s)", project_id, user_id, ident[1], ident[0])
     return "", 204
 
 

@@ -166,6 +166,23 @@ class CreateProjectSelfService(tables.LinkAction):
         return True
 
 
+class ManageMembersSelfService(tables.LinkAction):
+    name = "manage_members_selfservice"
+    verbose_name = _("Manage Members (Self-Service)")
+    url = "horizon:identity:projects:manage_members_selfservice"
+    icon = "pencil"
+
+    def allowed(self, request, project):
+        # Same reasoning as CreateProjectSelfService above -- always shown;
+        # project-facade requires the caller to actually be admin on this
+        # specific project before it lets them add/remove anyone, and
+        # refuses to remove the project's last admin.
+        return True
+
+    def get_link_url(self, project):
+        return reverse(self.url, args=[project.id])
+
+
 class UpdateProject(policy.PolicyTargetMixin, tables.LinkAction):
     name = "update"
     verbose_name = _("Edit Project")
@@ -319,7 +336,8 @@ class TenantsTable(tables.DataTable):
         row_class = UpdateRow
         row_actions = (UpdateMembersLink, UpdateGroupsLink, UpdateProject,
                        UsageLink, ModifyQuotas, DeleteTenantsAction,
-                       DeleteProjectSelfService, RescopeTokenToProject)
+                       DeleteProjectSelfService, ManageMembersSelfService,
+                       RescopeTokenToProject)
         table_actions = (TenantFilterAction, CreateProject,
                          CreateProjectSelfService, DeleteTenantsAction)
         pagination_param = "tenant_marker"
