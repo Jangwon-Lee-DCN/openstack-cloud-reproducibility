@@ -23,8 +23,21 @@ cd /home/ubuntu/openstack-cloud-reproducibility
 ./deploy/scripts/reconcile-full-stack.sh
 ```
 
-Set `BUILD_IMAGES=1` only when the locked custom images are unavailable. A
-rebuilt digest must match the recorded digest or be reviewed and committed.
+Set `BUILD_IMAGES=1` for an empty Harbor. The source build now covers every
+private runtime image family, builds Magnum before its GitOps derivative, and
+builds Horizon once from a public digest-pinned base instead of relying on a
+chain of private parent images. It writes immutable results to
+`deploy/generated/rebuilt-images.env`. Review those references and promote
+them with `deploy/scripts/apply-rebuilt-image-lock.py` before reconciling
+workloads; a new digest must
+never be hidden behind an old tag or silently substituted.
+
+The build requires clean, commit-pinned checkouts of `openstack-vpc-dashboard`,
+`vpc-control-plane`, and `magnum-capi-gitops` beside this repository. It stops
+instead of packaging uncommitted source. `verify-image-rebuild-closure.py`
+guards the required image families, public bootstrap boundary, pinned parent
+images, and the cumulative Octavia, Designate, VPC, project self-service, and
+Magnum UI Horizon extensions.
 
 ## Environment boundary
 

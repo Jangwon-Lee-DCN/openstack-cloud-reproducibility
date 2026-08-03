@@ -4,6 +4,8 @@ set -euo pipefail
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 
+"$REPO_ROOT/deploy/scripts/verify-image-rebuild-closure.py"
+
 python3 - "$REPO_ROOT/release-lock.yaml" <<'PYLOCK' | while read -r release expected; do
 import sys,yaml
 x=yaml.safe_load(open(sys.argv[1]))['spec']['releases']

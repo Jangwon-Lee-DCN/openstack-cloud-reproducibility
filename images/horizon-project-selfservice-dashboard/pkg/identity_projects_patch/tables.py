@@ -56,27 +56,30 @@ class RescopeTokenToProject(tables.LinkAction):
         return "?".join([base_url, param])
 
 
-class UpdateMembersLink(tables.LinkAction):
-    name = "users"
-    verbose_name = _("Manage Members")
-    url = "horizon:identity:projects:update"
-    classes = ("ajax-modal",)
-    icon = "pencil"
-    policy_rules = (("identity", "identity:list_users"),
-                    ("identity", "identity:list_roles"))
-
-    def get_link_url(self, project):
-        step = 'update_members'
-        base_url = reverse(self.url, args=[project.id])
-        param = urlencode({"step": step})
-        return "?".join([base_url, param])
-
-    def allowed(self, request, project):
-        if settings.OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT:
-            # domain admin or cloud admin = True
-            # project admin or member = False
-            return api.keystone.is_domain_admin(request)
-        return super().allowed(request, project)
+# The stock "Manage Members" action (UpdateMembersLink, linking to
+# UpdateProjectView's update_members step) was removed here -- not just
+# hidden -- after being found live to be actively misleading for this
+# deployment's group-based persona system, not merely admin-gated wrong.
+# Its underlying data source, api.keystone.get_project_users_roles(), calls
+# role_assignments_list(request, project=project) with Horizon's own
+# default effective=False, which only ever sees *direct* per-user role
+# grants. Every DCN persona (reconcile-iam-dcn.sh) grants roles to a
+# *group*, never directly to a user, so this workflow showed every real
+# federated user (confirmed live with jangwon.lee@dcn.ssu.ac.kr) with zero
+# roles checked regardless of their actual access -- and because Keystone's
+# grant/revoke API only operates on direct assignments, checking or
+# unchecking a box here could never correctly reflect or change a group-
+# derived permission anyway (unchecking one silently revokes nothing,
+# checking an already-effectively-held role just adds a redundant direct
+# grant). Patching the display to effective=True would have looked more
+# correct while making the round-trip semantics worse, not better, since
+# the edit side still only understands direct grants. See "New permission
+# tier: self-service project lifecycle" in the IAM hardening doc for the
+# project-facade-backed replacement below (ManageMembersSelfService),
+# which reads real effective membership via /users/{id}/groups and
+# performs every grant/revoke itself -- a full, correct superset of what
+# this stock action was ever able to offer here, so removing it in favor
+# of that one tool is a net simplification, not a lost capability.
 
 
 class UpdateGroupsLink(tables.LinkAction):
@@ -168,7 +171,13 @@ class CreateProjectSelfService(tables.LinkAction):
 
 class ManageMembersSelfService(tables.LinkAction):
     name = "manage_members_selfservice"
-    verbose_name = _("Manage Members (Self-Service)")
+    # Plain "Manage Members" -- the "(Self-Service)" qualifier this label
+    # originally carried made sense only while it stood alongside the
+    # native UpdateMembersLink action (removed above, see that comment for
+    # why); now that this is the *only* member-management entry point in
+    # this table, keeping the qualifier would just read as an unexplained
+    # oddity next to a plain "Manage Members" everyone expects.
+    verbose_name = _("Manage Members")
     url = "horizon:identity:projects:manage_members_selfservice"
     icon = "pencil"
 
@@ -334,7 +343,7 @@ class TenantsTable(tables.DataTable):
         name = "tenants"
         verbose_name = _("Projects")
         row_class = UpdateRow
-        row_actions = (UpdateMembersLink, UpdateGroupsLink, UpdateProject,
+        row_actions = (UpdateGroupsLink, UpdateProject,
                        UsageLink, ModifyQuotas, DeleteTenantsAction,
                        DeleteProjectSelfService, ManageMembersSelfService,
                        RescopeTokenToProject)

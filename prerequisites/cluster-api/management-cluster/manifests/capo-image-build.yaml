@@ -13,14 +13,18 @@ spec:
           effect: NoSchedule
       initContainers:
         - name: source
-          image: alpine/git:2.49.1
+          image: alpine/git:2.49.1@sha256:c0280cf9572316299b08544065d3bf35db65043d5e3963982ec50647d2746e26
           command:
             - /bin/sh
             - -ec
             - |
-              git clone --depth 1 --branch v0.14.6 \
+              git clone --no-checkout \
                 https://github.com/kubernetes-sigs/cluster-api-provider-openstack.git \
                 /workspace
+              git -C /workspace fetch --depth 1 origin \
+                2bfcd2a48b296963191238d2411643bb73179297
+              git -C /workspace checkout --detach \
+                2bfcd2a48b296963191238d2411643bb73179297
               test "$(grep -c 'Limit: 1,' \
                 /workspace/pkg/cloud/services/networking/port.go)" -eq 1
               sed -i 's/Limit: 1,/Limit: 2,/' \
@@ -36,7 +40,7 @@ spec:
           args:
             - --context=dir:///src
             - --dockerfile=/src/Dockerfile
-            - --destination=registry.dcn.ssu.ac.kr/openstack/capo-controller:v0.14.6-poc1
+            - --destination=registry.dcn.ssu.ac.kr/openstack/capo-controller:source-v0.14.6-poc1
             - --digest-file=/dev/termination-log
             - --skip-tls-verify
             - --snapshot-mode=redo

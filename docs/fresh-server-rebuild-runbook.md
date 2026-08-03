@@ -36,8 +36,10 @@ require editing the playbooks. Do not copy PoC replica counts into production.
    repository writer. Its Git commit is pinned in the Ansible inventory.
 4. The age private identity, institutional CA keys, SSH private keys, database
    backups, Ceph keyrings, and break-glass credentials remain outside Git.
-5. Mirror all container images and source archives into Harbor before an
-   isolated rebuild. A Git checkout alone is not an offline backup.
+5. If the new Harbor is empty but upstream registries and source sites are
+   reachable, run the source rebuild gate below. For a disconnected rebuild,
+   mirror the public digest-pinned parents and checksum-pinned wheels first;
+   Git alone cannot supply third-party base layers.
 
 Record SHA-256 checksums of both repository bundles and the offline secret
 media. Use signed Git tags for accepted releases.
@@ -202,6 +204,37 @@ Only after this gate create Neutron's external network with allocation range
 `192.168.21.100-192.168.21.200` (or the new site's approved equivalent).
 
 ## Phase 7 — Pinned OpenStack
+
+### Empty-Harbor source bootstrap
+
+Before installing OpenStack workloads, place clean checkouts of
+`openstack-vpc-dashboard`, `vpc-control-plane`, and `magnum-capi-gitops` next
+to this repository at the commits recorded in the inventory lock. Log in to
+the newly installed Harbor and provision the SOPS-encrypted push Secret, then
+run:
+
+```bash
+./deploy/scripts/verify-image-rebuild-closure.py
+BUILD_ID="$(git rev-parse --short=12 HEAD)" ./deploy/scripts/build-images.sh
+sed -n '1,200p' deploy/generated/rebuilt-images.env
+./deploy/scripts/apply-rebuilt-image-lock.py
+# After reviewing the report:
+./deploy/scripts/apply-rebuilt-image-lock.py --apply
+```
+
+The build order is dependency-aware: independent OpenStack extensions,
+Magnum base, Magnum GitOps/writer, VPC binaries, complete Horizon,
+project-facade, and CAPO. The complete Horizon build starts from the pinned
+Airship image and installs Octavia Dashboard, VPC Dashboard, Designate
+Dashboard, and project self-service in one image. Historical Horizon
+intermediate digests are not bootstrap inputs.
+
+Every emitted value is an immutable `repository:tag@sha256:...` reference.
+Review and commit the new environment's values pins before Phase 7. Preserve
+the generated file with the deployment acceptance record, but do not treat a
+mutable tag as a lock. If public registries will be unavailable during a
+future rebuild, export all public parents by digest to offline media as a
+separate prerequisite.
 
 ```bash
 ansible-playbook -i inventory/local/hosts.yml playbooks/50-openstack.yml
