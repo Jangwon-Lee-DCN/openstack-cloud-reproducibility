@@ -39,6 +39,23 @@ guards the required image families, public bootstrap boundary, pinned parent
 images, and the cumulative Octavia, Designate, VPC, project self-service, and
 Magnum UI Horizon extensions.
 
+**This is the only build path that should be used for a Horizon rebuild
+meant to persist.** The individual `images/horizon-*-dashboard/Dockerfile`
+files each build `FROM` whatever the *currently live* image digest happens
+to be -- a per-feature dev-iteration shortcut, not reproducible, and the
+repeated cause of previously-shipped features/panels silently disappearing
+when two rebuilds raced against a moving base (observed live more than
+once). `horizon-complete` never depends on registry state: every rebuild
+starts from the same pinned public upstream digest and re-applies every
+feature's current source fresh, so no previous work can be dropped by a
+later, unrelated build. Verified end to end (2026-08-03): rebuilt the VPC
+dashboard wheel from a clean checkout, assembled and built
+`horizon-complete` exactly as `build-images.sh` does, deployed it, and
+confirmed every panel family (compute, ENI, Magnum clusters, Designate
+zones, Octavia load balancers, every VPC panel, and Identity including the
+project self-service extension) loads for a real logged-in user, plus a
+full IAM persona regression pass.
+
 ## Environment boundary
 
 The release snapshots reproduce the current PoC, including environment-specific

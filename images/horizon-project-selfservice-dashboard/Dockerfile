@@ -1,7 +1,22 @@
+# FAST-ITERATION DEV IMAGE ONLY -- not the source of truth. This Dockerfile
+# layers on top of whatever HORIZON_BASE happened to be live at build time,
+# which is exactly the pattern that has repeatedly dropped previously-applied
+# features when two people rebuilt from different "current live" bases in
+# parallel (confirmed live more than once this engagement). The real,
+# reproducible build is images/horizon-complete/Dockerfile, assembled by
+# deploy/scripts/build-images.sh from a single pinned public upstream base
+# plus every feature's current source (Octavia workflow, Designate, the VPC
+# dashboard wheel, this project's pkg/, and Magnum UI) in one deterministic
+# pass -- no dependency on registry state at all. Use *that* path (or
+# reconcile-full-stack.sh with BUILD_IMAGES=1) for anything meant to persist;
+# treat this file as a scratch pad for quickly testing a change against
+# whatever is currently deployed, and mirror any lasting change into
+# pkg/ so build-images.sh's next horizon-complete run picks it up too.
+#
 # This incremental development image must retain the Magnum UI layer.  The
 # previous base (6b13...) predated Magnum and silently removed its panels when
 # project-selfservice was rebuilt on top of it.
-ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:9e2cea0e56b1702dc2db1794ab938620b59cab8d201127f8b79c7a16c289ad0e
+ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:3443a1843ed6243693bbf230df112a35b6779de0691d477f18712dfefd2dd4e2
 FROM ${HORIZON_BASE}
 
 USER root
