@@ -92,12 +92,11 @@ conf:
         raw:
           FORCE_SCRIPT_NAME: /horizon
           WEBROOT: /horizon/
-          # Keep offline manifests disabled; they were generated
-          # nondeterministically across replicas. Runtime compression remains
-          # enabled, with the startup script handing the static directory to
-          # the Horizon WSGI user after collectstatic/compress.
-          COMPRESS_OFFLINE: false
-          COMPRESS_ENABLED: true
+          # Horizon replicas share the Django cache. Caching this fragment
+          # lets a rolling-upgrade pod reuse the previous image's external
+          # template list and emit a different hashed preload JS than its
+          # peer, causing cross-pod 404s and broken Angular modals.
+          NG_TEMPLATE_CACHE_AGE: 0
           LOGIN_URL: /horizon/auth/login/
           LOGOUT_URL: /horizon/auth/logout/
           LOGIN_REDIRECT_URL: /horizon/
