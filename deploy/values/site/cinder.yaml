@@ -25,13 +25,26 @@ images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
-  # Read-only cloud inventory and capacity access for the monitoring role.
+  # Read-only cloud inventory and capacity access for the monitoring role,
+  # added on top of (not instead of) Cinder's own default project-scoped
+  # access. `volume_extension:services:index` and
+  # `scheduler_extension:scheduler_stats:get_pools` default to admin-only,
+  # so granting monitoring there is a pure addition. `volume:get_all`,
+  # `volume:get_all_snapshots`, and `volume_extension:quotas:show` default
+  # to `xena_system_admin_or_project_reader` ((role:admin) or (role:reader
+  # and project_id:%(project_id)s)) -- overwriting that with a bare
+  # "role:admin or role:monitoring" (as this block originally did) silently
+  # revoked every ordinary project member's own ability to list their
+  # project's volumes/snapshots/quota, breaking Horizon's instance-launch
+  # wizard for any non-admin, non-monitoring persona (e.g. openstack-members
+  # with only member+reader). Fixed by re-adding the original rule instead
+  # of replacing it.
   policy:
     "volume_extension:services:index": "role:admin or role:monitoring"
     "scheduler_extension:scheduler_stats:get_pools": "role:admin or role:monitoring"
-    "volume_extension:quotas:show": "role:admin or role:monitoring"
-    "volume:get_all": "role:admin or role:monitoring"
-    "volume:get_all_snapshots": "role:admin or role:monitoring"
+    "volume_extension:quotas:show": "role:admin or role:monitoring or (role:reader and project_id:%(project_id)s)"
+    "volume:get_all": "role:admin or role:monitoring or (role:reader and project_id:%(project_id)s)"
+    "volume:get_all_snapshots": "role:admin or role:monitoring or (role:reader and project_id:%(project_id)s)"
   ceph:
     pools:
       backup:
