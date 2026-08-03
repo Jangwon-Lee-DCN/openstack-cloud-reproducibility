@@ -17,6 +17,10 @@ from django.utils.translation import gettext_lazy as _
 
 PROJECT_FACADE_URL = "http://project-facade.openstack.svc.cluster.local:8080"
 _TIMEOUT = 15
+# Shorter than _TIMEOUT above: is_domain_admin() runs on ordinary page
+# renders (panel visibility, row-action gating), not a form submission --
+# a slow/unreachable project-facade must fail fast, not stall every page.
+_DOMAIN_ADMIN_TIMEOUT = 5
 
 
 class FacadeError(Exception):
@@ -107,6 +111,62 @@ def add_member(request, project_id, username, role):
     if r.status_code not in (200, 201):
         raise FacadeError(_error_message(r))
     return r.json()
+
+
+def is_domain_admin(request):
+    """Replacement for openstack_dashboard.api.keystone.is_domain_admin,
+    installed over the original at Django startup by
+    ProjectSelfserviceDashboardConfig.ready() (see apps.py) -- monkeypatch,
+    not a copy of that (large, widely-imported) file. Confirmed live that
+    every caller (identity/{projects,users,groups,roles,credentials}
+    panels/tables, plus keystone.py's own keystoneclient(admin=True))
+    invokes it as a module-attribute lookup (`keystone.is_domain_admin(...)`
+    or, from within keystone.py itself, a bare call resolved from the same
+    module globals at call time), so replacing the attribute on the module
+    object reaches every one of them.
+
+    The stock implementation asks a Horizon-local policy rule
+    ("admin_and_matching_domain_id") that (a) isn't defined anywhere in
+    this deployment's policy files, so openstack_auth.policy.check()'s
+    documented fail-open behavior for undefined rules makes it always
+    True regardless, and (b) even if defined, is only ever evaluated
+    against the caller's *project*-scoped credentials here: a domain-
+    scoped token would be needed for the real domain-scope evaluation,
+    and openstack_auth deliberately never caches one in the session when
+    SESSION_ENGINE is signed_cookies (this deployment's session backend --
+    a domain token doesn't fit in a cookie), logging an error and skipping
+    it instead. Both confirmed live, not assumed.
+
+    Fixed by asking project-facade instead, which already holds a
+    domain-scoped credential and already correctly resolves group-derived
+    (federated) role membership for exactly this kind of question -- the
+    same logic create_project() uses to check the project-creator role.
+    Fails closed (False) on any error or unreachable facade, since this
+    now gates real UI-visibility decisions (Identity dashboard panels,
+    admin-only table actions) rather than the previous always-True
+    default.
+    """
+    cache_attr = "_dcn_is_domain_admin"
+    if hasattr(request, cache_attr):
+        return getattr(request, cache_attr)
+
+    result = False
+    token = getattr(getattr(request, "user", None), "token", None)
+    token_id = getattr(token, "id", None)
+    if token_id:
+        try:
+            r = requests.get(
+                f"{PROJECT_FACADE_URL}/v1/domain-admin",
+                headers={"X-Auth-Token": token_id},
+                timeout=_DOMAIN_ADMIN_TIMEOUT,
+            )
+            if r.status_code == 200:
+                result = bool(r.json().get("is_domain_admin"))
+        except requests.RequestException:
+            result = False
+
+    setattr(request, cache_attr, result)
+    return result
 
 
 def remove_member(request, project_id, user_id):

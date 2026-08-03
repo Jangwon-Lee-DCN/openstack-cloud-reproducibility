@@ -1,4 +1,7 @@
-ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:a137d9c46958e91851bf2489cf08a62d56df1c1cc4b9e2291bc7db99019a33ac
+# This incremental development image must retain the Magnum UI layer.  The
+# previous base (6b13...) predated Magnum and silently removed its panels when
+# project-selfservice was rebuilt on top of it.
+ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:9e2cea0e56b1702dc2db1794ab938620b59cab8d201127f8b79c7a16c289ad0e
 FROM ${HORIZON_BASE}
 
 USER root
@@ -46,6 +49,8 @@ COPY pkg/identity_projects_patch/views.py /var/lib/openstack/lib/python3.12/site
 COPY pkg/enabled/_1800_project_selfservice_app.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1800_project_selfservice_app.py
 
 RUN python3 -c "import project_selfservice_dashboard" \
+    && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard/apps.py \
+    && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard/facade.py \
     && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tables.py \
     && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/urls.py \
     && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/views.py

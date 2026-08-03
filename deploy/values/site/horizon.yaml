@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:fd00f6ffb087c85e9ac79c336f86f8f65cb35d058b31a1f2486373aa31fc9b9d
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:279c3e186f9886e753c330c2759dec81c2772ea2e37073471716d7c4f4b08e5c
 pod:
   image_pull_secrets:
     horizon:
@@ -42,13 +42,12 @@ conf:
         # session written via one Pod is simply absent when a later request
         # lands on the other). Every login appeared to succeed (302 to
         # /horizon/) but the very next request was bounced straight back to
-        # the login page with the sessionid cookie cleared. signed_cookies
-        # needs no server-side store at all -- the session is a signed
-        # cookie validated only against SECRET_KEY, which both replicas
-        # already share from the same horizon-etc Secret -- so it's correct
-        # with any replica count and doesn't touch the shared memcached
-        # tier other OpenStack services rely on.
-        session_engine: 'django.contrib.sessions.backends.signed_cookies'
+        # the login page with the sessionid cookie cleared. signed_cookies is
+        # also unsuitable: the domain-scoped token and service catalog make
+        # the cookie exceed the browser's 4096-byte limit. Store sessions in
+        # the shared Horizon MariaDB instead; both replicas use the same
+        # django_session table and the browser carries only a short key.
+        session_engine: 'django.contrib.sessions.backends.db'
         csrf_trusted_origins:
           - https://cloud.dcn.ssu.ac.kr
         allowed_hosts:

@@ -664,6 +664,38 @@ def remove_member(project_id, user_id):
     return "", 204
 
 
+@app.route("/v1/domain-admin", methods=["GET"])
+def check_domain_admin():
+    """Tells a caller whether *they* hold `admin` at domain scope on the
+    one domain this service administers (OS_DOMAIN_NAME). Added so Horizon
+    can determine real domain-admin status for UI-visibility decisions
+    (Identity dashboard panels, admin-only table actions) without relying
+    on its own broken mechanism -- see docs/proposals/iam-hardening/
+    README.md, "New permission tier: self-service project lifecycle",
+    for why: Horizon's stock is_domain_admin() needs a domain-scoped token
+    cached in the session, which openstack_auth never sets when
+    SESSION_ENGINE is signed_cookies (this deployment's session backend,
+    chosen for an unrelated multi-replica session bug -- a domain token
+    doesn't fit in a cookie), so it silently fell back to evaluating an
+    undefined Horizon-local policy rule that fails open for everyone.
+    This endpoint sidesteps that entirely: it uses the caller's own
+    (whatever-scope) token just to identify who they are, then answers the
+    question itself via user_has_domain_role(), which already correctly
+    resolves group-derived (federated) role membership -- the same check
+    create_project() uses for the project-creator role."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    domain_id = get_domain_id(OS_DOMAIN_NAME)
+    is_admin = bool(domain_id) and user_has_domain_role(user_id, domain_id, ADMIN_ROLE)
+    return jsonify(is_domain_admin=is_admin, domain=OS_DOMAIN_NAME), 200
+
+
 @app.route("/healthz")
 def healthz():
     return jsonify(status="ok"), 200
