@@ -101,7 +101,10 @@ def add_member(request, project_id, username, role):
         )
     except requests.RequestException as exc:
         raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
-    if r.status_code != 201:
+    # 201 for a brand-new member, 200 when the named user was already a
+    # member and this call changed their role instead (see project-facade
+    # app.py's add_member -- idempotent "set role" semantics).
+    if r.status_code not in (200, 201):
         raise FacadeError(_error_message(r))
     return r.json()
 

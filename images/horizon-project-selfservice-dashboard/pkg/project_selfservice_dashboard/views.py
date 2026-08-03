@@ -13,6 +13,13 @@ from . import facade
 from . import forms
 from . import tables
 
+# Order to search a member's effective roles in for the "current role" a
+# Change Role form should pre-select. list_members() returns every
+# effective role (implied roles included, e.g. "admin" also implies
+# manager/member/reader), so this picks the highest one that's actually a
+# settable member-tier role.
+ROLE_PRIORITY = ("admin", "member", "reader")
+
 
 class CreateProjectSelfServiceView(horizon_forms.ModalFormView):
     """Reached from a "Create Project (Self-Service)" action added to the
@@ -84,3 +91,39 @@ class AddMemberView(horizon_forms.ModalFormView):
 
     def get_initial(self):
         return {"project_id": self.kwargs["project_id"]}
+
+
+class ChangeMemberRoleView(horizon_forms.ModalFormView):
+    form_class = forms.ChangeMemberRoleForm
+    template_name = "project_selfservice/add_member.html"
+    page_title = _("Change Member Role")
+    submit_label = _("Change Role")
+
+    def get_success_url(self):
+        return reverse("horizon:identity:projects:manage_members_selfservice", args=[self.kwargs["project_id"]])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:manage_members_selfservice_change_role",
+            args=[self.kwargs["project_id"], self.kwargs["user_id"]],
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        project_id = self.kwargs["project_id"]
+        user_id = self.kwargs["user_id"]
+        username = ""
+        current_role = "member"
+        try:
+            for m in facade.list_members(self.request, project_id):
+                if m["user_id"] == user_id:
+                    username = m["username"]
+                    current_role = next((r for r in ROLE_PRIORITY if r in m["roles"]), "member")
+                    break
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve this member's current role."))
+        return {"project_id": project_id, "username": username, "role": current_role}

@@ -18,6 +18,17 @@ class AddMember(tables.LinkAction):
         return reverse(self.url, args=[self.table.kwargs["project_id"]])
 
 
+class ChangeRole(tables.LinkAction):
+    name = "change_role"
+    verbose_name = _("Change Role")
+    url = "horizon:identity:projects:manage_members_selfservice_change_role"
+    classes = ("ajax-modal",)
+    icon = "pencil"
+
+    def get_link_url(self, datum):
+        return reverse(self.url, args=[self.table.kwargs["project_id"], datum.id])
+
+
 class RemoveMember(tables.DeleteAction):
     name = "remove_member"
 
@@ -47,4 +58,4 @@ class MembersTable(tables.DataTable):
         name = "members"
         verbose_name = _("Project Members")
         table_actions = (AddMember,)
-        row_actions = (RemoveMember,)
+        row_actions = (ChangeRole, RemoveMember)

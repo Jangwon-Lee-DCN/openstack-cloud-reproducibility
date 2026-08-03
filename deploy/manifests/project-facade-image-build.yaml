@@ -24,7 +24,7 @@ spec:
           args:
             - --context=dir:///workspace
             - --dockerfile=/workspace/Dockerfile
-            - --destination=registry.dcn.ssu.ac.kr/openstack/project-facade:2026.1-poc4
+            - --destination=registry.dcn.ssu.ac.kr/openstack/project-facade:2026.1-poc5
             - --digest-file=/dev/termination-log
             - --skip-tls-verify
             - --snapshot-mode=redo

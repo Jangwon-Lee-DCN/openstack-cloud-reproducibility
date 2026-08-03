@@ -55,3 +55,30 @@ class AddMemberForm(horizon_forms.SelfHandlingForm):
             _('Added "%(username)s" to this project as %(role)s.') % member,
         )
         return member
+
+
+class ChangeMemberRoleForm(AddMemberForm):
+    # Read-only: the target member is fixed by the row action that opened
+    # this form, not user-editable. Since the field is `disabled`, Django
+    # ignores any submitted value and uses the initial value instead, so
+    # this can't be tampered with via the POST body.
+    username = forms.CharField(label=_("Username"), disabled=True)
+
+    def handle(self, request, data):
+        project_id = self.initial["project_id"]
+        try:
+            # add_member has idempotent "set role" semantics -- posting an
+            # existing member's username with a new role changes it rather
+            # than duplicating the grant. See project-facade/app.py.
+            member = facade.add_member(request, project_id, data["username"], data["role"])
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to change member role."))
+            return False
+        messages.success(
+            request,
+            _('Changed "%(username)s"\'s role to %(role)s.') % member,
+        )
+        return member

@@ -9,14 +9,22 @@ flag set (used to protect a domain's designated admin project, e.g. `dcn`
 in the `dcn` domain -- see docs/proposals/iam-hardening/README.md, "New
 permission tier: self-service project lifecycle").
 
-Also lets that same project admin manage who else has access to their own
-project (add/remove members, admin/member/reader) -- the natural next
+Also lets a project's admin manage who else has access to it (add, remove,
+or change the role of a member: admin/member/reader) -- the natural next
 step once a project can be self-service-created at all: someone who owns
 a project needs to be able to invite teammates into it without asking a
-platform admin every time. Same authorization boundary as update/delete
-(caller must be project-scoped admin on that exact project); additionally
-refuses to remove a project's last remaining admin, so a project can never
-be locked out of its own self-service management.
+platform admin every time. Unlike update/delete, member management (1)
+accepts a *domain-scoped* admin of the project's own domain, not only a
+project-scoped admin on that exact project -- a genuine domain admin's
+`admin` role is granted at domain scope only (see reconcile-iam-dcn.sh),
+so restricting this to project-scoped admin would lock every real domain
+admin out of managing their own domain's shared project -- and (2) is not
+blocked by the project's `options.immutable` flag, since that flag
+protects a project's own structure (rename/delete), not who has access to
+it, and the domain's shared/admin project (e.g. `dcn`) still needs its
+membership manageable day to day. Refuses to demote or remove a project's
+last remaining admin, so a project can never be locked out of its own
+self-service management.
 
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
@@ -477,6 +485,43 @@ def delete_project(project_id):
     return "", 204
 
 
+def _authorize_member_admin(caller_token, project_id):
+    """Guard for member list/add/remove/role-change. See the module
+    docstring for why this deliberately differs from
+    _authorize_project_admin (no immutable block; also accepts a
+    domain-scoped admin of the project's own domain).
+    Returns ((user_id, user_name), project, None) on success, or
+    (None, None, (response, status)) on any failure."""
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return None, None, (jsonify(error="invalid or expired token"), 401)
+    user_id, user_name = ident
+
+    project = _load_target_project(project_id)
+    if not project:
+        return None, None, (jsonify(error="project not found"), 404)
+
+    if user_has_project_role(user_id, project_id, ADMIN_ROLE) or user_has_domain_role(
+        user_id, project["domain_id"], ADMIN_ROLE
+    ):
+        return (user_id, user_name), project, None
+
+    log.warning("denied member-management project=%s: user=%s missing admin", project_id, user_name)
+    return None, None, (jsonify(error="forbidden: you are not admin on this project or its domain"), 403)
+
+
+def _effective_admin_user_ids(project_id):
+    admin_role_id = role_id_by_name(ADMIN_ROLE)
+    r = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"scope.project.id": project_id, "role.id": admin_role_id, "effective": "true"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    return {a["user"]["id"] for a in r.json()["role_assignments"] if "user" in a}
+
+
 def _find_user_by_name(name, domain_id):
     r = requests.get(
         f"{OS_AUTH_URL}/users",
@@ -494,7 +539,7 @@ def list_members(project_id):
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
-    ident, err = _authorize_project_admin(caller_token, project_id)
+    ident, project, err = _authorize_member_admin(caller_token, project_id)
     if err:
         return err
 
@@ -517,10 +562,15 @@ def list_members(project_id):
 
 @app.route("/v1/projects/<project_id>/members", methods=["POST"])
 def add_member(project_id):
+    """Adds a new member, or -- if the named user is already a member --
+    changes their role instead. Idempotent "set role" semantics rather
+    than purely additive, so this endpoint doubles as the project's role
+    editor: re-inviting an existing member with a different role revokes
+    their old direct role(s) on this project and grants the new one."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
-    ident, err = _authorize_project_admin(caller_token, project_id)
+    ident, project, err = _authorize_member_admin(caller_token, project_id)
     if err:
         return err
 
@@ -532,23 +582,47 @@ def add_member(project_id):
     if role_name not in ALLOWED_MEMBER_ROLES:
         return jsonify(error=f"'role' must be one of {sorted(ALLOWED_MEMBER_ROLES)}"), 400
 
-    project = _load_target_project(project_id)
     target_user = _find_user_by_name(username, project["domain_id"])
     if not target_user:
         return jsonify(error=f"no user named '{username}' found in this domain"), 404
 
     role_id = role_id_by_name(role_name)
-    r = requests.put(
+
+    existing = requests.get(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    existing.raise_for_status()
+    existing_roles = existing.json()["roles"]
+
+    if role_name != ADMIN_ROLE and any(r["name"] == ADMIN_ROLE for r in existing_roles):
+        admin_ids = _effective_admin_user_ids(project_id)
+        if target_user["id"] in admin_ids and len(admin_ids) <= 1:
+            return jsonify(error="cannot demote the last admin of this project"), 409
+
+    for r in existing_roles:
+        if r["name"] in ALLOWED_MEMBER_ROLES and r["id"] != role_id:
+            rr = requests.delete(
+                f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{r['id']}",
+                headers=keystone_headers(),
+                timeout=10,
+            )
+            if rr.status_code not in (204, 404):
+                rr.raise_for_status()
+
+    grant = requests.put(
         f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{role_id}",
         headers=keystone_headers(),
         timeout=10,
     )
-    r.raise_for_status()
+    grant.raise_for_status()
     log.info(
-        "added member project=%s user=%s(%s) role=%s by=%s(%s)",
+        "set member role project=%s user=%s(%s) role=%s by=%s(%s)",
         project_id, username, target_user["id"], role_name, ident[1], ident[0],
     )
-    return jsonify(user_id=target_user["id"], username=username, role=role_name), 201
+    status = 201 if not existing_roles else 200
+    return jsonify(user_id=target_user["id"], username=username, role=role_name), status
 
 
 @app.route("/v1/projects/<project_id>/members/<user_id>", methods=["DELETE"])
@@ -556,24 +630,15 @@ def remove_member(project_id, user_id):
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
-    ident, err = _authorize_project_admin(caller_token, project_id)
+    ident, project, err = _authorize_member_admin(caller_token, project_id)
     if err:
         return err
-
-    admin_role_id = role_id_by_name(ADMIN_ROLE)
 
     # Refuse to strip the project's last admin, effective (including any
     # group-derived) grants included -- otherwise a project could be
     # locked out of its own self-service management entirely, with no
     # break-glass path back in short of a platform admin.
-    r = requests.get(
-        f"{OS_AUTH_URL}/role_assignments",
-        headers=keystone_headers(),
-        params={"scope.project.id": project_id, "role.id": admin_role_id, "effective": "true"},
-        timeout=10,
-    )
-    r.raise_for_status()
-    admin_user_ids = {a["user"]["id"] for a in r.json()["role_assignments"] if "user" in a}
+    admin_user_ids = _effective_admin_user_ids(project_id)
     if user_id in admin_user_ids and len(admin_user_ids) <= 1:
         return jsonify(error="cannot remove the last admin of this project"), 409
 
