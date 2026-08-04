@@ -15,17 +15,14 @@ limitations under the License.
 */}}
 
 set -ex
+COMMAND="${@:-start}"
 
-# A replicated cinder-backup Deployment must not make every pod advertise the
-# global cinder-volume host name. The backup record stores this host and the
-# volume service targets the async continue_backup callback to it. Give every
-# backup consumer its own stable-for-the-pod RPC server queue.
-cat > /tmp/cinder-backup-host.conf <<EOF
-[DEFAULT]
-host = ${HOSTNAME}
-EOF
+function start () {
+   exec masakari-api --config-file /etc/masakari/masakari.conf
+}
 
-exec cinder-backup \
-     --config-file /etc/cinder/cinder.conf \
-     --config-dir /etc/cinder/cinder.conf.d \
-     --config-file /tmp/cinder-backup-host.conf
+function stop () {
+   kill -TERM 1
+}
+
+$COMMAND

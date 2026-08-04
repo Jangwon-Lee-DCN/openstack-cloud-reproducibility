@@ -18,7 +18,7 @@ import sys,yaml
 lock,name,field=sys.argv[1:]
 d=yaml.safe_load(open(lock))
 x=next(x for x in d['spec']['releases'] if x['name']==name)
-print(x[field])
+print(x.get(field, ''))
 PYLOCK
 }
 
@@ -48,7 +48,7 @@ import yaml
 with open(sys.argv[1]) as stream:
     lock = yaml.safe_load(stream)
 for release in lock["spec"]["releases"]:
-    snapshot = release.get("valuesSnapshot")
+    snapshot = release.get("valuesSnapshot") or release.get("secretsFile")
     if snapshot:
         print(release["name"], snapshot)
 PYLOCK
@@ -73,23 +73,51 @@ install_release() {
     "$REPO_ROOT/deploy/scripts/reconcile-octavia.sh"
     return
   fi
+  if [[ "$1" == "designate" ]]; then
+    "$REPO_ROOT/deploy/scripts/install-designate.sh"
+    return
+  fi
+  if [[ "$1" == "magnum" ]]; then
+    "$REPO_ROOT/deploy/scripts/install-magnum.sh"
+    return
+  fi
+  if [[ "$1" == "manila" ]]; then
+    kubectl apply -f "$REPO_ROOT/deploy/manifests/manila-cephfilesystem.yaml"
+    kubectl wait -n rook-ceph --for=jsonpath='{.status.phase}'=Ready \
+      cephfilesystem/manila-cephfs --timeout=15m
+  fi
   if [[ "$1" == "neutron" ]]; then
     sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" \
       | kubectl apply -f -
     kubectl apply \
       -f "$REPO_ROOT/deploy/manifests/neutron-harbor-serviceaccounts.yaml"
   fi
-  local release=$1 package snapshot expected actual values
+  local release=$1 package snapshot values_file secrets_file expected actual values
   package=$(release_field "$release" package)
   snapshot=$(release_field "$release" valuesSnapshot)
+  values_file=$(release_field "$release" valuesFile)
+  secrets_file=$(release_field "$release" secretsFile)
   expected=$(release_field "$release" sha256)
   actual=$(sha256sum "$REPO_ROOT/$package" | awk '{print $1}')
   [[ "$actual" == "$expected" ]] || {
     echo "$release package checksum mismatch" >&2; exit 1;
   }
-  values="$WORK_DIR/$release.yaml"
-  sops -d "$REPO_ROOT/$snapshot" > "$values"
-  helm upgrade --install "$release" "$REPO_ROOT/$package"     --namespace "$NAMESPACE" --create-namespace -f "$values" --timeout 15m
+  local -a value_args=()
+  if [[ -n "$snapshot" ]]; then
+    values="$WORK_DIR/$release.yaml"
+    sops -d "$REPO_ROOT/$snapshot" > "$values"
+    value_args+=( -f "$values" )
+  else
+    [[ -n "$values_file" && -n "$secrets_file" ]] || {
+      echo "$release has neither a values snapshot nor a site/secret pair" >&2
+      exit 1
+    }
+    values="$WORK_DIR/$release.secrets.yaml"
+    sops -d "$REPO_ROOT/$secrets_file" > "$values"
+    value_args+=( -f "$REPO_ROOT/$values_file" -f "$values" )
+  fi
+  helm upgrade --install "$release" "$REPO_ROOT/$package" \
+    --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
   wait_release "$release"
 }
 
@@ -107,7 +135,7 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
 fi
 
 # Dependency order of the accepted PoC deployment.
-for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder barbican   openvswitch ovn neutron   libvirt nova   heat octavia horizon skyline ironic   prometheus-openstack-exporter; do
+for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder manila barbican   openvswitch ovn neutron designate   libvirt nova masakari   heat octavia magnum horizon skyline ironic   prometheus-openstack-exporter; do
   install_release "$release"
 done
 
@@ -132,6 +160,10 @@ kubectl rollout status -n "$NAMESPACE" deployment/gnocchi-metricd --timeout=15m
 install_release ceilometer
 kubectl apply -f "$REPO_ROOT/deploy/manifests/ceilometer-pdb.yaml"
 install_release aodh
+kubectl -n "$NAMESPACE" delete job telemetry-resource-type-reconcile --ignore-not-found
+kubectl apply -f "$REPO_ROOT/deploy/manifests/telemetry-resource-type-reconcile.yaml"
+kubectl -n "$NAMESPACE" wait --for=condition=complete \
+  job/telemetry-resource-type-reconcile --timeout=10m
 kubectl apply -f "$REPO_ROOT/deploy/manifests/openstack-public-routes.yaml"
 kubectl apply -f "$REPO_ROOT/deploy/manifests/keystone-oidc-federation-routes.yaml"
 "$REPO_ROOT/deploy/scripts/fix-keystone-fernet-permissions.sh"

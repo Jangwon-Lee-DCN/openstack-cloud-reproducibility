@@ -1,0 +1,36 @@
+apiVersion: ceph.rook.io/v1
+kind: CephFilesystem
+metadata:
+  name: manila-cephfs
+  namespace: rook-ceph
+spec:
+  metadataPool:
+    replicated:
+      size: 1
+      requireSafeReplicaSize: false
+    parameters:
+      pg_num: "16"
+  dataPools:
+    - name: data0
+      failureDomain: osd
+      replicated:
+        size: 1
+        requireSafeReplicaSize: false
+      parameters:
+        pg_num: "32"
+  metadataServer:
+    activeCount: 1
+    activeStandby: true
+    placement:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values: [rook-ceph-mds]
+            topologyKey: kubernetes.io/hostname

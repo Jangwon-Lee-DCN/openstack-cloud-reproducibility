@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: telemetry-resource-type-reconcile
+  namespace: openstack
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        application: telemetry
+        component: reconcile
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: reconcile
+          image: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: keystone-keystone-admin
+          command: [/bin/bash, -ec]
+          args:
+            - |
+              token=$(openstack token issue -f value -c id)
+              endpoint=http://gnocchi-api.openstack.svc.cluster.local:8041
+              patch='[
+                {"op":"remove","path":"/attributes/flavor_id"},
+                {"op":"remove","path":"/attributes/flavor_name"},
+                {"op":"add","path":"/attributes/flavor_id","value":{"type":"string","required":false,"min_length":0,"max_length":255}},
+                {"op":"add","path":"/attributes/flavor_name","value":{"type":"string","required":false,"min_length":0,"max_length":255}}
+              ]'
+              curl --fail --silent --show-error -X PATCH \
+                -H "X-Auth-Token: $token" \
+                -H 'Content-Type: application/json-patch+json' \
+                --data "$patch" "$endpoint/v1/resource_type/instance"

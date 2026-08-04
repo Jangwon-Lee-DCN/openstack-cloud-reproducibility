@@ -15,17 +15,9 @@ limitations under the License.
 */}}
 
 set -ex
+export HOME=/tmp
 
-# A replicated cinder-backup Deployment must not make every pod advertise the
-# global cinder-volume host name. The backup record stores this host and the
-# volume service targets the async continue_backup callback to it. Give every
-# backup consumer its own stable-for-the-pod RPC server queue.
-cat > /tmp/cinder-backup-host.conf <<EOF
-[DEFAULT]
-host = ${HOSTNAME}
+cat > /etc/ceph/ceph.client.${CEPHFS_AUTH_ID}.keyring <<EOF
+[client.${CEPHFS_AUTH_ID}]
+    key = $(cat /tmp/client-keyring)
 EOF
-
-exec cinder-backup \
-     --config-file /etc/cinder/cinder.conf \
-     --config-dir /etc/cinder/cinder.conf.d \
-     --config-file /tmp/cinder-backup-host.conf

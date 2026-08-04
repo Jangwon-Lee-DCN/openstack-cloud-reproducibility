@@ -16,16 +16,9 @@ limitations under the License.
 
 set -ex
 
-# A replicated cinder-backup Deployment must not make every pod advertise the
-# global cinder-volume host name. The backup record stores this host and the
-# volume service targets the async continue_backup callback to it. Give every
-# backup consumer its own stable-for-the-pod RPC server queue.
-cat > /tmp/cinder-backup-host.conf <<EOF
-[DEFAULT]
-host = ${HOSTNAME}
+{{- if and ( empty .Values.conf.manila.generic.service_network_host ) ( .Values.pod.use_fqdn.share ) }}
+tee > /tmp/pod-shared/manila-share-fqdn.conf << EOF
+[generic]
+service_network_host = $(hostname --fqdn)
 EOF
-
-exec cinder-backup \
-     --config-file /etc/cinder/cinder.conf \
-     --config-dir /etc/cinder/cinder.conf.d \
-     --config-file /tmp/cinder-backup-host.conf
+{{- end }}

@@ -1,0 +1,67 @@
+# Masakari control plane only. Monitors and automatic recovery intentionally
+# remain disabled until a second compute host and production fencing exist.
+images:
+  tags:
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_sync: quay.io/airshipit/masakari:2026.1-ubuntu_noble@sha256:6ee8a77b0c89bc2f07ef8217d329617ee6f69d9b77af41e06bbf8ebad97494d5
+    db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    masakari_api: quay.io/airshipit/masakari:2026.1-ubuntu_noble@sha256:6ee8a77b0c89bc2f07ef8217d329617ee6f69d9b77af41e06bbf8ebad97494d5
+    masakari_engine: quay.io/airshipit/masakari:2026.1-ubuntu_noble@sha256:6ee8a77b0c89bc2f07ef8217d329617ee6f69d9b77af41e06bbf8ebad97494d5
+    masakari_host_monitor: quay.io/airshipit/masakari-monitors:2026.1-ubuntu_noble@sha256:35f8acdf24651b5270f586bd5bb06a6d92dd579d2d90d690dd56b47bce90a7de
+    masakari_process_monitor: quay.io/airshipit/masakari-monitors:2026.1-ubuntu_noble@sha256:35f8acdf24651b5270f586bd5bb06a6d92dd579d2d90d690dd56b47bce90a7de
+    masakari_instance_monitor: quay.io/airshipit/masakari-monitors:2026.1-ubuntu_noble@sha256:35f8acdf24651b5270f586bd5bb06a6d92dd579d2d90d690dd56b47bce90a7de
+    masakari_introspective_instance_monitor: quay.io/airshipit/masakari-monitors:2026.1-ubuntu_noble@sha256:35f8acdf24651b5270f586bd5bb06a6d92dd579d2d90d690dd56b47bce90a7de
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+pod:
+  tolerations:
+    masakari:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    masakari_api: 2
+    masakari_engine: 2
+  lifecycle:
+    disruption_budget:
+      masakari_api:
+        min_available: 1
+      masakari_engine:
+        min_available: 1
+conf:
+  masakari:
+    DEFAULT:
+      masakari_api_workers: 2
+      host_failure_recovery_threads: 1
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  instance_ha:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /instance-ha/v1/%(tenant_id)s
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  host_monitor: false
+  instance_monitor: false
+  process_monitor: false
+  introspective_instance_monitor: false

@@ -34,9 +34,26 @@ spec:
     chart: cinder
     chartVersion: 2026.1.0
     appVersion: 28.0.0
-    package: helm/packages/upstream/cinder-2026.1.0.tgz
-    sha256: 8d81d34640ab5af652bdf82178fc3caca302988590ddf27fa9013ebe003d76d3
-    valuesSnapshot: deploy/releases/cinder.values.sops.yaml
+    package: helm/packages/patched/cinder-2026.1.0.tgz
+    sha256: 787f157afe81c859e5813230d3f857e8c78da0370b1c0ff4d2e5db81917903b1
+    valuesFile: deploy/values/site/cinder.yaml
+    secretsFile: deploy/secrets/cinder.values.sops.yaml
+  - name: manila
+    chart: manila
+    chartVersion: 2026.1.0
+    appVersion: 22.0.0
+    package: helm/packages/patched/manila-2026.1.0.tgz
+    sha256: dcff97f1c9f71fe9cfa3416bad10b07c9ce2ced335eee35a03c9fdbef2c6f314
+    valuesFile: deploy/values/site/manila.yaml
+    secretsFile: deploy/secrets/manila.values.sops.yaml
+  - name: masakari
+    chart: masakari
+    chartVersion: 2026.1.0
+    appVersion: 21.0.0
+    package: helm/packages/patched/masakari-2026.1.0.tgz
+    sha256: 2084ef760b8c1c03b70ef30d24da438d51227b1d502af52f512a471cf7ae402c
+    valuesFile: deploy/values/site/masakari.yaml
+    secretsFile: deploy/secrets/masakari.values.sops.yaml
   - name: designate
     chart: designate
     chartVersion: 2026.1.0

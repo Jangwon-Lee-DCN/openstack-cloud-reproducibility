@@ -6,14 +6,19 @@ not maintain an independent chart fork.
 
 ## Locked inputs
 
-- `release-lock.yaml`: all 20 installed Helm releases, exact package path,
+- `release-lock.yaml`: 27 OpenStack/platform Helm releases with exact package path,
   SHA-256, chart/app versions, and encrypted final values snapshot
 - `helm/packages/upstream`: unmodified packages
-- `helm/packages/patched`: Ironic, Nova, OVN, Skyline, and Horizon packages used by the cluster
+- `helm/packages/patched`: service packages carrying reviewed site fixes,
+  including Cinder backup RPC identity, Manila 2026.1 API compatibility, and
+  Masakari control-plane taint support
 - `deploy/releases`: SOPS-encrypted snapshots from `helm get values`
 - `deploy/values/site`: human-maintained non-secret layers
 - `deploy/secrets`: human-maintained SOPS profiles
 - `images` and `deploy/manifests`: custom telemetry artifacts
+- `prerequisites/octavia-jobboard`: the separately frozen Valkey chart,
+  values, encrypted credential, and verification workflow for the 28th live
+  Helm release (`octavia-valkey`)
 
 ## Usage
 

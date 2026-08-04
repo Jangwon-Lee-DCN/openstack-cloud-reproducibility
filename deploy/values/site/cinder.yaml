@@ -6,39 +6,55 @@ labels:
     node_selector_key: openstack-cinder-volume
     node_selector_value: enabled
   backup:
-    node_selector_key: openstack-cinder-volume
+    # Backup is a control service; only cinder-volume is tied to the physical
+    # storage node. Run backup consumers on both controllers.
+    node_selector_key: openstack-control-plane
     node_selector_value: enabled
 pod:
+  security_context:
+    cinder_backup:
+      container:
+        cinder_backup:
+          # os-brick's privsep helper must attach the RBD backup device.
+          # SYS_ADMIN alone leaves the helper defunct on Noble/2026.1.
+          privileged: true
   tolerations:
     cinder:
       enabled: true
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
   replicas:
     api: 2
     scheduler: 2
     volume: 1
-    backup: 1
+    backup: 2
   lifecycle:
     disruption_budget:
       api:
         min_available: 1
 images:
   tags:
+    bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+    cinder_api: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_backup: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_db_sync: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_scheduler: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_volume: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_volume_usage_audit: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_db_purge: quay.io/airshipit/cinder:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
-  # Read-only cloud inventory and capacity access for the monitoring role,
-  # added on top of (not instead of) Cinder's own default project-scoped
-  # access. `volume_extension:services:index` and
-  # `scheduler_extension:scheduler_stats:get_pools` default to admin-only,
-  # so granting monitoring there is a pure addition. `volume:get_all`,
-  # `volume:get_all_snapshots`, and `volume_extension:quotas:show` default
-  # to `xena_system_admin_or_project_reader` ((role:admin) or (role:reader
-  # and project_id:%(project_id)s)) -- overwriting that with a bare
-  # "role:admin or role:monitoring" (as this block originally did) silently
-  # revoked every ordinary project member's own ability to list their
-  # project's volumes/snapshots/quota, breaking Horizon's instance-launch
-  # wizard for any non-admin, non-monitoring persona (e.g. openstack-members
-  # with only member+reader). Fixed by re-adding the original rule instead
-  # of replacing it.
+  # Add provider monitoring without removing the upstream project-reader
+  # access used by ordinary Horizon users in their own project.
   policy:
     "volume_extension:services:index": "role:admin or role:monitoring"
     "scheduler_extension:scheduler_stats:get_pools": "role:admin or role:monitoring"
@@ -56,6 +72,9 @@ conf:
   cinder:
     DEFAULT:
       backup_driver: cinder.backup.drivers.ceph.CephBackupDriver
+      # Keep one service process per Pod. Two anti-affined Pods provide HA;
+      # Cinder 28's multi-process backup callback path is not used here.
+      backup_workers: 1
 endpoints:
   identity:
     auth:

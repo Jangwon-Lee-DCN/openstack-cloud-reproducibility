@@ -1,0 +1,90 @@
+images:
+  tags:
+    manila_api: quay.io/airshipit/manila:2026.1-ubuntu_noble@sha256:5117d274abd30bfed90db2197373a0fc61a9f47bb5a1d79a0ee154d6eb0a7044
+    manila_data: quay.io/airshipit/manila:2026.1-ubuntu_noble@sha256:5117d274abd30bfed90db2197373a0fc61a9f47bb5a1d79a0ee154d6eb0a7044
+    manila_db_sync: quay.io/airshipit/manila:2026.1-ubuntu_noble@sha256:5117d274abd30bfed90db2197373a0fc61a9f47bb5a1d79a0ee154d6eb0a7044
+    manila_scheduler: quay.io/airshipit/manila:2026.1-ubuntu_noble@sha256:5117d274abd30bfed90db2197373a0fc61a9f47bb5a1d79a0ee154d6eb0a7044
+    manila_share: quay.io/airshipit/manila:2026.1-ubuntu_noble@sha256:5117d274abd30bfed90db2197373a0fc61a9f47bb5a1d79a0ee154d6eb0a7044
+    rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+pod:
+  tolerations:
+    manila:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    api: 2
+    data: 2
+    scheduler: 2
+    share: 2
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+      sheduler:
+        min_available: 1
+      share:
+        min_available: 1
+conf:
+  manila:
+    DEFAULT:
+      enabled_share_backends: cephfs
+      enabled_share_protocols: CEPHFS
+      default_share_type: cephfs
+      cephfs_auth_id: manila
+      admin_only_metadata: __mount_options
+    cephfs:
+      driver_handles_share_servers: false
+      share_backend_name: CEPHFS
+      share_driver: manila.share.drivers.cephfs.driver.CephFSDriver
+      cephfs_protocol_helper_type: CEPHFS
+      cephfs_conf_path: /etc/ceph/ceph.conf
+      cephfs_auth_id: manila
+      cephfs_cluster_name: ceph
+      cephfs_filesystem_name: manila-cephfs
+      reserved_share_percentage: 10
+  # The 2026.1 image sample config no longer supplies
+  # DEFAULT.osapi_share_workers, while this chart derives the uWSGI process
+  # count from it. Pin an explicit worker count to avoid a master-only API.
+  manila_api_uwsgi:
+    uwsgi:
+      processes: 2
+  paste:
+    # Manila 2026.1 removed manila.api.v1. Keep the legacy /v1 URL loadable
+    # through the v2 router so PasteDeploy can initialize the complete map.
+    app:api:
+      paste.app_factory: manila.api.v2.router:APIRouter.factory
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        project_name: admin
+  sharev2:
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /share/v2
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+manifests:
+  # The upstream bootstrap downloads a generic-driver service image. The
+  # CephFS native backend does not use service VMs; share types are reconciled
+  # by the site verification script instead.
+  job_bootstrap: false
+  ingress_api: false
+  service_ingress_api: false
+  job_image_repo_sync: false
+  pod_rally_test: false
