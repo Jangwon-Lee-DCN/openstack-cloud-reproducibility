@@ -1,6 +1,13 @@
 # HA Glance API backed by the dedicated Rook-Ceph RBD image pool.
 storage: rbd
 conf:
+  # A single uWSGI worker is occupied for the full duration of a multi-GB image
+  # download. Kubernetes health checks then time out and kill that worker,
+  # truncating Nova's Glance stream. Keep independent workers available for
+  # probes and metadata requests while an image is streamed.
+  glance_api_uwsgi:
+    uwsgi:
+      processes: 4
   software:
     rbd:
       rbd_store_pool_app_name: rbd
