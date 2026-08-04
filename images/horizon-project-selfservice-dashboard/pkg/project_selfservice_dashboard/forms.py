@@ -50,19 +50,57 @@ ROLE_CHOICES = [
 ]
 
 
+def _bundle_choices(request):
+    """Shared by every form below that offers a role-bundle shortcut --
+    fetched fresh per form render since bundles are admin-editable and a
+    stale cached list would just offer options that no longer exist."""
+    try:
+        bundles = facade.list_role_bundles(request)
+    except Exception:
+        bundles = {}
+    return [("", _("-- none, pick roles individually below --"))] + [
+        (name, f"{name} ({', '.join(sorted(b['roles']))})") for name, b in sorted(bundles.items())
+    ]
+
+
 class AddMemberForm(horizon_forms.SelfHandlingForm):
     username = forms.CharField(label=_("Username"))
+    bundle = forms.ChoiceField(
+        label=_("Role Bundle"),
+        required=False,
+        choices=[("", "")],
+        help_text=_("A named preset combining several roles at once -- see Role Bundles to define one. "
+                     "Combines with any individually-checked roles below."),
+    )
     roles = forms.MultipleChoiceField(
         label=_("Roles"),
         choices=ROLE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         initial=["member"],
+        required=False,
     )
+
+    def __init__(self, request, *args, **kwargs):
+        super().__init__(request, *args, **kwargs)
+        self.fields["bundle"].choices = _bundle_choices(request)
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("bundle") and not cleaned.get("roles"):
+            raise forms.ValidationError(_("Pick a role bundle, at least one individual role, or both."))
+        return cleaned
+
+    @staticmethod
+    def _combined_roles(data):
+        roles = list(data.get("roles") or [])
+        if data.get("bundle"):
+            roles.append(data["bundle"])
+        return roles
 
     def handle(self, request, data):
         project_id = self.initial["project_id"]
         try:
-            member = facade.add_member(request, project_id, data["username"], data["roles"])
+            member = facade.add_member(request, project_id, data["username"], self._combined_roles(data))
         except facade.FacadeError as exc:
             self.api_error(str(exc))
             return False
@@ -90,7 +128,7 @@ class ChangeMemberRoleForm(AddMemberForm):
             # add_member has idempotent "set roles" semantics -- posting
             # an existing member's username with a new role set changes
             # it rather than duplicating grants. See project-facade/app.py.
-            member = facade.add_member(request, project_id, data["username"], data["roles"])
+            member = facade.add_member(request, project_id, data["username"], self._combined_roles(data))
         except facade.FacadeError as exc:
             self.api_error(str(exc))
             return False
@@ -111,13 +149,30 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
         help_text=_("One per line, or comma-separated."),
         widget=forms.Textarea(attrs={"rows": 6}),
     )
+    bundle = forms.ChoiceField(
+        label=_("Role Bundle"),
+        required=False,
+        choices=[("", "")],
+        help_text=_("Combines with any individually-checked roles below. Applied to every username above."),
+    )
     roles = forms.MultipleChoiceField(
         label=_("Roles"),
         help_text=_("Applied to every username above -- to give people different roles, invite them separately."),
         choices=ROLE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         initial=["member"],
+        required=False,
     )
+
+    def __init__(self, request, *args, **kwargs):
+        super().__init__(request, *args, **kwargs)
+        self.fields["bundle"].choices = _bundle_choices(request)
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("bundle") and not cleaned.get("roles"):
+            raise forms.ValidationError(_("Pick a role bundle, at least one individual role, or both."))
+        return cleaned
 
     @staticmethod
     def _parse_usernames(raw):
@@ -142,10 +197,13 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
 
     def handle(self, request, data):
         project_id = self.initial["project_id"]
+        roles = list(data.get("roles") or [])
+        if data.get("bundle"):
+            roles.append(data["bundle"])
         added, failed = [], []
         for username in data["usernames"]:
             try:
-                member = facade.add_member(request, project_id, username, data["roles"])
+                member = facade.add_member(request, project_id, username, roles)
                 added.append(member["username"])
             except facade.FacadeError as exc:
                 failed.append((username, str(exc)))
@@ -155,7 +213,7 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
             messages.success(
                 request,
                 _('Added %(count)d member(s) as %(roles)s: %(names)s.')
-                % {"count": len(added), "roles": ", ".join(data["roles"]), "names": ", ".join(added)},
+                % {"count": len(added), "roles": ", ".join(roles), "names": ", ".join(added)},
             )
         for username, error in failed:
             messages.error(request, _('Could not add "%(username)s": %(error)s') % {"username": username, "error": error})
@@ -202,3 +260,39 @@ class LeaveProjectForm(horizon_forms.SelfHandlingForm):
             return False
         messages.success(request, _("You have left this project."))
         return True
+
+
+class RoleBundleForm(horizon_forms.SelfHandlingForm):
+    """Create or update a named bundle of the existing roles (e.g. "VPC
+    Operator" = network-operator + security-operator) -- domain-admin
+    only, enforced by project-facade's PUT /v1/role-bundles/<name>
+    itself; a non-admin submitting this form sees that endpoint's own
+    403 as a form error, same pattern as everywhere else in this app.
+    """
+
+    name = forms.CharField(
+        label=_("Bundle Name"),
+        help_text=_("Must not be the same as a real role name (admin, member, etc.)."),
+    )
+    description = forms.CharField(label=_("Description"), required=False)
+    roles = forms.MultipleChoiceField(
+        label=_("Roles"),
+        choices=ROLE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def handle(self, request, data):
+        try:
+            bundle = facade.put_role_bundle(request, data["name"], data.get("description", ""), data["roles"])
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to save this role bundle."))
+            return False
+        messages.success(
+            request,
+            _('Saved role bundle "%(name)s": %(roles)s.')
+            % {"name": bundle["name"], "roles": ", ".join(bundle["roles"])},
+        )
+        return bundle

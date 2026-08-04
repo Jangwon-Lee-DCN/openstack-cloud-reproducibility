@@ -104,6 +104,12 @@ class ExportAuditLogCSV(tables.LinkAction):
 
 class AuditLogTable(tables.DataTable):
     timestamp = tables.Column("timestamp", verbose_name=_("Time"))
+    # "project-facade" (this project's own create/update/member/etc.
+    # actions) or "vpc-facade" (its networking/VPC resource history for
+    # the same project) -- see project-facade app.py's
+    # _vpc_facade_audit_entries for how the two get merged into one
+    # table.
+    source = tables.Column("source", verbose_name=_("Source"))
     action = tables.Column("action", verbose_name=_("Action"))
     # Same denied/allowed distinction project-facade itself logs at --
     # status=True/status_choices renders this as a status-styled
@@ -170,3 +176,59 @@ class DomainProjectsOverviewTable(tables.DataTable):
         verbose_name = _("Domain Projects Overview")
         multi_select = False
         row_actions = (ViewProjectMembers,)
+
+
+class CreateRoleBundle(tables.LinkAction):
+    name = "create_role_bundle"
+    verbose_name = _("Create Role Bundle")
+    url = "horizon:identity:projects:create_role_bundle"
+    classes = ("ajax-modal",)
+    icon = "plus"
+
+
+class DeleteRoleBundle(tables.DeleteAction):
+    name = "delete_role_bundle"
+
+    @staticmethod
+    def action_present(count):
+        return ngettext_lazy("Delete Role Bundle", "Delete Role Bundles", count)
+
+    @staticmethod
+    def action_past(count):
+        return ngettext_lazy("Deleted Role Bundle", "Deleted Role Bundles", count)
+
+    def allowed(self, request, bundle):
+        # Unconditional -- project-facade's own domain-admin check on
+        # DELETE /v1/role-bundles/<name> is the real gate.
+        return True
+
+    def delete(self, request, obj_id):
+        facade.delete_role_bundle(request, obj_id)
+
+
+class RoleBundlesTable(tables.DataTable):
+    name = tables.Column("name", verbose_name=_("Bundle Name"))
+    description = tables.Column("description", verbose_name=_("Description"))
+    roles = tables.Column("roles", verbose_name=_("Expands To"))
+
+    class Meta:
+        name = "role_bundles"
+        verbose_name = _("Role Bundles")
+        table_actions = (CreateRoleBundle,)
+        row_actions = (DeleteRoleBundle,)
+
+
+class SimulateAccessTable(tables.DataTable):
+    action = tables.Column("action", verbose_name=_("Action"))
+    allowed = tables.Column(
+        "allowed",
+        verbose_name=_("Can You Do This?"),
+        status=True,
+        status_choices=(("Yes", True), ("No", False)),
+    )
+    reason = tables.Column("reason", verbose_name=_("Why"), empty_value="")
+
+    class Meta:
+        name = "simulate_access"
+        verbose_name = _("What Can I Do Here?")
+        multi_select = False

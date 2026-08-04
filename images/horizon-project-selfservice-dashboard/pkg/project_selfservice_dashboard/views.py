@@ -151,6 +151,86 @@ class ChangeMemberRoleView(horizon_forms.ModalFormView):
         return {"project_id": project_id, "username": username, "roles": current_roles}
 
 
+class RoleBundlesView(horizon_tables.DataTableView):
+    """Named presets of the existing roles (e.g. "VPC Operator" =
+    network-operator + security-operator), managed here and selectable
+    as a single option on the Add Member / Bulk Invite forms -- see
+    forms._bundle_choices. Viewing is open to anyone (needed just to
+    render what a bundle means when picking one); project-facade's own
+    domain-admin check gates create/delete.
+    """
+
+    table_class = tables.RoleBundlesTable
+    page_title = _("Role Bundles")
+
+    def get_data(self):
+        try:
+            bundles = facade.list_role_bundles(self.request)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve role bundles."))
+            return []
+        return [
+            SimpleNamespace(id=name, name=name, description=b.get("description") or "-",
+                             roles=", ".join(sorted(b["roles"])))
+            for name, b in bundles.items()
+        ]
+
+
+class CreateRoleBundleView(horizon_forms.ModalFormView):
+    form_class = forms.RoleBundleForm
+    template_name = "project_selfservice/create_role_bundle.html"
+    page_title = _("Create Role Bundle")
+    submit_label = _("Save Bundle")
+    submit_url = reverse_lazy("horizon:identity:projects:create_role_bundle")
+    success_url = reverse_lazy("horizon:identity:projects:role_bundles")
+    cancel_url = reverse_lazy("horizon:identity:projects:role_bundles")
+
+
+class SimulateAccessView(horizon_tables.DataTableView):
+    """Per-action dry run of the caller's own current access to a
+    project -- "why can/can't I do this" without having to actually
+    attempt each action. See project-facade app.py's simulate_access for
+    exactly which actions this covers and its limits (not a hypothetical
+    "what if I had role X" evaluator).
+    """
+
+    table_class = tables.SimulateAccessTable
+    page_title = _("What Can I Do Here?")
+
+    _ACTION_LABELS = {
+        "manage_members": _("Manage Members (add/remove/change roles)"),
+        "view_audit_log": _("View Audit Log"),
+        "transfer_ownership": _("Transfer Ownership"),
+        "update_project": _("Edit Project"),
+        "delete_project": _("Delete Project"),
+        "leave_project": _("Leave Project"),
+    }
+
+    def get_data(self):
+        project_id = self.kwargs["project_id"]
+        try:
+            result = facade.simulate_access(self.request, project_id)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to simulate access for this project."))
+            return []
+        reasons = result.get("reasons", {})
+        return [
+            SimpleNamespace(
+                id=action,
+                action=str(self._ACTION_LABELS.get(action, action)),
+                allowed="Yes" if allowed else "No",
+                reason=reasons.get(action, ""),
+            )
+            for action, allowed in result.get("actions", {}).items()
+        ]
+
+
 class TransferOwnershipView(horizon_forms.ModalFormView):
     """Reached from a "Transfer Ownership" row action on the Members
     table -- promotes that row's user to admin and demotes the caller to

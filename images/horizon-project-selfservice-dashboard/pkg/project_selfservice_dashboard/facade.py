@@ -114,6 +114,62 @@ def add_member(request, project_id, username, roles):
     return r.json()
 
 
+def list_role_bundles(request):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/role-bundles",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["bundles"]
+
+
+def put_role_bundle(request, name, description, roles):
+    try:
+        r = requests.put(
+            f"{PROJECT_FACADE_URL}/v1/role-bundles/{name}",
+            headers=_headers(request),
+            json={"description": description, "roles": list(roles)},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
+def delete_role_bundle(request, name):
+    try:
+        r = requests.delete(
+            f"{PROJECT_FACADE_URL}/v1/role-bundles/{name}",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code not in (204, 404):
+        raise FacadeError(_error_message(r))
+
+
+def simulate_access(request, project_id):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/simulate-access",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
 def my_access(request):
     try:
         r = requests.get(

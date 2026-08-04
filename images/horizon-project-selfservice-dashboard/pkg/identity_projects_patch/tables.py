@@ -355,6 +355,33 @@ class AuditLogSelfService(tables.LinkAction):
         return reverse(self.url, args=[project.id])
 
 
+class RoleBundlesLink(tables.LinkAction):
+    name = "role_bundles"
+    verbose_name = _("Role Bundles")
+    url = "horizon:identity:projects:role_bundles"
+    icon = "list"
+
+    def allowed(self, request, project):
+        # Unconditional, same reasoning as every other self-service
+        # action in this table -- project-facade's own domain-admin
+        # check on create/delete is the real gate; viewing bundles is
+        # open to everyone (see RoleBundlesView's docstring).
+        return True
+
+
+class SimulateAccessSelfService(tables.LinkAction):
+    name = "simulate_access_selfservice"
+    verbose_name = _("What Can I Do Here?")
+    url = "horizon:identity:projects:simulate_access_selfservice"
+    icon = "question-sign"
+
+    def allowed(self, request, project):
+        return True
+
+    def get_link_url(self, project):
+        return reverse(self.url, args=[project.id])
+
+
 class TenantFilterAction(tables.FilterAction):
     filter_type = "server"
     filter_choices = (('name', _("Project Name ="), True),
@@ -411,9 +438,10 @@ class TenantsTable(tables.DataTable):
         row_actions = (UpdateGroupsLink, UpdateProject,
                        UsageLink, ModifyQuotas, DeleteTenantsAction,
                        DeleteProjectSelfService, ManageMembersSelfService,
-                       AuditLogSelfService, LeaveProjectSelfService,
-                       RescopeTokenToProject)
+                       AuditLogSelfService, SimulateAccessSelfService,
+                       LeaveProjectSelfService, RescopeTokenToProject)
         table_actions = (TenantFilterAction, CreateProject,
                          CreateProjectSelfService, MyAccessLink,
-                         DomainProjectsOverviewLink, DeleteTenantsAction)
+                         DomainProjectsOverviewLink, RoleBundlesLink,
+                         DeleteTenantsAction)
         pagination_param = "tenant_marker"

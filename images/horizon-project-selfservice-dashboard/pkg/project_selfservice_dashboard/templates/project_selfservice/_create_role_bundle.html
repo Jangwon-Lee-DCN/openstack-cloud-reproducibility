@@ -1,0 +1,6 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+
+{% block modal-body-right %}
+  <p>{% trans "Domain admins only. Defines a named preset combining several roles at once, selectable as a single option when adding or inviting members to any project in this domain. Saving a bundle with an existing name replaces its role set." %}</p>
+{% endblock %}
