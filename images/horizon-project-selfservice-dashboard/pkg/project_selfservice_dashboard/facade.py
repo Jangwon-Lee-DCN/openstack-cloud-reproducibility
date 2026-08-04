@@ -95,19 +95,20 @@ def list_members(request, project_id):
     return r.json()["members"]
 
 
-def add_member(request, project_id, username, role):
+def add_member(request, project_id, username, roles):
     try:
         r = requests.post(
             f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/members",
             headers=_headers(request),
-            json={"username": username, "role": role},
+            json={"username": username, "roles": list(roles)},
             timeout=_TIMEOUT,
         )
     except requests.RequestException as exc:
         raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
     # 201 for a brand-new member, 200 when the named user was already a
-    # member and this call changed their role instead (see project-facade
-    # app.py's add_member -- idempotent "set role" semantics).
+    # member and this call changed their role set instead (see
+    # project-facade app.py's add_member -- idempotent "set roles"
+    # semantics).
     if r.status_code not in (200, 201):
         raise FacadeError(_error_message(r))
     return r.json()
@@ -173,6 +174,19 @@ def remove_member(request, project_id, user_id):
     try:
         r = requests.delete(
             f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/members/{user_id}",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code not in (204, 404):
+        raise FacadeError(_error_message(r))
+
+
+def leave_project(request, project_id):
+    try:
+        r = requests.post(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/leave",
             headers=_headers(request),
             timeout=_TIMEOUT,
         )

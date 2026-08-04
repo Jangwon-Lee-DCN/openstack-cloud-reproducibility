@@ -290,6 +290,26 @@ class DeleteProjectSelfService(tables.DeleteAction):
         facade.delete_project(request, obj_id)
 
 
+class LeaveProjectSelfService(tables.LinkAction):
+    name = "leave_selfservice"
+    verbose_name = _("Leave Project")
+    url = "horizon:identity:projects:leave_selfservice"
+    classes = ("ajax-modal",)
+    icon = "remove"
+
+    def allowed(self, request, project):
+        # Unconditional, same reasoning as every other self-service action
+        # in this table -- project-facade's own leave_project endpoint is
+        # the real gate (refuses only if the caller is this project's last
+        # admin); showing the button to everyone and letting the facade's
+        # own response explain a refusal is simpler than trying to predict
+        # "are you the last admin" here just to hide a button.
+        return True
+
+    def get_link_url(self, project):
+        return reverse(self.url, args=[project.id])
+
+
 class TenantFilterAction(tables.FilterAction):
     filter_type = "server"
     filter_choices = (('name', _("Project Name ="), True),
@@ -346,7 +366,7 @@ class TenantsTable(tables.DataTable):
         row_actions = (UpdateGroupsLink, UpdateProject,
                        UsageLink, ModifyQuotas, DeleteTenantsAction,
                        DeleteProjectSelfService, ManageMembersSelfService,
-                       RescopeTokenToProject)
+                       LeaveProjectSelfService, RescopeTokenToProject)
         table_actions = (TenantFilterAction, CreateProject,
                          CreateProjectSelfService, DeleteTenantsAction)
         pagination_param = "tenant_marker"

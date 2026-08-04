@@ -32,18 +32,37 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
         return project
 
 
+# Matches project-facade/app.py's ALLOWED_MEMBER_ROLES. The first three
+# are the base access tiers; the rest are the platform's additive marker
+# roles (reconcile-iam-dcn.sh) -- a member typically wants a base tier
+# plus zero or more of these together (e.g. Member + Network Operator),
+# since the marker roles alone don't grant ordinary project CRUD in
+# vpc-facade's own authorization classes. This form doesn't enforce that
+# combination; it just lets the project admin pick any set.
+ROLE_CHOICES = [
+    ("admin", _("Admin")),
+    ("member", _("Member")),
+    ("reader", _("Reader")),
+    ("network-operator", _("Network Operator")),
+    ("security-operator", _("Security Operator")),
+    ("load-balancer_admin", _("Load Balancer Operator")),
+    ("monitoring", _("Monitoring")),
+]
+
+
 class AddMemberForm(horizon_forms.SelfHandlingForm):
     username = forms.CharField(label=_("Username"))
-    role = forms.ChoiceField(
-        label=_("Role"),
-        choices=[("member", _("Member")), ("reader", _("Reader")), ("admin", _("Admin"))],
-        initial="member",
+    roles = forms.MultipleChoiceField(
+        label=_("Roles"),
+        choices=ROLE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        initial=["member"],
     )
 
     def handle(self, request, data):
         project_id = self.initial["project_id"]
         try:
-            member = facade.add_member(request, project_id, data["username"], data["role"])
+            member = facade.add_member(request, project_id, data["username"], data["roles"])
         except facade.FacadeError as exc:
             self.api_error(str(exc))
             return False
@@ -52,7 +71,8 @@ class AddMemberForm(horizon_forms.SelfHandlingForm):
             return False
         messages.success(
             request,
-            _('Added "%(username)s" to this project as %(role)s.') % member,
+            _('Added "%(username)s" to this project as %(roles)s.')
+            % {"username": member["username"], "roles": ", ".join(member["roles"])},
         )
         return member
 
@@ -67,18 +87,34 @@ class ChangeMemberRoleForm(AddMemberForm):
     def handle(self, request, data):
         project_id = self.initial["project_id"]
         try:
-            # add_member has idempotent "set role" semantics -- posting an
-            # existing member's username with a new role changes it rather
-            # than duplicating the grant. See project-facade/app.py.
-            member = facade.add_member(request, project_id, data["username"], data["role"])
+            # add_member has idempotent "set roles" semantics -- posting
+            # an existing member's username with a new role set changes
+            # it rather than duplicating grants. See project-facade/app.py.
+            member = facade.add_member(request, project_id, data["username"], data["roles"])
         except facade.FacadeError as exc:
             self.api_error(str(exc))
             return False
         except Exception:
-            exceptions.handle(request, _("Unable to change member role."))
+            exceptions.handle(request, _("Unable to change member roles."))
             return False
         messages.success(
             request,
-            _('Changed "%(username)s"\'s role to %(role)s.') % member,
+            _('Changed "%(username)s"\'s roles to %(roles)s.')
+            % {"username": member["username"], "roles": ", ".join(member["roles"])},
         )
         return member
+
+
+class LeaveProjectForm(horizon_forms.SelfHandlingForm):
+    def handle(self, request, data):
+        project_id = self.initial["project_id"]
+        try:
+            facade.leave_project(request, project_id)
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to leave this project."))
+            return False
+        messages.success(request, _("You have left this project."))
+        return True

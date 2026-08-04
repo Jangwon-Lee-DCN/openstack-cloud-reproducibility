@@ -13,12 +13,12 @@ from . import facade
 from . import forms
 from . import tables
 
-# Order to search a member's effective roles in for the "current role" a
-# Change Role form should pre-select. list_members() returns every
-# effective role (implied roles included, e.g. "admin" also implies
-# manager/member/reader), so this picks the highest one that's actually a
-# settable member-tier role.
-ROLE_PRIORITY = ("admin", "member", "reader")
+# list_members() returns every *effective* role, implied roles included
+# (e.g. "admin" also implies "manager"). "manager" itself is never
+# directly grantable/settable (see project_selfservice_dashboard.forms.
+# ROLE_CHOICES / project-facade's ALLOWED_MEMBER_ROLES), so it's filtered
+# out when pre-selecting a Change Role form's current checkboxes.
+SETTABLE_ROLES = {"admin", "member", "reader", "network-operator", "security-operator", "load-balancer_admin", "monitoring"}
 
 
 class CreateProjectSelfServiceView(horizon_forms.ModalFormView):
@@ -115,15 +115,44 @@ class ChangeMemberRoleView(horizon_forms.ModalFormView):
         project_id = self.kwargs["project_id"]
         user_id = self.kwargs["user_id"]
         username = ""
-        current_role = "member"
+        current_roles = ["member"]
         try:
             for m in facade.list_members(self.request, project_id):
                 if m["user_id"] == user_id:
                     username = m["username"]
-                    current_role = next((r for r in ROLE_PRIORITY if r in m["roles"]), "member")
+                    current_roles = [r for r in m["roles"] if r in SETTABLE_ROLES] or ["member"]
                     break
         except facade.FacadeError as exc:
             messages.error(self.request, str(exc))
         except Exception:
-            exceptions.handle(self.request, _("Unable to retrieve this member's current role."))
-        return {"project_id": project_id, "username": username, "role": current_role}
+            exceptions.handle(self.request, _("Unable to retrieve this member's current roles."))
+        return {"project_id": project_id, "username": username, "roles": current_roles}
+
+
+class LeaveProjectView(horizon_forms.ModalFormView):
+    """Lets any member remove themselves from a project, no admin rights
+    needed -- see project-facade app.py's leave_project for why this is a
+    deliberately different authorization path from every other member-
+    management action in this app. Reached from a "Leave Project" row
+    action on the same stock Identity > Projects table.
+    """
+
+    form_class = forms.LeaveProjectForm
+    template_name = "project_selfservice/leave_project.html"
+    page_title = _("Leave Project")
+    submit_label = _("Leave Project")
+    success_url = reverse_lazy("horizon:identity:projects:index")
+
+    def get_success_url(self):
+        return str(self.success_url)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:leave_selfservice", args=[self.kwargs["project_id"]]
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        return {"project_id": self.kwargs["project_id"]}

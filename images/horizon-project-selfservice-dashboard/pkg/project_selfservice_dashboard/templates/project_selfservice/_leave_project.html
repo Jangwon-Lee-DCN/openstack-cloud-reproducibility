@@ -1,0 +1,6 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+
+{% block modal-body-right %}
+  <p>{% blocktrans %}You will lose access to this project immediately. If you are the project's only admin, hand off ownership (change someone else's role to Admin) before leaving.{% endblocktrans %}</p>
+{% endblock %}

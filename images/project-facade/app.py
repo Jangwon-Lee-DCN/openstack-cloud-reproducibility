@@ -10,21 +10,27 @@ in the `dcn` domain -- see docs/proposals/iam-hardening/README.md, "New
 permission tier: self-service project lifecycle").
 
 Also lets a project's admin manage who else has access to it (add, remove,
-or change the role of a member: admin/member/reader) -- the natural next
-step once a project can be self-service-created at all: someone who owns
-a project needs to be able to invite teammates into it without asking a
-platform admin every time. Unlike update/delete, member management (1)
-accepts a *domain-scoped* admin of the project's own domain, not only a
-project-scoped admin on that exact project -- a genuine domain admin's
-`admin` role is granted at domain scope only (see reconcile-iam-dcn.sh),
-so restricting this to project-scoped admin would lock every real domain
-admin out of managing their own domain's shared project -- and (2) is not
-blocked by the project's `options.immutable` flag, since that flag
-protects a project's own structure (rename/delete), not who has access to
-it, and the domain's shared/admin project (e.g. `dcn`) still needs its
-membership manageable day to day. Refuses to demote or remove a project's
-last remaining admin, so a project can never be locked out of its own
-self-service management.
+or change a member's role set: admin/member/reader plus zero or more of
+the platform's additive marker roles -- network-operator/security-
+operator/load-balancer_admin/monitoring) -- the natural next step once a
+project can be self-service-created at all: someone who owns a project
+needs to be able to invite teammates into it, and hand them a narrower
+capability like "manage VPC peering for this project" specifically,
+without asking a platform admin every time. Unlike update/delete, member
+management (1) accepts a *domain-scoped* admin of the project's own
+domain, not only a project-scoped admin on that exact project -- a
+genuine domain admin's `admin` role is granted at domain scope only (see
+reconcile-iam-dcn.sh), so restricting this to project-scoped admin would
+lock every real domain admin out of managing their own domain's shared
+project -- and (2) is not blocked by the project's `options.immutable`
+flag, since that flag protects a project's own structure (rename/delete),
+not who has access to it, and the domain's shared/admin project (e.g.
+`dcn`) still needs its membership manageable day to day. Refuses to
+demote or remove a project's last remaining admin, so a project can never
+be locked out of its own self-service management. Any member can also
+remove *themselves* (`POST .../leave`) without needing admin rights at
+all -- leaving is not an admin action -- subject to the same last-admin
+protection.
 
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
@@ -84,7 +90,23 @@ NEUTRON_URL = os.environ.get("NEUTRON_ENDPOINT", "http://neutron-server.openstac
 
 PROJECT_CREATOR_ROLE = "project-creator"
 ADMIN_ROLE = "admin"
-ALLOWED_MEMBER_ROLES = {"admin", "member", "reader"}
+# admin/member/reader are the base access tiers (mutually exclusive in
+# practice, though not enforced as such here -- see add_member). The rest
+# are the same additive marker roles reconcile-iam-dcn.sh's platform-wide
+# personas already grant via Keycloak groups (network-operator,
+# security-operator, load-balancer_admin, monitoring); exposing them here
+# lets a project owner grant a teammate a narrower capability (e.g. "can
+# manage VPC peering for this project") without asking a platform admin
+# to add them to a domain-wide persona group.
+ALLOWED_MEMBER_ROLES = {
+    "admin",
+    "member",
+    "reader",
+    "network-operator",
+    "security-operator",
+    "load-balancer_admin",
+    "monitoring",
+}
 
 _service_token_cache = {"token": None, "expires_at": 0.0}
 _role_id_cache = {}
@@ -563,10 +585,20 @@ def list_members(project_id):
 @app.route("/v1/projects/<project_id>/members", methods=["POST"])
 def add_member(project_id):
     """Adds a new member, or -- if the named user is already a member --
-    changes their role instead. Idempotent "set role" semantics rather
-    than purely additive, so this endpoint doubles as the project's role
-    editor: re-inviting an existing member with a different role revokes
-    their old direct role(s) on this project and grants the new one."""
+    changes their role set instead. Idempotent "set roles" semantics
+    rather than purely additive, so this endpoint doubles as the
+    project's role editor: re-inviting an existing member with a
+    different role set revokes whichever of their old direct
+    ALLOWED_MEMBER_ROLES roles on this project aren't in the new set, and
+    grants whatever's missing. A caller typically wants a base tier
+    (admin/member/reader) plus zero or more capability roles
+    (network-operator/security-operator/load-balancer_admin/monitoring)
+    together -- e.g. ["member", "network-operator"] -- since the
+    capability roles alone don't grant ordinary project CRUD in
+    vpc-facade's own authorization classes (see docs/proposals/
+    iam-hardening/README.md, "Coordinated implementation direction for
+    the VPC platform"). This endpoint doesn't enforce that combination;
+    it just sets exactly the roles given."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
@@ -576,17 +608,23 @@ def add_member(project_id):
 
     body = request.get_json(silent=True) or {}
     username = (body.get("username") or "").strip()
-    role_name = (body.get("role") or "member").strip()
+    roles = sorted({(r or "").strip() for r in (body.get("roles") or [])} - {""})
     if not username:
         return jsonify(error="'username' is required"), 400
-    if role_name not in ALLOWED_MEMBER_ROLES:
-        return jsonify(error=f"'role' must be one of {sorted(ALLOWED_MEMBER_ROLES)}"), 400
+    if not roles:
+        return jsonify(error="'roles' must be a non-empty list"), 400
+    invalid = [r for r in roles if r not in ALLOWED_MEMBER_ROLES]
+    if invalid:
+        return (
+            jsonify(error=f"invalid role(s) {invalid}; must be one of {sorted(ALLOWED_MEMBER_ROLES)}"),
+            400,
+        )
 
     target_user = _find_user_by_name(username, project["domain_id"])
     if not target_user:
         return jsonify(error=f"no user named '{username}' found in this domain"), 404
 
-    role_id = role_id_by_name(role_name)
+    target_role_ids = {role_id_by_name(r) for r in roles}
 
     existing = requests.get(
         f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles",
@@ -596,13 +634,13 @@ def add_member(project_id):
     existing.raise_for_status()
     existing_roles = existing.json()["roles"]
 
-    if role_name != ADMIN_ROLE and any(r["name"] == ADMIN_ROLE for r in existing_roles):
+    if ADMIN_ROLE not in roles and any(r["name"] == ADMIN_ROLE for r in existing_roles):
         admin_ids = _effective_admin_user_ids(project_id)
         if target_user["id"] in admin_ids and len(admin_ids) <= 1:
             return jsonify(error="cannot demote the last admin of this project"), 409
 
     for r in existing_roles:
-        if r["name"] in ALLOWED_MEMBER_ROLES and r["id"] != role_id:
+        if r["name"] in ALLOWED_MEMBER_ROLES and r["id"] not in target_role_ids:
             rr = requests.delete(
                 f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{r['id']}",
                 headers=keystone_headers(),
@@ -611,18 +649,43 @@ def add_member(project_id):
             if rr.status_code not in (204, 404):
                 rr.raise_for_status()
 
-    grant = requests.put(
-        f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{role_id}",
+    existing_names = {r["name"] for r in existing_roles}
+    for role_name in roles:
+        if role_name in existing_names:
+            continue
+        grant = requests.put(
+            f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{role_id_by_name(role_name)}",
+            headers=keystone_headers(),
+            timeout=10,
+        )
+        grant.raise_for_status()
+
+    log.info(
+        "set member roles project=%s user=%s(%s) roles=%s by=%s(%s)",
+        project_id, username, target_user["id"], roles, ident[1], ident[0],
+    )
+    status = 201 if not existing_roles else 200
+    return jsonify(user_id=target_user["id"], username=username, roles=roles), status
+
+
+def _revoke_direct_roles(project_id, user_id):
+    """Direct (non-effective) assignments only -- these are exactly what
+    DELETE .../roles/{role_id} can actually revoke; a role held only via
+    group membership isn't removable through this per-user endpoint."""
+    r = requests.get(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{user_id}/roles",
         headers=keystone_headers(),
         timeout=10,
     )
-    grant.raise_for_status()
-    log.info(
-        "set member role project=%s user=%s(%s) role=%s by=%s(%s)",
-        project_id, username, target_user["id"], role_name, ident[1], ident[0],
-    )
-    status = 201 if not existing_roles else 200
-    return jsonify(user_id=target_user["id"], username=username, role=role_name), status
+    r.raise_for_status()
+    for role in r.json()["roles"]:
+        rr = requests.delete(
+            f"{OS_AUTH_URL}/projects/{project_id}/users/{user_id}/roles/{role['id']}",
+            headers=keystone_headers(),
+            timeout=10,
+        )
+        if rr.status_code not in (204, 404):
+            rr.raise_for_status()
 
 
 @app.route("/v1/projects/<project_id>/members/<user_id>", methods=["DELETE"])
@@ -642,25 +705,41 @@ def remove_member(project_id, user_id):
     if user_id in admin_user_ids and len(admin_user_ids) <= 1:
         return jsonify(error="cannot remove the last admin of this project"), 409
 
-    # Direct (non-effective) assignments only -- these are exactly what
-    # DELETE .../roles/{role_id} can actually revoke; a role held only via
-    # group membership isn't removable through this per-user endpoint.
-    r2 = requests.get(
-        f"{OS_AUTH_URL}/projects/{project_id}/users/{user_id}/roles",
-        headers=keystone_headers(),
-        timeout=10,
-    )
-    r2.raise_for_status()
-    for role in r2.json()["roles"]:
-        rr = requests.delete(
-            f"{OS_AUTH_URL}/projects/{project_id}/users/{user_id}/roles/{role['id']}",
-            headers=keystone_headers(),
-            timeout=10,
-        )
-        if rr.status_code not in (204, 404):
-            rr.raise_for_status()
-
+    _revoke_direct_roles(project_id, user_id)
     log.info("removed member project=%s user=%s by=%s(%s)", project_id, user_id, ident[1], ident[0])
+    return "", 204
+
+
+@app.route("/v1/projects/<project_id>/leave", methods=["POST"])
+def leave_project(project_id):
+    """Lets any authenticated user remove themselves from a project they
+    hold a direct role on. Deliberately no admin check at all, unlike
+    every other member-management endpoint above -- leaving a project is
+    something a member should always be able to do for themselves,
+    without needing anyone else's permission, the same way a platform
+    doesn't normally require someone else's approval to quit a team.
+    Still refuses if the caller is the project's last admin (the same
+    protection remove_member has), so a project can never be abandoned
+    with no one left able to manage it -- the caller must hand off
+    ownership (change someone else's role to admin) before leaving."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, user_name = ident
+
+    project = _load_target_project(project_id)
+    if not project:
+        return jsonify(error="project not found"), 404
+
+    admin_user_ids = _effective_admin_user_ids(project_id)
+    if user_id in admin_user_ids and len(admin_user_ids) <= 1:
+        return jsonify(error="cannot leave: you are the last admin of this project"), 409
+
+    _revoke_direct_roles(project_id, user_id)
+    log.info("left project project=%s user=%s(%s)", project_id, user_name, user_id)
     return "", 204
 
 
