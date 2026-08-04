@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: source-rebuild-horizon-complete
+  namespace: openstack
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        openstack-control-plane: enabled
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: extract-context
+          image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+          command: [/busybox/sh, -c, 'cd /workspace && /busybox/tar xzf /archive/context.tar.gz']
+          volumeMounts:
+            - {name: archive, mountPath: /archive, readOnly: true}
+            - {name: workspace, mountPath: /workspace}
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+          args:
+            - --context=dir:///workspace
+            - --dockerfile=/workspace/Dockerfile
+            - --destination=registry.dcn.ssu.ac.kr/openstack/horizon:source-complete-20260804
+            - --digest-file=/dev/termination-log
+            - --skip-tls-verify
+            - --snapshot-mode=redo
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace, readOnly: true}
+            - {name: registry-auth, mountPath: /kaniko/.docker, readOnly: true}
+      volumes:
+        - {name: archive, configMap: {name: source-rebuild-horizon-complete}}
+        - {name: workspace, emptyDir: {}}
+        - name: registry-auth
+          secret:
+            secretName: telemetry-harbor-push
+            items:
+              - {key: .dockerconfigjson, path: config.json}

@@ -44,7 +44,10 @@ RUN python3 /tmp/enhance_magnum_ui.py \
     && sed -i '$a @import "platform";' ${MAGNUM_UI_STATIC}/clusters/clusters.scss \
     && rm -f /tmp/enhance_magnum_ui.py \
     && grep -q 'Create Kubernetes Cluster' ${MAGNUM_UI_STATIC}/clusters/create/create.service.js \
-    && grep -q 'Argo CD' ${MAGNUM_UI_STATIC}/clusters/workflow/review.html
+    && grep -q 'Argo CD' ${MAGNUM_UI_STATIC}/clusters/workflow/review.html \
+    && grep -q 'Provisioning timeline' ${MAGNUM_UI_STATIC}/clusters/details/overview.html \
+    && grep -q 'Rolling Kubernetes Upgrade' ${MAGNUM_UI_STATIC}/clusters/details/overview.html \
+    && grep -q 'Download Kubeconfig' ${MAGNUM_UI_STATIC}/clusters/actions.module.js
 
 # Local Octavia workflow patches and self-service Identity integration are
 # copied from this repository; the VPC wheel is built from its separately
@@ -72,4 +75,10 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
        "$enabled/_1500_project_trunks_panel.py" "$enabled/_1510_project_network_qos_panel.py" \
        "$enabled/_1520_project_floating_ip_portforwardings_panel.py" \
     && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient" \
-    && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard
+    && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard \
+    && test -f "$local_enabled/_1395_compute_network_interfaces.py" \
+    && test -f "$local_enabled/_1482_project_load_balancer_panel.py" \
+    && test -f "$local_enabled/_2360_admin_network_interfaces.py" \
+    && test -f "$local_enabled/_1800_project_selfservice_app.py" \
+    && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
+    && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py"

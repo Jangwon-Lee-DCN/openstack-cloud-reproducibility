@@ -32,8 +32,11 @@ build_context() {
   local name=$1 context=$2 image=$3 job="source-rebuild-${name}"
   local archive="$WORK_DIR/${name}.tar.gz" digest
   tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
-  kubectl create configmap "$job" -n "$NAMESPACE" --from-file=context.tar.gz="$archive" --dry-run=client -o yaml | kubectl apply -f -
   kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
+  # A binary build context can exceed the 256 KiB annotation limit added by
+  # `kubectl apply`. Recreate this disposable, job-scoped ConfigMap directly.
+  kubectl delete configmap "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
+  kubectl create configmap "$job" -n "$NAMESPACE" --from-file=context.tar.gz="$archive"
   kubectl apply -f - <<EOF
 apiVersion: batch/v1
 kind: Job

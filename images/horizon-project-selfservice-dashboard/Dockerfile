@@ -16,7 +16,7 @@
 # This incremental development image must retain the Magnum UI layer.  The
 # previous base (6b13...) predated Magnum and silently removed its panels when
 # project-selfservice was rebuilt on top of it.
-ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:3443a1843ed6243693bbf230df112a35b6779de0691d477f18712dfefd2dd4e2
+ARG HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:f6074a6b86c7ad95c61207b092e1b0b6048cc6504b04b9686b7956c23242f2db
 FROM ${HORIZON_BASE}
 
 USER root
