@@ -22,10 +22,11 @@
 # `manage_members_selfservice_add`/`manage_members_selfservice_bulk_add`/
 # `manage_members_selfservice_change_role`/
 # `manage_members_selfservice_transfer_ownership`/`leave_selfservice`/
-# `audit_log_selfservice`/`audit_log_selfservice_export` -- appended to
-# the stock URL list below unchanged. Kept as a full copy of the upstream
-# file (rather than trying to monkeypatch urlpatterns from outside it) so
-# a diff against the real upstream file shows exactly these additions.
+# `audit_log_selfservice`/`audit_log_selfservice_export`/`my_access`/
+# `domain_projects_overview` -- appended to the stock URL list below
+# unchanged. Kept as a full copy of the upstream file (rather than trying
+# to monkeypatch urlpatterns from outside it) so a diff against the real
+# upstream file shows exactly these additions.
 
 from django.urls import re_path
 
@@ -38,6 +39,12 @@ urlpatterns = [
     re_path(r'^create_selfservice$',
             selfservice_views.CreateProjectSelfServiceView.as_view(),
             name='create_selfservice'),
+    re_path(r'^my_access$',
+            selfservice_views.MyAccessView.as_view(),
+            name='my_access'),
+    re_path(r'^domain_projects_overview$',
+            selfservice_views.DomainProjectsOverviewView.as_view(),
+            name='domain_projects_overview'),
     re_path(r'^(?P<tenant_id>[^/]+)/update/$',
             views.UpdateProjectView.as_view(), name='update'),
     re_path(r'^(?P<project_id>[^/]+)/usage/$',

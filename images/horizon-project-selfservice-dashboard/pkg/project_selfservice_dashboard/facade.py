@@ -114,6 +114,34 @@ def add_member(request, project_id, username, roles):
     return r.json()
 
 
+def my_access(request):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/my-access",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["projects"]
+
+
+def domain_projects_overview(request):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/domain-projects-overview",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["projects"]
+
+
 def is_domain_admin(request):
     """Replacement for openstack_dashboard.api.keystone.is_domain_admin,
     installed over the original at Django startup by

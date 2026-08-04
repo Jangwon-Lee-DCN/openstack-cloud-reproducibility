@@ -310,6 +310,32 @@ class LeaveProjectSelfService(tables.LinkAction):
         return reverse(self.url, args=[project.id])
 
 
+class MyAccessLink(tables.LinkAction):
+    name = "my_access"
+    verbose_name = _("My Access")
+    url = "horizon:identity:projects:my_access"
+    icon = "list"
+
+    def allowed(self, request, project):
+        # Unconditional and not row-scoped -- see CreateProjectSelfService
+        # above for the general reasoning. This one genuinely has nothing
+        # to gate on: it's always the caller's own access.
+        return True
+
+
+class DomainProjectsOverviewLink(tables.LinkAction):
+    name = "domain_projects_overview"
+    verbose_name = _("Domain Projects Overview")
+    url = "horizon:identity:projects:domain_projects_overview"
+    icon = "list"
+
+    def allowed(self, request, project):
+        # Unconditional, same reasoning as every other self-service
+        # action in this table -- project-facade's own domain-admin
+        # check on GET /v1/domain-projects-overview is the real gate.
+        return True
+
+
 class AuditLogSelfService(tables.LinkAction):
     name = "audit_log_selfservice"
     verbose_name = _("Audit Log")
@@ -388,5 +414,6 @@ class TenantsTable(tables.DataTable):
                        AuditLogSelfService, LeaveProjectSelfService,
                        RescopeTokenToProject)
         table_actions = (TenantFilterAction, CreateProject,
-                         CreateProjectSelfService, DeleteTenantsAction)
+                         CreateProjectSelfService, MyAccessLink,
+                         DomainProjectsOverviewLink, DeleteTenantsAction)
         pagination_param = "tenant_marker"

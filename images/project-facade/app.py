@@ -44,6 +44,14 @@ then separately leave/demote yourself) manual process -- see
 `transfer_ownership` for why this is the one path that never hits the
 last-admin guard.
 
+`GET /v1/my-access` answers "which projects can I actually get into, and
+with what role" for the caller themselves, across the whole domain --
+group-derived roles included, the thing a stock session token can't
+answer without walking every project one at a time. `GET
+/v1/domain-projects-overview` is the domain-admin equivalent: every
+project in the domain with its admin(s), member count, and last
+self-service activity, gated the same way `check_domain_admin` is.
+
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
 IPs) -- Keystone's own project delete has no idea these exist and would
@@ -1008,6 +1016,164 @@ def check_domain_admin():
     domain_id = get_domain_id(OS_DOMAIN_NAME)
     is_admin = bool(domain_id) and user_has_domain_role(user_id, domain_id, ADMIN_ROLE)
     return jsonify(is_domain_admin=is_admin, domain=OS_DOMAIN_NAME), 200
+
+
+@app.route("/v1/my-access", methods=["GET"])
+def my_access():
+    """Every project in this service's domain the caller has *any*
+    effective access to (direct or group-derived), with their role(s) on
+    each -- the thing a stock Keystone/Horizon session token can't answer
+    on its own without walking every project one at a time. Reuses the
+    exact same `role_assignments?...&effective=true` mechanism
+    `list_members` already relies on for correct group-derived
+    visibility, just filtered by the caller's own user id instead of a
+    project id. No special authorization beyond a valid token -- this is
+    always a user looking at their own access, never someone else's."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    domain_id = get_domain_id(OS_DOMAIN_NAME)
+
+    r = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"user.id": user_id, "effective": "true", "include_names": "true"},
+        timeout=10,
+    )
+    r.raise_for_status()
+
+    roles_by_project = {}
+    for a in r.json()["role_assignments"]:
+        project = a.get("scope", {}).get("project")
+        if not project:
+            continue  # domain- or system-scoped grant, not project membership
+        roles_by_project.setdefault(project["id"], set()).add(a["role"]["name"])
+
+    projects = []
+    for project_id, roles in roles_by_project.items():
+        project = _load_target_project(project_id)
+        # Only this service's own domain -- a user could in principle
+        # have grants on projects in other domains this service doesn't
+        # administer, and it has no way to resolve those names correctly.
+        if not project or project["domain_id"] != domain_id:
+            continue
+        projects.append({"project_id": project_id, "project_name": project["name"], "roles": sorted(roles)})
+    projects.sort(key=lambda p: p["project_name"])
+    return jsonify(projects=projects), 200
+
+
+def _project_member_summary(project_id):
+    """(admin usernames, total effective member count) for one project --
+    same role_assignments call list_members makes, reduced down for an
+    overview table rather than a full per-member breakdown."""
+    r = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"scope.project.id": project_id, "effective": "true", "include_names": "true"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    admins, members = set(), set()
+    for a in r.json()["role_assignments"]:
+        if "user" not in a:
+            continue
+        members.add(a["user"]["id"])
+        if a["role"]["name"] == ADMIN_ROLE:
+            admins.add(a["user"]["name"])
+    return sorted(admins), len(members)
+
+
+def _domain_last_activity_by_project(lookback_lines=1000):
+    """Best-effort last-touched timestamp per project, for the overview
+    table below -- one broad Loki query across every project's log
+    lines rather than one query per project (which would be an N+1
+    Loki call for every project in the domain on every page load).
+    Extracts the project id from each line via the same 32-hex-character
+    Keystone id shape every id in this service already has, rather than
+    trying to match a specific key name (see _query_loki_project_lines
+    for the same reasoning applied to a single project)."""
+    end_ns = int(time.time() * 1_000_000_000)
+    start_ns = end_ns - AUDIT_LOG_LOOKBACK_SECONDS * 1_000_000_000
+    query = '{job="%s"} |= "project-facade:"' % LOKI_JOB_LABEL
+    try:
+        r = requests.get(
+            f"{LOKI_URL}/loki/api/v1/query_range",
+            params={
+                "query": query,
+                "start": start_ns,
+                "end": end_ns,
+                "limit": lookback_lines,
+                "direction": "backward",
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        streams = r.json()["data"]["result"]
+    except requests.RequestException:
+        return {}
+
+    latest = {}
+    for stream in streams:
+        for ts_ns, line in stream.get("values", []):
+            m = _LOG_LINE_RE.match(line.strip())
+            if not m:
+                continue
+            pid_match = re.search(r"[0-9a-f]{32}", m.group(2))
+            if not pid_match:
+                continue
+            pid = pid_match.group(0)
+            iso = datetime.datetime.fromtimestamp(int(ts_ns) / 1_000_000_000, tz=datetime.timezone.utc).isoformat()
+            if pid not in latest or iso > latest[pid]:
+                latest[pid] = iso
+    return latest
+
+
+@app.route("/v1/domain-projects-overview", methods=["GET"])
+def domain_projects_overview():
+    """Every project in this service's domain, with its admin(s), member
+    count, and last self-service activity -- the domain-wide view a
+    domain admin currently has no way to get without opening each
+    project's Manage Members panel one at a time. Same domain-admin
+    authorization as check_domain_admin (user_has_domain_role), since
+    this exposes membership summaries across every project in the
+    domain, not just one a caller already administers."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    domain_id = get_domain_id(OS_DOMAIN_NAME)
+    if not domain_id or not user_has_domain_role(user_id, domain_id, ADMIN_ROLE):
+        return jsonify(error="forbidden: you are not an admin of this domain"), 403
+
+    r = requests.get(
+        f"{OS_AUTH_URL}/projects", headers=keystone_headers(), params={"domain_id": domain_id}, timeout=10
+    )
+    r.raise_for_status()
+    last_activity = _domain_last_activity_by_project()
+
+    overview = []
+    for project in r.json()["projects"]:
+        admins, member_count = _project_member_summary(project["id"])
+        overview.append(
+            {
+                "project_id": project["id"],
+                "project_name": project["name"],
+                "admins": admins,
+                "member_count": member_count,
+                "last_activity": last_activity.get(project["id"]),
+            }
+        )
+    overview.sort(key=lambda p: p["project_name"])
+    return jsonify(projects=overview), 200
 
 
 @app.route("/healthz")

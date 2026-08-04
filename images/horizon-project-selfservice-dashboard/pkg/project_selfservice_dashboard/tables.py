@@ -125,3 +125,48 @@ class AuditLogTable(tables.DataTable):
         # read-only by design (see facade.audit_log's docstring).
         multi_select = False
         table_actions = (ExportAuditLogCSV,)
+
+
+# Shared by MyAccessTable and DomainProjectsOverviewTable below -- both
+# tables' rows carry a project_id, and "go manage this project's members"
+# is the same jump-off point from either one. project-facade's own
+# _authorize_member_admin re-checks the caller actually has access on
+# arrival, same as every other self-service link in this app.
+class ViewProjectMembers(tables.LinkAction):
+    name = "view_project_members"
+    verbose_name = _("Manage Members")
+    url = "horizon:identity:projects:manage_members_selfservice"
+    icon = "pencil"
+
+    def get_link_url(self, datum):
+        return reverse(self.url, args=[datum.project_id])
+
+
+class MyAccessTable(tables.DataTable):
+    project_name = tables.Column("project_name", verbose_name=_("Project"))
+    project_id = tables.Column("project_id", verbose_name=_("Project ID"))
+    roles = tables.Column("roles", verbose_name=_("Your Roles"))
+
+    class Meta:
+        name = "my_access"
+        verbose_name = _("My Access")
+        multi_select = False
+        row_actions = (ViewProjectMembers,)
+
+
+class DomainProjectsOverviewTable(tables.DataTable):
+    project_name = tables.Column("project_name", verbose_name=_("Project"))
+    project_id = tables.Column("project_id", verbose_name=_("Project ID"))
+    admins = tables.Column("admins", verbose_name=_("Admin(s)"))
+    member_count = tables.Column("member_count", verbose_name=_("Members"))
+    last_activity = tables.Column(
+        "last_activity",
+        verbose_name=_("Last Self-Service Activity"),
+        empty_value=_("no recent activity"),
+    )
+
+    class Meta:
+        name = "domain_projects_overview"
+        verbose_name = _("Domain Projects Overview")
+        multi_select = False
+        row_actions = (ViewProjectMembers,)

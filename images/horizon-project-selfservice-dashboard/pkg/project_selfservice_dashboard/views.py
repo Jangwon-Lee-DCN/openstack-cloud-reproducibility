@@ -191,6 +191,74 @@ class TransferOwnershipView(horizon_forms.ModalFormView):
         return {"project_id": project_id, "username": username}
 
 
+class MyAccessView(horizon_tables.DataTableView):
+    """Every project in this domain the logged-in user has any effective
+    access to, and their role(s) on each -- see facade.my_access /
+    project-facade app.py's my_access for why this needs its own
+    endpoint rather than something derivable from the session token
+    alone (group-derived roles, same reason Manage Members needed one).
+    Reachable by any logged-in user; this is always someone looking at
+    their own access, so there's nothing to authorize beyond a valid
+    session.
+    """
+
+    table_class = tables.MyAccessTable
+    page_title = _("My Access")
+
+    def get_data(self):
+        try:
+            projects = facade.my_access(self.request)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve your project access."))
+            return []
+        return [
+            SimpleNamespace(
+                id=p["project_id"],
+                project_id=p["project_id"],
+                project_name=p["project_name"],
+                roles=", ".join(p["roles"]),
+            )
+            for p in projects
+        ]
+
+
+class DomainProjectsOverviewView(horizon_tables.DataTableView):
+    """Every project in this domain with its admin(s), member count, and
+    last self-service activity -- the domain-wide view a domain admin
+    otherwise has no way to get without opening each project's Manage
+    Members panel individually. project-facade's own domain-admin check
+    on GET /v1/domain-projects-overview is the real gate; a non-admin
+    who follows this link sees that endpoint's own error message.
+    """
+
+    table_class = tables.DomainProjectsOverviewTable
+    page_title = _("Domain Projects Overview")
+
+    def get_data(self):
+        try:
+            projects = facade.domain_projects_overview(self.request)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve the domain projects overview."))
+            return []
+        return [
+            SimpleNamespace(
+                id=p["project_id"],
+                project_id=p["project_id"],
+                project_name=p["project_name"],
+                admins=", ".join(p["admins"]) or "-",
+                member_count=p["member_count"],
+                last_activity=p["last_activity"],
+            )
+            for p in projects
+        ]
+
+
 class AuditLogView(horizon_tables.DataTableView):
     """Read-only trail of self-service actions taken against this project
     (including denied attempts), sourced from project-facade's own
