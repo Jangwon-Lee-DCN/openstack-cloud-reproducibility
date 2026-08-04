@@ -35,7 +35,7 @@ spec:
             - --context=dir:///workspace
             - --dockerfile=/workspace/Dockerfile
             - --build-arg=HORIZON_BASE=registry.dcn.ssu.ac.kr/openstack/horizon@sha256:6b13cb8e540b6ad752649b686c5348fd355f20f3d09ef8a0186a9fd5ca5556b2
-            - --destination=registry.dcn.ssu.ac.kr/openstack/horizon:2026.1-magnum-platform-poc1
+            - --destination=registry.dcn.ssu.ac.kr/openstack/horizon:2026.1-magnum-platform-poc3
             - --digest-file=/dev/termination-log
             - --skip-tls-verify
             - --snapshot-mode=redo

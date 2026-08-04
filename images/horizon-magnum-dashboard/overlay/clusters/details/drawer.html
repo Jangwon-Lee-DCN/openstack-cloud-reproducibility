@@ -10,5 +10,9 @@
     <dl class="col-md-6"><dt>Deployment profile</dt><dd><a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ item.cluster_template_id $}">{$ item.cluster_template_id $}</a></dd></dl>
   </div>
   <div class="alert alert-danger" ng-if="item.status_reason"><strong>Latest reconcile message:</strong> {$ item.status_reason $}</div>
-  <ol class="magnum-mini-flow"><li>Magnum</li><li>Git package</li><li>Argo CD</li><li>CAPI/CAPO</li><li>OpenStack resources</li></ol>
+  <div class="magnum-drawer-progress">
+    <strong>Current phase:</strong> {$ drawerCtrl.phase(item) $}
+    <span class="pull-right" ng-if="item.updated_at">Updated {$ item.updated_at|date:'short' $}</span>
+  </div>
+  <ol class="magnum-mini-flow"><li>Magnum</li><li>Draft</li><li>Approval</li><li>Argo CD</li><li>CAPI/CAPO</li><li>Workload API</li></ol>
 </div>

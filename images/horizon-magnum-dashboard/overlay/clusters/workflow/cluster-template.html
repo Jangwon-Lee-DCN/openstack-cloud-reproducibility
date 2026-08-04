@@ -16,6 +16,18 @@
         <dt>TLS</dt><dd>{$ ctrl.clusterTemplate.tls_disabled ? 'Disabled' : 'Enabled' $}</dd>
       </dl>
     </div>
+    <div class="magnum-profile-contract">
+      <strong>Platform compatibility</strong>
+      <span class="label" ng-class="ctrl.clusterTemplate.coe === 'kubernetes' ? 'label-success' : 'label-danger'">{$ ctrl.clusterTemplate.coe === 'kubernetes' ? 'Kubernetes' : 'Unsupported COE' $}</span>
+      <span class="label" ng-class="ctrl.clusterTemplate.master_lb_enabled !== false ? 'label-success' : 'label-warning'">{$ ctrl.clusterTemplate.master_lb_enabled !== false ? 'Octavia endpoint' : 'Direct endpoint' $}</span>
+      <span class="label label-info">{$ ctrl.clusterTemplate.labels.kube_tag || 'Image-defined version' $}</span>
+    </div>
+    <div class="alert alert-danger" ng-if="ctrl.clusterTemplate.coe !== 'kubernetes'">
+      This platform workflow supports Kubernetes templates only. Select a Kubernetes deployment profile.
+    </div>
+    <div class="alert alert-warning" ng-if="ctrl.clusterTemplate.master_lb_enabled === false">
+      This profile disables the supported Octavia API endpoint and is limited to experimental single-control-plane use.
+    </div>
     <a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ ctrl.clusterTemplate.id $}" ng-click="cancel()">Inspect complete profile</a>
   </div>
 </div>

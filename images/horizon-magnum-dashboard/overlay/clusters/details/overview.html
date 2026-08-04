@@ -1,22 +1,40 @@
 <div ng-controller="ClusterOverviewController as ctrl" class="magnum-overview">
   <header class="magnum-detail-hero">
     <div><span class="magnum-eyebrow">MANAGED KUBERNETES CLUSTER</span><h2>{$ ctrl.cluster.name|noName $}</h2><code>{$ ctrl.cluster.id $}</code></div>
-    <div class="magnum-state"><strong>{$ ctrl.cluster.status $}</strong><span>{$ ctrl.cluster.health_status|noValue $}</span></div>
+    <div class="magnum-state" ng-class="{'magnum-state-error': ctrl.hasFailed}"><strong>{$ ctrl.cluster.status $}</strong><span>{$ ctrl.cluster.health_status|noValue $}</span></div>
   </header>
-  <div class="alert alert-danger" ng-if="ctrl.cluster.status_reason"><strong>Reconcile message:</strong> {$ ctrl.cluster.status_reason $}</div>
+
+  <div class="alert alert-danger" ng-if="ctrl.cluster.status_reason"><strong>Latest reconcile failure:</strong> {$ ctrl.cluster.status_reason $}<br><small>The failed phase is highlighted below. Correct the reported dependency before retrying an operation.</small></div>
+
   <section class="magnum-detail-section">
-    <h3>Provisioning flow</h3>
-    <ol class="magnum-flow compact">
-      <li><span>1</span><strong>Magnum</strong><small>Request accepted</small></li><li><span>2</span><strong>Git</strong><small>Desired state rendered</small></li><li><span>3</span><strong>Argo CD</strong><small>Package reconciled</small></li><li><span>4</span><strong>CAPI/CAPO</strong><small>Machines provisioned</small></li><li><span>5</span><strong>Workload</strong><small>Add-ons ready</small></li>
+    <div class="magnum-section-heading"><h3>Provisioning timeline</h3><span ng-if="ctrl.cluster.updated_at">Last reconcile {$ ctrl.cluster.updated_at|date:'medium' $}</span></div>
+    <ol class="magnum-timeline">
+      <li ng-repeat="phase in ctrl.timeline" class="magnum-phase-{$ phase.state $}">
+        <span class="magnum-phase-icon"><i class="fa" ng-class="{'fa-check': phase.state === 'complete', 'fa-spinner fa-spin': phase.state === 'active', 'fa-times': phase.state === 'failed', 'fa-clock-o': phase.state === 'pending'}"></i></span>
+        <strong>{$ phase.title $}</strong><small>{$ phase.detail $}</small>
+      </li>
     </ol>
   </section>
+
   <div class="row">
-    <section class="col-md-6 magnum-detail-section"><h3>Access and network</h3><dl class="dl-horizontal"><dt>Kubernetes API</dt><dd><code>{$ ctrl.cluster.api_address|noValue $}</code></dd><dt>Control planes</dt><dd><span ng-repeat="addr in ctrl.cluster.master_addresses">{$ addr $}<br></span><span ng-if="!ctrl.cluster.master_addresses.length">Pending</span></dd><dt>Workers</dt><dd><span ng-repeat="addr in ctrl.cluster.node_addresses">{$ addr $}<br></span><span ng-if="!ctrl.cluster.node_addresses.length">Pending</span></dd><dt>API load balancer</dt><dd>{$ ctrl.cluster.master_lb_enabled ? 'Enabled (supported)' : 'Disabled (experimental)' $}</dd></dl></section>
-    <section class="col-md-6 magnum-detail-section"><h3>Compute capacity</h3><dl class="dl-horizontal"><dt>Control planes</dt><dd>{$ ctrl.cluster.master_count $} × {$ ctrl.cluster.master_flavor_id|noValue $}</dd><dt>Workers</dt><dd>{$ ctrl.cluster.node_count $} × {$ ctrl.cluster.flavor_id|noValue $}</dd><dt>Kubernetes</dt><dd>{$ ctrl.cluster.coe_version|noValue $}</dd><dt>Image</dt><dd>{$ ctrl.cluster_template.image_id|noValue $}</dd></dl></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Access and network</h3><dl class="dl-horizontal"><dt>Kubernetes API</dt><dd><code>{$ ctrl.cluster.api_address|noValue $}</code></dd><dt>Control planes</dt><dd><span ng-repeat="addr in ctrl.cluster.master_addresses">{$ addr $}<br></span><span ng-if="!ctrl.cluster.master_addresses.length">Pending</span></dd><dt>Workers</dt><dd><span ng-repeat="addr in ctrl.cluster.node_addresses">{$ addr $}<br></span><span ng-if="!ctrl.cluster.node_addresses.length">Pending</span></dd><dt>API load balancer</dt><dd>{$ ctrl.cluster.master_lb_enabled ? 'Octavia managed endpoint' : 'Direct endpoint (experimental)' $}</dd></dl></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Node groups and capacity</h3><table class="table table-condensed"><thead><tr><th>Role</th><th>Desired</th><th>Flavor</th><th>Operation</th></tr></thead><tbody><tr><td>Control plane</td><td>{$ ctrl.cluster.master_count $}</td><td>{$ ctrl.cluster.master_flavor_id|noValue $}</td><td>Rolling replacement</td></tr><tr><td>default-worker</td><td>{$ ctrl.cluster.node_count $}</td><td>{$ ctrl.cluster.flavor_id|noValue $}</td><td>Resize / upgrade</td></tr></tbody></table><p class="text-muted">Kubernetes {$ ctrl.cluster.coe_version|noValue $}</p></section>
   </div>
+
   <div class="row">
-    <section class="col-md-6 magnum-detail-section"><h3>Deployment profile</h3><dl class="dl-horizontal"><dt>Name</dt><dd><a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ ctrl.cluster_template.id $}">{$ ctrl.cluster_template.name|noName $}</a></dd><dt>Template ID</dt><dd><code>{$ ctrl.cluster_template.id $}</code></dd><dt>COE</dt><dd>{$ ctrl.cluster_template.coe $}</dd><dt>Created</dt><dd>{$ ctrl.cluster.created_at|date:'medium' $}</dd><dt>Last reconciled</dt><dd>{$ ctrl.cluster.updated_at|date:'medium'|noValue $}</dd></dl></section>
-    <section class="col-md-6 magnum-detail-section"><h3>Driver and add-on contract</h3><ul class="magnum-output-list"><li>Cluster API with OpenStack infrastructure provider</li><li>Git-backed desired state reconciled by Argo CD</li><li>OpenStack CCM and Cinder CSI</li><li>CNI, metrics-server and node-problem-detector baseline</li></ul></section>
+    <section class="col-md-6 magnum-detail-section"><h3>GitOps ownership</h3><dl class="dl-horizontal"><dt>Repository path</dt><dd><code>{$ ctrl.repositoryPath $}</code></dd><dt>Desired objects</dt><dd>Cluster, KubeadmControlPlane, MachineDeployment</dd><dt>Reconciler</dt><dd>Argo CD → CAPI/CAPO</dd><dt>Observed state</dt><dd><span class="label" ng-class="{'label-success': ctrl.isReady, 'label-info': ctrl.isBusy, 'label-danger': ctrl.hasFailed}">{$ ctrl.cluster.status $}</span></dd></dl><p class="text-muted">Magnum is the user-facing owner. Do not edit generated CAPI objects directly.</p></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Profile compatibility</h3><ul class="magnum-check-list"><li ng-repeat="check in ctrl.compatibility"><i class="fa" ng-class="check.supported ? 'fa-check-circle text-success' : 'fa-exclamation-triangle text-warning'"></i><strong>{$ check.name $}</strong><span>{$ check.value $}</span></li></ul></section>
   </div>
+
+  <div class="row">
+    <section class="col-md-6 magnum-detail-section"><h3>Lifecycle operations</h3><ul class="magnum-output-list"><li><strong>Resize Cluster</strong> changes the default-worker MachineDeployment through Magnum.</li><li><strong>Rolling Kubernetes Upgrade</strong> selects a compatible newer template and controls batch size.</li><li><strong>Rotate Credentials</strong> rolls workload credentials; use only while the cluster is stable.</li><li ng-if="ctrl.isBusy" class="text-warning">Mutating actions are unsafe while another reconciliation is in progress.</li></ul></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Diagnosis and recovery</h3><ol class="magnum-recovery-list"><li>Read the failed timeline phase and latest reconcile message.</li><li>Verify Git/Argo ownership before changing infrastructure.</li><li>Retry through the Magnum action that owns the resource.</li><li>Delete only after checking load balancers, volumes and floating IP dependencies.</li></ol><div class="alert alert-warning" ng-if="ctrl.hasFailed">Automatic repair is intentionally not started from this view. Review the reported dependency first.</div></section>
+  </div>
+
+  <div class="row">
+    <section class="col-md-6 magnum-detail-section"><h3>Cluster access</h3><p>Use <strong>Get Cluster Config</strong> from the Actions menu to download the kubeconfig and certificate material generated by Magnum.</p><dl class="dl-horizontal"><dt>Endpoint</dt><dd><code>{$ ctrl.cluster.api_address|noValue $}</code></dd><dt>TLS</dt><dd>{$ ctrl.cluster_template.tls_disabled ? 'Disabled' : 'Certificate protected' $}</dd><dt>Handling</dt><dd>Store locally with mode 0600; do not upload to Git</dd></dl><div class="alert alert-info">Downloaded credentials are security-sensitive. Rotate cluster credentials after suspected disclosure.</div></section>
+    <section class="col-md-6 magnum-detail-section"><h3>Deployment profile</h3><dl class="dl-horizontal"><dt>Name</dt><dd><a ng-href="ngdetails/OS::Magnum::ClusterTemplate/{$ ctrl.cluster_template.id $}">{$ ctrl.cluster_template.name|noName $}</a></dd><dt>Template ID</dt><dd><code>{$ ctrl.cluster_template.id $}</code></dd><dt>COE</dt><dd>{$ ctrl.cluster_template.coe $}</dd><dt>Image</dt><dd>{$ ctrl.cluster_template.image_id|noValue $}</dd><dt>Created</dt><dd>{$ ctrl.cluster.created_at|date:'medium' $}</dd></dl></section>
+  </div>
+
   <section class="magnum-detail-section"><h3>Effective labels</h3><div class="magnum-labels"><span ng-repeat="(key, value) in ctrl.cluster.labels"><strong>{$ key $}</strong>={$ value $}</span><em ng-if="ctrl.objLen(ctrl.cluster.labels) === 0">No labels reported</em></div></section>
 </div>

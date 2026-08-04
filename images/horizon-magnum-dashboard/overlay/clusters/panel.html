@@ -13,10 +13,11 @@
     </div>
     <ol class="magnum-flow" aria-label="Provisioning flow">
       <li><span>1</span><strong>Request</strong><small>Magnum validates input</small></li>
-      <li><span>2</span><strong>Desired state</strong><small>Rendered package enters Git</small></li>
-      <li><span>3</span><strong>Reconcile</strong><small>Argo CD applies CAPI objects</small></li>
-      <li><span>4</span><strong>Infrastructure</strong><small>CAPO creates Nova, Neutron and Octavia resources</small></li>
-      <li><span>5</span><strong>Ready</strong><small>Add-ons and workload API become healthy</small></li>
+      <li><span>2</span><strong>Draft</strong><small>Rendered package enters staging</small></li>
+      <li><span>3</span><strong>Approve</strong><small>Policy review publishes deployment</small></li>
+      <li><span>4</span><strong>Reconcile</strong><small>Argo CD applies CAPI objects</small></li>
+      <li><span>5</span><strong>Infrastructure</strong><small>CAPO creates OpenStack resources</small></li>
+      <li><span>6</span><strong>Ready</strong><small>Workload API and add-ons become healthy</small></li>
     </ol>
     <div class="alert alert-info magnum-contract-note">
       <span class="fa fa-info-circle"></span>

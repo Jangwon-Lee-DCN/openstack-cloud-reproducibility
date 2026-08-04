@@ -74,6 +74,32 @@ replace(create, "spinnerModal.showModalSpinner(gettext('Loading'));", "// Depend
 replace(create, "workflow.init(gettext('Create New Cluster'), $scope)", "workflow.init(gettext('Create Kubernetes Cluster'), $scope)")
 replace(create, "create_timeout: 60,", "create_timeout: 60,")
 
+# Operations are asynchronous GitOps changes. Do not offer a second mutation
+# while Magnum reports another reconciliation in progress or a failed state.
+for operation in (
+    "clusters/resize/resize.service.js",
+    "clusters/rolling-upgrade/upgrade.service.js",
+):
+    replace(
+        operation,
+        """    function allowed() {
+      return $qExtensions.booleanAsPromise(true);
+    }""",
+        """    function allowed(selected) {
+      var status = selected && selected.status ? selected.status : '';
+      return $qExtensions.booleanAsPromise(
+        /^(CREATE|UPDATE|RESUME)_COMPLETE$/.test(status));
+    }""",
+    )
+
+config = "clusters/config/config.service.js"
+replace(config, "selected.name + \"_config\"", "selected.name + \"_kubeconfig.yaml\"")
+
+actions = "clusters/actions.module.js"
+replace(actions, "gettext('Get Cluster Config')", "gettext('Download Kubeconfig')")
+replace(actions, "gettext('Resize Cluster')", "gettext('Scale Worker Node Group')")
+replace(actions, "gettext('Rolling Cluster Upgrade')", "gettext('Rolling Kubernetes Upgrade')")
+
 # Remove legacy Heat vocabulary from the resource list and expose operational
 # fields that Magnum actually returns for the CAPI driver.
 module = "clusters/clusters.module.js"

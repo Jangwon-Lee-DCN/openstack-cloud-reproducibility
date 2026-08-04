@@ -1,7 +1,7 @@
 <div class="magnum-review">
   <div class="alert alert-info">
     <span class="fa fa-code-fork"></span>
-    This request is validated by Magnum, rendered into a CAPI package, committed to the deployment repository and reconciled by Argo CD.
+    This request is validated by Magnum and rendered into a staging package. An independent approval publishes it to the deployment repository before Argo CD reconciliation begins.
   </div>
   <div class="row">
     <section class="col-md-6">
@@ -46,5 +46,14 @@
   <div class="alert alert-warning" ng-if="model.master_lb_floating_ip_enabled && !model.api_master_lb_allowed_cidrs">
     <span class="fa fa-warning"></span>
     The Kubernetes API will be internet-routable without a CIDR restriction. Restrict it for production workloads.
+  </div>
+  <div class="magnum-submit-contract">
+    <h4>Change contract</h4>
+    <p>Submitting creates an asynchronous GitOps reconciliation. The cluster may remain in progress while Argo CD, CAPI and OpenStack converge.</p>
+    <ul>
+      <li>Do not submit the same name twice while the first request is pending.</li>
+      <li>Scale and upgrade operations become available after the cluster reaches a complete state.</li>
+      <li>Deletion is asynchronous and may wait for LoadBalancer and volume cleanup.</li>
+    </ul>
   </div>
 </div>

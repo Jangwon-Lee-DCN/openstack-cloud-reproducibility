@@ -33,4 +33,7 @@ RUN python3 /tmp/enhance_magnum_ui.py \
     && rm -f /tmp/enhance_magnum_ui.py \
     && python3 -c "import magnum_ui, magnumclient, heatclient" \
     && grep -q 'Create Kubernetes Cluster' ${MAGNUM_UI_STATIC}/clusters/create/create.service.js \
-    && grep -q 'Argo CD' ${MAGNUM_UI_STATIC}/clusters/workflow/review.html
+    && grep -q 'Argo CD' ${MAGNUM_UI_STATIC}/clusters/workflow/review.html \
+    && grep -q 'Download Kubeconfig' ${MAGNUM_UI_STATIC}/clusters/actions.module.js \
+    && grep -q 'buildTimeline' ${MAGNUM_UI_STATIC}/clusters/details/overview.controller.js \
+    && grep -q 'Provisioning timeline' ${MAGNUM_UI_STATIC}/clusters/details/overview.html
