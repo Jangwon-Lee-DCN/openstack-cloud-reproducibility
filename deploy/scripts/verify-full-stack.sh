@@ -74,6 +74,35 @@ for dashboard in skyline horizon; do
   }
 done
 
+# Horizon stores compressed bundles on a pod-local emptyDir. Its compressor
+# metadata must therefore also be pod-local; sharing that cache previously let
+# one replica advertise a JavaScript hash which existed only on another pod.
+mapfile -t horizon_pods < <(kubectl get pods -n "$NAMESPACE" \
+  -l application=horizon,component=server \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
+[[ "${#horizon_pods[@]}" -eq 2 ]] || {
+  echo "expected two Horizon server pods" >&2; exit 1;
+}
+horizon_bundle=''
+for pod in "${horizon_pods[@]}"; do
+  settings=$(kubectl exec -n "$NAMESPACE" "$pod" -- /tmp/manage.py shell -c \
+    'from django.conf import settings; print(settings.COMPRESS_OFFLINE, settings.COMPRESS_CACHE_BACKEND, settings.CACHES[settings.COMPRESS_CACHE_BACKEND]["BACKEND"], settings.STATIC_URL)')
+  [[ "$settings" == *"False compressor django.core.cache.backends.locmem.LocMemCache /horizon/static/"* ]] || {
+    echo "$pod has unsafe Horizon compressor settings: $settings" >&2; exit 1;
+  }
+  bundle=$(kubectl exec -n "$NAMESPACE" "$pod" -- sh -c \
+    "find /var/www/html -name 'angular_template_cache_preloads*.js' -printf '%f %s\\n' | sort")
+  [[ "$(printf '%s\n' "$bundle" | sed '/^$/d' | wc -l)" -eq 1 ]] || {
+    echo "$pod has an unexpected Angular preload bundle set: $bundle" >&2; exit 1;
+  }
+  if [[ -n "$horizon_bundle" && "$bundle" != "$horizon_bundle" ]]; then
+    echo "Horizon replicas generated different Angular preload bundles" >&2
+    printf '%s: %s\n' "$pod" "$bundle" >&2
+    exit 1
+  fi
+  horizon_bundle=$bundle
+done
+
 kubectl get pdb -n "$NAMESPACE" skyline >/dev/null
 [[ "$(kubectl get deployment -n "$NAMESPACE" barbican-api -o jsonpath='{.status.readyReplicas}')" == "2" ]]
 [[ "$(kubectl get pdb -n "$NAMESPACE" barbican-api -o jsonpath='{.spec.minAvailable}')" == "1" ]]

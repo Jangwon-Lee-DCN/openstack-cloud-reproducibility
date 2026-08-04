@@ -12,7 +12,7 @@ This directory is the local correction layer over the clean charts under
 Do not hand-edit live resources without translating the change back into this
 directory and recording it in the component ISSUE/FIX documents.
 
-`reconcile-full-stack.sh` runs `ensure-horizon-static-ownership.sh` after the
-Horizon Helm release. This idempotently patches the chart-generated startup
-script so runtime asset compression can write to the per-Pod static volume,
-then restarts Horizon before waiting for rollout health.
+`reconcile-full-stack.sh` uses the patched Horizon chart's pod-local
+django-compressor cache; no post-Helm ConfigMap mutation is required after the
+Horizon Helm release. The chart renders the cache backend and probe timing as
+declarative values, and its Deployment checksum performs any required rollout.
