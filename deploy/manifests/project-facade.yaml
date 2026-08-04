@@ -1,3 +1,42 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: project-facade
+  namespace: openstack
+---
+# Role bundles (see docs/proposals/iam-hardening/README.md, "Custom role
+# bundles") are the one piece of project-facade's own state that isn't
+# Keystone -- persisted here rather than an in-memory dict specifically
+# because the Deployment runs 2 replicas; an in-memory dict wouldn't
+# even be consistent between them, let alone survive a restart. Scoped
+# tightly to exactly this one ConfigMap by resourceName (get/update only,
+# never create/delete/list) -- the ConfigMap itself is pre-created below
+# so project-facade never needs broader configmap-create permission.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: project-facade-role-bundles
+  namespace: openstack
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["project-facade-role-bundles"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: project-facade-role-bundles
+  namespace: openstack
+subjects:
+  - kind: ServiceAccount
+    name: project-facade
+    namespace: openstack
+roleRef:
+  kind: Role
+  name: project-facade-role-bundles
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,11 +57,12 @@ spec:
         application: project-facade
         component: api
     spec:
+      serviceAccountName: project-facade
       imagePullSecrets:
         - name: telemetry-harbor-push
       containers:
         - name: project-facade
-          image: registry.dcn.ssu.ac.kr/openstack/project-facade@sha256:3e6c3d626abd900f65f3cae29ca586d79f381be51a2d162e0264fa0e49c9c1ae
+          image: registry.dcn.ssu.ac.kr/openstack/project-facade@sha256:24ccf2db073a8b5cdec61ec208eda2404b07d27d8ae29be5a962934cc524c2c1
           ports:
             - containerPort: 8080
               name: http

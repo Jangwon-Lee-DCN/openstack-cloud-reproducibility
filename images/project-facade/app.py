@@ -52,6 +52,17 @@ answer without walking every project one at a time. `GET
 project in the domain with its admin(s), member count, and last
 self-service activity, gated the same way `check_domain_admin` is.
 
+`GET .../simulate-access` is a per-action dry run of the caller's own
+current access to a project (see `simulate_access`) -- not a
+hypothetical "what if I had role X" policy evaluator. `/v1/role-bundles`
+(GET/PUT/DELETE) let a domain admin define named bundles of the existing
+roles (e.g. "VPC Operator" = network-operator + security-operator),
+grantable as a single name via `add_member`/`bulk invite` instead of
+selecting each role individually -- see `_expand_role_bundles`, stored
+in a ConfigMap since this service runs multiple replicas. `.../audit-log`
+now also merges in vpc-facade's own richer audit history for the same
+project (`_vpc_facade_audit_entries`).
+
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
 IPs) -- Keystone's own project delete has no idea these exist and would
@@ -82,6 +93,7 @@ the IAM hardening doc).
 import csv
 import datetime
 import io
+import json
 import logging
 import os
 import re
@@ -118,6 +130,21 @@ NEUTRON_URL = os.environ.get("NEUTRON_ENDPOINT", "http://neutron-server.openstac
 LOKI_URL = os.environ.get("LOKI_ENDPOINT", "http://loki.monitoring.svc.cluster.local:3100")
 LOKI_JOB_LABEL = os.environ.get("LOKI_JOB_LABEL", "openstack/project-facade")
 AUDIT_LOG_LOOKBACK_SECONDS = int(os.environ.get("AUDIT_LOG_LOOKBACK_SECONDS", str(30 * 24 * 3600)))
+# vpc-facade's own /v1/audit is richer than anything this service could
+# derive from its own logs (Kubernetes Events plus SecurityGroup/
+# ElasticIP/NetworkInterface status history, not just request logs) --
+# see project_audit_log below for how its entries get merged in rather
+# than duplicated.
+VPC_FACADE_URL = os.environ.get("VPC_FACADE_ENDPOINT", "http://vpc-facade.vpc-control-plane-system.svc.cluster.local:8090")
+
+# In-cluster Kubernetes API access for role bundles below -- plain REST
+# calls via `requests` (the same HTTP client this whole file already
+# uses for everything else) rather than pulling in the full kubernetes
+# client library for what's really just one GET and one PATCH.
+K8S_API_URL = "https://kubernetes.default.svc"
+K8S_SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
+ROLE_BUNDLES_NAMESPACE = os.environ.get("ROLE_BUNDLES_NAMESPACE", "openstack")
+ROLE_BUNDLES_CONFIGMAP = os.environ.get("ROLE_BUNDLES_CONFIGMAP", "project-facade-role-bundles")
 
 PROJECT_CREATOR_ROLE = "project-creator"
 ADMIN_ROLE = "admin"
@@ -613,6 +640,151 @@ def list_members(project_id):
     return jsonify(members=list(members.values())), 200
 
 
+def _k8s_token():
+    with open(f"{K8S_SA_DIR}/token") as f:
+        return f.read().strip()
+
+
+def _load_role_bundles():
+    """Named bundles of the existing marker/base roles (e.g. "VPC
+    Operator" = network-operator + security-operator), so a project
+    admin can grant a common combination in one click instead of
+    checking several boxes every time. Not a general action-level policy
+    engine -- a bundle only ever expands to roles this service already
+    understands (see _expand_role_bundles), it can't grant anything
+    add_member couldn't already grant directly. Persisted in a
+    ConfigMap (see deploy/manifests/project-facade.yaml's Role/
+    RoleBinding) rather than in-memory, since this Deployment runs 2
+    replicas -- an in-memory dict wouldn't even be consistent between
+    them."""
+    r = requests.get(
+        f"{K8S_API_URL}/api/v1/namespaces/{ROLE_BUNDLES_NAMESPACE}/configmaps/{ROLE_BUNDLES_CONFIGMAP}",
+        headers={"Authorization": f"Bearer {_k8s_token()}"},
+        verify=f"{K8S_SA_DIR}/ca.crt",
+        timeout=10,
+    )
+    r.raise_for_status()
+    data = r.json().get("data") or {}
+    return json.loads(data.get("bundles.json") or "{}")
+
+
+def _save_role_bundles(bundles):
+    body = {"data": {"bundles.json": json.dumps(bundles)}}
+    r = requests.patch(
+        f"{K8S_API_URL}/api/v1/namespaces/{ROLE_BUNDLES_NAMESPACE}/configmaps/{ROLE_BUNDLES_CONFIGMAP}",
+        headers={"Authorization": f"Bearer {_k8s_token()}", "Content-Type": "application/strategic-merge-patch+json"},
+        json=body,
+        verify=f"{K8S_SA_DIR}/ca.crt",
+        timeout=10,
+    )
+    r.raise_for_status()
+
+
+def _expand_role_bundles(roles):
+    """Replace any bundle name in `roles` with its underlying role set,
+    leaving ordinary role names untouched. If the ConfigMap can't be
+    read for any reason, degrades to a no-op rather than failing the
+    whole request -- a name that was genuinely meant to be a bundle then
+    just falls through to add_member's normal "invalid role" rejection,
+    same as a typo would."""
+    try:
+        bundles = _load_role_bundles()
+    except requests.RequestException:
+        return roles
+    expanded = set()
+    for r in roles:
+        expanded.update(bundles[r]["roles"] if r in bundles else [r])
+    return sorted(expanded)
+
+
+@app.route("/v1/role-bundles", methods=["GET"])
+def list_role_bundles():
+    """Any authenticated user can view bundle definitions -- needed just
+    to render what a bundle actually means when selecting one on the Add
+    Member form. Viewing isn't the sensitive part; granting one via
+    add_member (already domain/project-admin gated) is."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    if not validate_caller_token(caller_token):
+        return jsonify(error="invalid or expired token"), 401
+    try:
+        bundles = _load_role_bundles()
+    except requests.RequestException as exc:
+        log.warning("role-bundles read failed: %s", exc)
+        return jsonify(error="role bundle storage unavailable"), 502
+    return jsonify(bundles=bundles), 200
+
+
+@app.route("/v1/role-bundles/<name>", methods=["PUT"])
+def put_role_bundle(name):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, user_name = ident
+
+    domain_id = get_domain_id(OS_DOMAIN_NAME)
+    if not domain_id or not user_has_domain_role(user_id, domain_id, ADMIN_ROLE):
+        return jsonify(error="forbidden: you are not an admin of this domain"), 403
+
+    name = name.strip()
+    if not name:
+        return jsonify(error="bundle name must not be empty"), 400
+    if name in ALLOWED_MEMBER_ROLES:
+        return jsonify(error=f"'{name}' is already a real role name, can't also be a bundle name"), 400
+
+    body = request.get_json(silent=True) or {}
+    description = (body.get("description") or "").strip()
+    roles = sorted({(r or "").strip() for r in (body.get("roles") or [])} - {""})
+    if not roles:
+        return jsonify(error="'roles' must be a non-empty list"), 400
+    invalid = [r for r in roles if r not in ALLOWED_MEMBER_ROLES]
+    if invalid:
+        return jsonify(error=f"invalid role(s) {invalid}; must be one of {sorted(ALLOWED_MEMBER_ROLES)}"), 400
+
+    try:
+        bundles = _load_role_bundles()
+        bundles[name] = {"description": description, "roles": roles}
+        _save_role_bundles(bundles)
+    except requests.RequestException as exc:
+        log.warning("role-bundles write failed: %s", exc)
+        return jsonify(error="role bundle storage unavailable"), 502
+
+    log.info("set role bundle name=%s roles=%s by=%s(%s)", name, roles, user_name, user_id)
+    return jsonify(name=name, description=description, roles=roles), 200
+
+
+@app.route("/v1/role-bundles/<name>", methods=["DELETE"])
+def delete_role_bundle(name):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, user_name = ident
+
+    domain_id = get_domain_id(OS_DOMAIN_NAME)
+    if not domain_id or not user_has_domain_role(user_id, domain_id, ADMIN_ROLE):
+        return jsonify(error="forbidden: you are not an admin of this domain"), 403
+
+    try:
+        bundles = _load_role_bundles()
+        if name not in bundles:
+            return jsonify(error=f"no such bundle '{name}'"), 404
+        del bundles[name]
+        _save_role_bundles(bundles)
+    except requests.RequestException as exc:
+        log.warning("role-bundles delete failed: %s", exc)
+        return jsonify(error="role bundle storage unavailable"), 502
+
+    log.info("deleted role bundle name=%s by=%s(%s)", name, user_name, user_id)
+    return "", 204
+
+
 @app.route("/v1/projects/<project_id>/members", methods=["POST"])
 def add_member(project_id):
     """Adds a new member, or -- if the named user is already a member --
@@ -640,6 +812,10 @@ def add_member(project_id):
     body = request.get_json(silent=True) or {}
     username = (body.get("username") or "").strip()
     roles = sorted({(r or "").strip() for r in (body.get("roles") or [])} - {""})
+    # A name here can be a real role or a role-bundle name (see
+    # _expand_role_bundles) -- expanded before validation so the rest of
+    # this function never has to know the difference.
+    roles = _expand_role_bundles(roles)
     if not username:
         return jsonify(error="'username' is required"), 400
     if not roles:
@@ -881,6 +1057,7 @@ _AUDIT_LINE_PREFIXES = (
     ("removed member", "remove_member"),
     ("left project", "leave_project"),
     ("transferred ownership", "transfer_ownership"),
+    ("vpc-facade audit merge failed", "vpc_facade_unavailable"),
 )
 
 
@@ -916,16 +1093,71 @@ def _query_loki_project_lines(project_id, limit):
     return r.json()["data"]["result"]
 
 
+def _vpc_facade_audit_entries(caller_token, project_id, limit):
+    """vpc-facade's own /v1/audit -- Kubernetes Events plus SecurityGroup/
+    ElasticIP/NetworkInterface status history, richer than anything this
+    service could derive from its own request logs -- merged in here so
+    a project's identity/membership history and its VPC/network history
+    show up in one place. Deliberately forwards the CALLER's own token
+    rather than this service's admin credential: vpc-facade scopes that
+    endpoint to the caller's own accessible namespaces
+    (scope.Namespaces), which could include projects beyond the one
+    requested (a domain-scoped caller sees their whole domain) -- so
+    results are filtered here to exactly this project_id rather than
+    trusting vpc-facade's response set as already scoped correctly for
+    this purpose. Best-effort: an unreachable or erroring vpc-facade
+    just means fewer entries, not a failed request -- this project's own
+    audit history is still worth showing on its own."""
+    try:
+        r = requests.get(
+            f"{VPC_FACADE_URL}/v1/audit",
+            headers={"X-Auth-Token": caller_token},
+            params={"limit": limit},
+            timeout=10,
+        )
+        r.raise_for_status()
+        raw_entries = r.json()
+    except (requests.RequestException, ValueError) as exc:
+        log.warning("vpc-facade audit merge failed project=%s: %s", project_id, exc)
+        return []
+
+    mapped = []
+    for e in raw_entries or []:
+        if e.get("projectID") != project_id:
+            continue
+        ts_raw = e.get("time") or ""
+        try:
+            timestamp = datetime.datetime.fromisoformat(ts_raw.replace("Z", "+00:00")).isoformat()
+        except ValueError:
+            timestamp = ts_raw
+        detail_parts = [p for p in (e.get("detail"), e.get("before"), e.get("after")) if p]
+        message = f"{e.get('kind', '')}/{e.get('name', '')}: {e.get('action', '')}"
+        if detail_parts:
+            message += " (" + "; ".join(detail_parts) + ")"
+        mapped.append(
+            {
+                "timestamp": timestamp,
+                "level": "WARNING" if e.get("outcome") == "failed" else "INFO",
+                "action": e.get("action") or "other",
+                "message": message,
+                "source": "vpc-facade",
+            }
+        )
+    return mapped
+
+
 @app.route("/v1/projects/<project_id>/audit-log", methods=["GET"])
 def project_audit_log(project_id):
     """Read-only audit trail of self-service actions taken against this
     project -- create/update/delete, member add/change/remove, leave,
     including denied attempts -- sourced from this service's own request
     logs via Loki rather than a separate datastore (every mutating action
-    above already logs project id, actor, and outcome). Same admin-or-
-    domain-admin authorization as member management (_authorize_member_
-    admin): this exposes who did what to the project, which is at least
-    as sensitive as the membership list itself."""
+    above already logs project id, actor, and outcome), merged with
+    vpc-facade's own richer audit history for the same project (see
+    _vpc_facade_audit_entries). Same admin-or-domain-admin authorization
+    as member management (_authorize_member_admin): this exposes who did
+    what to the project, which is at least as sensitive as the
+    membership list itself."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
@@ -966,17 +1198,19 @@ def project_audit_log(project_id):
                     "level": level,
                     "action": _classify_audit_line(message),
                     "message": message,
+                    "source": "project-facade",
                 }
             )
+    entries.extend(_vpc_facade_audit_entries(caller_token, project_id, limit))
     entries.sort(key=lambda e: e["timestamp"], reverse=True)
     entries = entries[:limit]
 
     if request.args.get("format", "").lower() == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(["timestamp", "level", "action", "message"])
+        writer.writerow(["timestamp", "level", "action", "source", "message"])
         for e in entries:
-            writer.writerow([e["timestamp"], e["level"], e["action"], e["message"]])
+            writer.writerow([e["timestamp"], e["level"], e["action"], e["source"], e["message"]])
         return Response(
             buf.getvalue(),
             mimetype="text/csv",
@@ -1016,6 +1250,70 @@ def check_domain_admin():
     domain_id = get_domain_id(OS_DOMAIN_NAME)
     is_admin = bool(domain_id) and user_has_domain_role(user_id, domain_id, ADMIN_ROLE)
     return jsonify(is_domain_admin=is_admin, domain=OS_DOMAIN_NAME), 200
+
+
+@app.route("/v1/projects/<project_id>/simulate-access", methods=["GET"])
+def simulate_access(project_id):
+    """Dry-run breakdown of what the caller can actually do to this
+    project right now, one line per gated action, reusing the exact same
+    checks each real endpoint enforces -- not a hypothetical "what if I
+    had role X" evaluator (that would need a synthetic identity threaded
+    through every check below, a much bigger change), but a genuine
+    answer to "why can/can't I do this" without having to actually
+    attempt each action and read its error. No authorization beyond a
+    valid token: this only ever evaluates the caller's own real access,
+    never someone else's.
+
+    `delete_project`'s True/False here reflects only its admin/immutable
+    gate -- the real endpoint also refuses to delete a project with
+    active Nova/Cinder/Neutron resources, which isn't cheap to check and
+    isn't duplicated here; a True from this endpoint means "you have
+    permission to attempt it", not "it's guaranteed to succeed"."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    project = _load_target_project(project_id)
+    if not project:
+        return jsonify(error="project not found"), 404
+
+    is_project_admin = user_has_project_role(user_id, project_id, ADMIN_ROLE)
+    is_domain_admin = user_has_domain_role(user_id, project["domain_id"], ADMIN_ROLE)
+    is_member_admin_eligible = is_project_admin or is_domain_admin  # _authorize_member_admin's rule
+    immutable = bool(project.get("options", {}).get("immutable"))
+    admin_ids = _effective_admin_user_ids(project_id)
+    is_last_admin = user_id in admin_ids and len(admin_ids) <= 1
+    has_any_role = bool(user_has_project_role(user_id, project_id, "member")
+                         or user_has_project_role(user_id, project_id, "reader")
+                         or user_id in admin_ids)
+
+    actions = {
+        "manage_members": is_member_admin_eligible,
+        "view_audit_log": is_member_admin_eligible,
+        "transfer_ownership": user_id in admin_ids,
+        "update_project": is_project_admin and not immutable,
+        "delete_project": is_project_admin and not immutable,
+        "leave_project": has_any_role and not is_last_admin,
+    }
+    reasons = {}
+    if not is_member_admin_eligible:
+        reasons["manage_members"] = reasons["view_audit_log"] = "not admin on this project or its domain"
+    if user_id not in admin_ids:
+        reasons["transfer_ownership"] = "not an admin of this project"
+    if immutable:
+        reasons["update_project"] = reasons["delete_project"] = "project is protected (immutable)"
+    elif not is_project_admin:
+        reasons["update_project"] = reasons["delete_project"] = "not project-scoped admin (domain admin doesn't qualify here)"
+    if not has_any_role:
+        reasons["leave_project"] = "you have no role on this project to leave"
+    elif is_last_admin:
+        reasons["leave_project"] = "you are the last admin of this project"
+
+    return jsonify(project_id=project_id, actions=actions, reasons=reasons), 200
 
 
 @app.route("/v1/my-access", methods=["GET"])

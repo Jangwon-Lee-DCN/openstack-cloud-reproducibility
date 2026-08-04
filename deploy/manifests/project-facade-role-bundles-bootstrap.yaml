@@ -1,0 +1,17 @@
+# BOOTSTRAP ONLY -- apply this exactly once, when project-facade-role-
+# bundles doesn't already exist. Deliberately kept OUT of
+# project-facade.yaml (which gets `kubectl apply -f`'d on every routine
+# project-facade redeploy in this repo's workflow) because this
+# ConfigMap's `data` is project-facade's own live, mutated state (see
+# app.py's _load_role_bundles/_save_role_bundles) -- re-applying this
+# file after bundles have been created through the API would silently
+# wipe them back to empty on the next unrelated deploy. If you need to
+# reset role bundles back to empty, that's the one time to actually run
+# this again.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: project-facade-role-bundles
+  namespace: openstack
+data:
+  bundles.json: "{}"
