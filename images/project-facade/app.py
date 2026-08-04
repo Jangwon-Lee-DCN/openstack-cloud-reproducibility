@@ -38,6 +38,12 @@ request logs via Loki -- see `_query_loki_project_lines` -- rather than a
 separate datastore. Same admin-or-domain-admin authorization as member
 management.
 
+`POST .../transfer-ownership` atomically grants a named user admin and
+demotes the caller to member, replacing the two-step (change their role,
+then separately leave/demote yourself) manual process -- see
+`transfer_ownership` for why this is the one path that never hits the
+last-admin guard.
+
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
 IPs) -- Keystone's own project delete has no idea these exist and would
@@ -65,14 +71,16 @@ matrix" pattern already used by vpc-facade (see "Authority boundaries" in
 the IAM hardening doc).
 """
 
+import csv
 import datetime
+import io
 import logging
 import os
 import re
 import time
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -683,6 +691,92 @@ def add_member(project_id):
     return jsonify(user_id=target_user["id"], username=username, roles=roles), status
 
 
+@app.route("/v1/projects/<project_id>/transfer-ownership", methods=["POST"])
+def transfer_ownership(project_id):
+    """One-click hand-off: grants the named user admin and demotes the
+    caller from admin to member in the same request, instead of the two
+    manual steps this previously took (change the target's role to
+    admin, then separately change your own role or leave). Deliberately
+    additive for the target -- their other existing roles are left
+    alone, only admin is added -- unlike add_member's "set exact list"
+    semantics, since making someone the new owner shouldn't strip
+    whatever capability roles they already held.
+
+    Requires the caller to already be a direct or group-derived
+    *effective* admin of this exact project, not just a domain admin --
+    there's nothing of their own to hand off otherwise. Because this
+    always grants the target admin before touching the caller's own
+    role, the admin count can never drop to zero mid-transfer, so this
+    is exactly the one case that never hits add_member's or leave_
+    project's "cannot demote/leave the last admin" guard -- that guard
+    exists precisely to force this atomic hand-off instead of a
+    demote-then-leave that could momentarily (or permanently, if the
+    second step is forgotten) leave the project without an admin."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    caller_id, caller_name = ident
+
+    project = _load_target_project(project_id)
+    if not project:
+        return jsonify(error="project not found"), 404
+
+    if caller_id not in _effective_admin_user_ids(project_id):
+        return jsonify(error="forbidden: you are not an admin of this project"), 403
+
+    body = request.get_json(silent=True) or {}
+    username = (body.get("username") or "").strip()
+    if not username:
+        return jsonify(error="'username' is required"), 400
+
+    target_user = _find_user_by_name(username, project["domain_id"])
+    if not target_user:
+        return jsonify(error=f"no user named '{username}' found in this domain"), 404
+    if target_user["id"] == caller_id:
+        return jsonify(error="cannot transfer ownership to yourself"), 400
+
+    admin_role_id = role_id_by_name(ADMIN_ROLE)
+    member_role_id = role_id_by_name("member")
+
+    grant = requests.put(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{target_user['id']}/roles/{admin_role_id}",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    grant.raise_for_status()
+
+    revoke = requests.delete(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{caller_id}/roles/{admin_role_id}",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    if revoke.status_code not in (204, 404):
+        revoke.raise_for_status()
+
+    caller_roles = requests.get(
+        f"{OS_AUTH_URL}/projects/{project_id}/users/{caller_id}/roles",
+        headers=keystone_headers(),
+        timeout=10,
+    )
+    caller_roles.raise_for_status()
+    if not {r["name"] for r in caller_roles.json()["roles"]} & {"member", "reader"}:
+        grant_member = requests.put(
+            f"{OS_AUTH_URL}/projects/{project_id}/users/{caller_id}/roles/{member_role_id}",
+            headers=keystone_headers(),
+            timeout=10,
+        )
+        grant_member.raise_for_status()
+
+    log.info(
+        "transferred ownership project=%s from=%s(%s) to=%s(%s)",
+        project_id, caller_name, caller_id, username, target_user["id"],
+    )
+    return jsonify(new_admin=username), 200
+
+
 def _revoke_direct_roles(project_id, user_id):
     """Direct (non-effective) assignments only -- these are exactly what
     DELETE .../roles/{role_id} can actually revoke; a role held only via
@@ -778,6 +872,7 @@ _AUDIT_LINE_PREFIXES = (
     ("set member roles", "set_member_roles"),
     ("removed member", "remove_member"),
     ("left project", "leave_project"),
+    ("transferred ownership", "transfer_ownership"),
 )
 
 
@@ -866,7 +961,21 @@ def project_audit_log(project_id):
                 }
             )
     entries.sort(key=lambda e: e["timestamp"], reverse=True)
-    return jsonify(entries=entries[:limit])
+    entries = entries[:limit]
+
+    if request.args.get("format", "").lower() == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["timestamp", "level", "action", "message"])
+        for e in entries:
+            writer.writerow([e["timestamp"], e["level"], e["action"], e["message"]])
+        return Response(
+            buf.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="project-{project_id}-audit-log.csv"'},
+        )
+
+    return jsonify(entries=entries)
 
 
 @app.route("/v1/domain-admin", methods=["GET"])

@@ -183,6 +183,21 @@ def remove_member(request, project_id, user_id):
         raise FacadeError(_error_message(r))
 
 
+def transfer_ownership(request, project_id, username):
+    try:
+        r = requests.post(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/transfer-ownership",
+            headers=_headers(request),
+            json={"username": username},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
 def leave_project(request, project_id):
     try:
         r = requests.post(
@@ -209,3 +224,18 @@ def audit_log(request, project_id, limit=100):
     if r.status_code != 200:
         raise FacadeError(_error_message(r))
     return r.json()["entries"]
+
+
+def export_audit_log_csv(request, project_id):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/audit-log",
+            headers=_headers(request),
+            params={"limit": 500, "format": "csv"},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.content

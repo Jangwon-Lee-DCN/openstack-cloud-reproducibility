@@ -18,6 +18,17 @@ class AddMember(tables.LinkAction):
         return reverse(self.url, args=[self.table.kwargs["project_id"]])
 
 
+class BulkAddMember(tables.LinkAction):
+    name = "bulk_add_member"
+    verbose_name = _("Bulk Invite")
+    url = "horizon:identity:projects:manage_members_selfservice_bulk_add"
+    classes = ("ajax-modal",)
+    icon = "plus"
+
+    def get_link_url(self, datum=None):
+        return reverse(self.url, args=[self.table.kwargs["project_id"]])
+
+
 class ChangeRole(tables.LinkAction):
     name = "change_role"
     verbose_name = _("Change Role")
@@ -27,6 +38,26 @@ class ChangeRole(tables.LinkAction):
 
     def get_link_url(self, datum):
         return reverse(self.url, args=[self.table.kwargs["project_id"], datum.id])
+
+
+class TransferOwnership(tables.LinkAction):
+    name = "transfer_ownership"
+    verbose_name = _("Transfer Ownership")
+    url = "horizon:identity:projects:manage_members_selfservice_transfer_ownership"
+    classes = ("ajax-modal",)
+    icon = "arrow-right"
+
+    def allowed(self, request, member):
+        # Unconditional, same reasoning as every other self-service
+        # action in this table -- project-facade's own transfer-ownership
+        # endpoint is the real gate (caller must be a current effective
+        # admin; can't target yourself). Showing it on every row and
+        # letting the facade's response explain a refusal is simpler than
+        # trying to predict "am I an admin, is this row not me" here.
+        return True
+
+    def get_link_url(self, member):
+        return reverse(self.url, args=[self.table.kwargs["project_id"], member.id])
 
 
 class RemoveMember(tables.DeleteAction):
@@ -57,20 +88,27 @@ class MembersTable(tables.DataTable):
     class Meta:
         name = "members"
         verbose_name = _("Project Members")
-        table_actions = (AddMember,)
-        row_actions = (ChangeRole, RemoveMember)
+        table_actions = (AddMember, BulkAddMember)
+        row_actions = (ChangeRole, TransferOwnership, RemoveMember)
 
 
-# Same denied/allowed distinction project-facade itself logs at -- shown
-# as a status-styled column (get_data_type -> danger/warning/success) so
-# a denied attempt is visually distinct in the table, not just a plain
-# text value.
-_AUDIT_LEVEL_STATUS = {"WARNING": "danger", "ERROR": "danger"}
+class ExportAuditLogCSV(tables.LinkAction):
+    name = "audit_log_export"
+    verbose_name = _("Export CSV")
+    url = "horizon:identity:projects:audit_log_selfservice_export"
+    icon = "download"
+
+    def get_link_url(self, datum=None):
+        return reverse(self.url, args=[self.table.kwargs["project_id"]])
 
 
 class AuditLogTable(tables.DataTable):
     timestamp = tables.Column("timestamp", verbose_name=_("Time"))
     action = tables.Column("action", verbose_name=_("Action"))
+    # Same denied/allowed distinction project-facade itself logs at --
+    # status=True/status_choices renders this as a status-styled
+    # (success/danger) value instead of plain text, so a denied attempt
+    # is visually distinct in the table.
     level = tables.Column(
         "level",
         verbose_name=_("Result"),
@@ -86,3 +124,4 @@ class AuditLogTable(tables.DataTable):
         # here for a project admin to add, edit, or delete; this table is
         # read-only by design (see facade.audit_log's docstring).
         multi_select = False
+        table_actions = (ExportAuditLogCSV,)

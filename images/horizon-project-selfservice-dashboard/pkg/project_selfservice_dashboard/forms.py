@@ -105,6 +105,90 @@ class ChangeMemberRoleForm(AddMemberForm):
         return member
 
 
+class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
+    usernames = forms.CharField(
+        label=_("Usernames"),
+        help_text=_("One per line, or comma-separated."),
+        widget=forms.Textarea(attrs={"rows": 6}),
+    )
+    roles = forms.MultipleChoiceField(
+        label=_("Roles"),
+        help_text=_("Applied to every username above -- to give people different roles, invite them separately."),
+        choices=ROLE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        initial=["member"],
+    )
+
+    @staticmethod
+    def _parse_usernames(raw):
+        # Comma AND newline both accepted, since pasting from a
+        # spreadsheet column and pasting a comma-separated list are both
+        # realistic sources for this field.
+        parts = raw.replace(",", "\n").splitlines()
+        seen = set()
+        usernames = []
+        for part in parts:
+            name = part.strip()
+            if name and name not in seen:
+                seen.add(name)
+                usernames.append(name)
+        return usernames
+
+    def clean_usernames(self):
+        usernames = self._parse_usernames(self.cleaned_data["usernames"])
+        if not usernames:
+            raise forms.ValidationError(_("Enter at least one username."))
+        return usernames
+
+    def handle(self, request, data):
+        project_id = self.initial["project_id"]
+        added, failed = [], []
+        for username in data["usernames"]:
+            try:
+                member = facade.add_member(request, project_id, username, data["roles"])
+                added.append(member["username"])
+            except facade.FacadeError as exc:
+                failed.append((username, str(exc)))
+            except Exception:
+                failed.append((username, str(_("unexpected error"))))
+        if added:
+            messages.success(
+                request,
+                _('Added %(count)d member(s) as %(roles)s: %(names)s.')
+                % {"count": len(added), "roles": ", ".join(data["roles"]), "names": ", ".join(added)},
+            )
+        for username, error in failed:
+            messages.error(request, _('Could not add "%(username)s": %(error)s') % {"username": username, "error": error})
+        # A partial failure (e.g. one bad username in a batch of ten)
+        # still closes the modal and refreshes the member list -- the per-
+        # user error messages above already say exactly what didn't land,
+        # and the successful adds shouldn't be hidden behind them.
+        return added or not failed
+
+
+class TransferOwnershipForm(horizon_forms.SelfHandlingForm):
+    # Read-only, same reasoning as ChangeMemberRoleForm.username above --
+    # the target is fixed by the row action that opened this form.
+    username = forms.CharField(label=_("New Admin"), disabled=True)
+
+    def handle(self, request, data):
+        project_id = self.initial["project_id"]
+        try:
+            result = facade.transfer_ownership(request, project_id, data["username"])
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to transfer ownership."))
+            return False
+        messages.success(
+            request,
+            _('Transferred ownership of this project to "%s". You are now a regular member.')
+            % result["new_admin"],
+        )
+        return result
+
+
 class LeaveProjectForm(horizon_forms.SelfHandlingForm):
     def handle(self, request, data):
         project_id = self.initial["project_id"]

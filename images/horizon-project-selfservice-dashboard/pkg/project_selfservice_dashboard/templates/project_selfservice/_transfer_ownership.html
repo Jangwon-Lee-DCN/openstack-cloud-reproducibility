@@ -1,0 +1,6 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+
+{% block modal-body-right %}
+  <p>{% blocktrans %}Makes this person the project's admin and downgrades you to a regular member. Unlike changing roles yourself, this is safe to do even if you're currently the only admin -- the project is never left without one, even for a moment.{% endblocktrans %}</p>
+{% endblock %}

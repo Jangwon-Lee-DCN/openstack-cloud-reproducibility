@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from django.http import HttpResponse
 from django.urls import reverse
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -93,6 +94,27 @@ class AddMemberView(horizon_forms.ModalFormView):
         return {"project_id": self.kwargs["project_id"]}
 
 
+class BulkAddMemberView(horizon_forms.ModalFormView):
+    form_class = forms.BulkAddMemberForm
+    template_name = "project_selfservice/bulk_add_member.html"
+    page_title = _("Bulk Invite Members")
+    submit_label = _("Add Members")
+
+    def get_success_url(self):
+        return reverse("horizon:identity:projects:manage_members_selfservice", args=[self.kwargs["project_id"]])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:manage_members_selfservice_bulk_add", args=[self.kwargs["project_id"]]
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        return {"project_id": self.kwargs["project_id"]}
+
+
 class ChangeMemberRoleView(horizon_forms.ModalFormView):
     form_class = forms.ChangeMemberRoleForm
     template_name = "project_selfservice/add_member.html"
@@ -129,6 +151,46 @@ class ChangeMemberRoleView(horizon_forms.ModalFormView):
         return {"project_id": project_id, "username": username, "roles": current_roles}
 
 
+class TransferOwnershipView(horizon_forms.ModalFormView):
+    """Reached from a "Transfer Ownership" row action on the Members
+    table -- promotes that row's user to admin and demotes the caller to
+    member in one request. See project-facade app.py's
+    transfer_ownership for why this is the atomic alternative to the
+    previous two-step change-role-then-leave process."""
+
+    form_class = forms.TransferOwnershipForm
+    template_name = "project_selfservice/transfer_ownership.html"
+    page_title = _("Transfer Ownership")
+    submit_label = _("Transfer Ownership")
+
+    def get_success_url(self):
+        return reverse("horizon:identity:projects:manage_members_selfservice", args=[self.kwargs["project_id"]])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:manage_members_selfservice_transfer_ownership",
+            args=[self.kwargs["project_id"], self.kwargs["user_id"]],
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        project_id = self.kwargs["project_id"]
+        user_id = self.kwargs["user_id"]
+        username = ""
+        try:
+            for m in facade.list_members(self.request, project_id):
+                if m["user_id"] == user_id:
+                    username = m["username"]
+                    break
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve this member's username."))
+        return {"project_id": project_id, "username": username}
+
+
 class AuditLogView(horizon_tables.DataTableView):
     """Read-only trail of self-service actions taken against this project
     (including denied attempts), sourced from project-facade's own
@@ -161,6 +223,24 @@ class AuditLogView(horizon_tables.DataTableView):
             SimpleNamespace(id=f"{e['timestamp']}-{i}", **e)
             for i, e in enumerate(entries)
         ]
+
+
+def export_audit_log_csv(request, project_id):
+    """Plain function view, not a class -- mirrors export_audit_csv in the
+    VPC dashboard (openstack_vpc_dashboard.dashboards.project.vpc.vpcs.
+    views), the established pattern in this deployment for a download-a-
+    file action rather than a page render. project-facade's own admin-or-
+    domain-admin gate on the audit-log endpoint is what actually protects
+    this -- a non-admin's request comes back as project-facade's own error
+    message, still shown to the user, not the CSV file."""
+    try:
+        content = facade.export_audit_log_csv(request, project_id)
+    except facade.FacadeError as exc:
+        messages.error(request, str(exc))
+        content = b""
+    response = HttpResponse(content, content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="project-{project_id}-audit-log.csv"'
+    return response
 
 
 class LeaveProjectView(horizon_forms.ModalFormView):
