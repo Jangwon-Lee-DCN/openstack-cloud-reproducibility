@@ -220,7 +220,13 @@ conf:
         session_cookie_secure: "False"
         session_cookie_httponly: "False"
         session_engine: 'django.contrib.sessions.backends.cache'
+        compress_offline: true
         cache_backend: 'django.core.cache.backends.memcached.PyMemcacheCache'
+        # Compressed assets are written to a pod-local emptyDir. Do not share
+        # their cache keys through memcached, otherwise one replica can return
+        # a bundle hash which exists only on another replica.
+        compressor_cache_backend: 'django.core.cache.backends.locmem.LocMemCache'
+        compressor_cache_location: 'horizon-compressor'
         secure_proxy_ssl_header: false
         password_autocomplete: "False"
         disallow_iframe_embed: "False"
@@ -269,7 +275,7 @@ conf:
         DEBUG = {{ .Values.conf.horizon.local_settings.config.debug }}
         TEMPLATE_DEBUG = DEBUG
 
-        COMPRESS_OFFLINE = True
+        COMPRESS_OFFLINE = {{ ternary "True" "False" .Values.conf.horizon.local_settings.config.compress_offline }}
         COMPRESS_CSS_HASHING_METHOD = "hash"
 
         # WEBROOT is the location relative to Webserver root
@@ -408,8 +414,13 @@ conf:
             'default': {
                 'BACKEND': '{{ .Values.conf.horizon.local_settings.config.cache_backend }}',
                 'LOCATION': '{{ tuple "oslo_cache" "internal" "memcache" . | include "helm-toolkit.endpoints.host_and_port_endpoint_uri_lookup" }}',
+            },
+            'compressor': {
+                'BACKEND': '{{ .Values.conf.horizon.local_settings.config.compressor_cache_backend }}',
+                'LOCATION': '{{ .Values.conf.horizon.local_settings.config.compressor_cache_location }}',
             }
         }
+        COMPRESS_CACHE_BACKEND = 'compressor'
         DATABASES = {
             'default': {
                 # Database configuration here
@@ -1106,6 +1117,16 @@ dependencies:
           service: dashboard
 
 pod:
+  probes:
+    horizon:
+      readiness:
+        initial_delay: 15
+        period: 10
+        timeout: 15
+      liveness:
+        initial_delay: 180
+        period: 60
+        timeout: 15
   security_context:
     horizon:
       pod:

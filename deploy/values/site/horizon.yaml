@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:b88176ff44a305657fbc2aafc80178637e15382002a88120a559a9c76b98d817
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:e55a2e77f356a4ec2fde012823077d9f38c0df33a2c9c5d503668e0400d7c55c
 pod:
   image_pull_secrets:
     horizon:
@@ -48,6 +48,17 @@ conf:
         # the shared Horizon MariaDB instead; both replicas use the same
         # django_session table and the browser carries only a short key.
         session_engine: 'django.contrib.sessions.backends.db'
+        # Runtime compression is required because Horizon's compressed blocks
+        # include the request-aware /horizon prefix. The chart isolates only
+        # compressor metadata per pod, matching its pod-local static volume.
+        compress_offline: false
+        raw:
+          FORCE_SCRIPT_NAME: /horizon
+          LOGIN_REDIRECT_URL: /horizon/
+          LOGIN_URL: /horizon/auth/login/
+          LOGOUT_URL: /horizon/auth/logout/
+          STATIC_URL: /horizon/static/
+          WEBROOT: /horizon/
         csrf_trusted_origins:
           - https://cloud.dcn.ssu.ac.kr
         allowed_hosts:

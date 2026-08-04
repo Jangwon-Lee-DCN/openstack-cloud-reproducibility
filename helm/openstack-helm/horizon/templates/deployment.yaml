@@ -95,17 +95,17 @@ spec:
               scheme: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.keystone_endpoint_scheme_lookup" | upper }}
               path: /auth/login/
               port: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 5
+            initialDelaySeconds: {{ .Values.pod.probes.horizon.readiness.initial_delay }}
+            periodSeconds: {{ .Values.pod.probes.horizon.readiness.period }}
+            timeoutSeconds: {{ .Values.pod.probes.horizon.readiness.timeout }}
           livenessProbe:
             httpGet:
               scheme: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.keystone_endpoint_scheme_lookup" | upper }}
               path: /auth/login/
               port: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
-            initialDelaySeconds: 180
-            periodSeconds: 60
-            timeoutSeconds: 5
+            initialDelaySeconds: {{ .Values.pod.probes.horizon.liveness.initial_delay }}
+            periodSeconds: {{ .Values.pod.probes.horizon.liveness.period }}
+            timeoutSeconds: {{ .Values.pod.probes.horizon.liveness.timeout }}
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp
