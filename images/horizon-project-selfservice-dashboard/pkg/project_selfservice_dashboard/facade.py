@@ -194,3 +194,18 @@ def leave_project(request, project_id):
         raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
     if r.status_code not in (204, 404):
         raise FacadeError(_error_message(r))
+
+
+def audit_log(request, project_id, limit=100):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/audit-log",
+            headers=_headers(request),
+            params={"limit": limit},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["entries"]

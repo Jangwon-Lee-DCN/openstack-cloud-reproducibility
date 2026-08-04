@@ -129,6 +129,40 @@ class ChangeMemberRoleView(horizon_forms.ModalFormView):
         return {"project_id": project_id, "username": username, "roles": current_roles}
 
 
+class AuditLogView(horizon_tables.DataTableView):
+    """Read-only trail of self-service actions taken against this project
+    (including denied attempts), sourced from project-facade's own
+    request logs via Loki -- see facade.audit_log and project-facade
+    app.py's project_audit_log for where this actually comes from. Same
+    "admin on this project or its domain" gate as Manage Members; a
+    non-admin hitting this URL directly gets project-facade's own 403
+    surfaced as a page error, same pattern as every other view here.
+    """
+
+    table_class = tables.AuditLogTable
+    page_title = _("Audit Log")
+
+    def get_data(self):
+        project_id = self.kwargs["project_id"]
+        try:
+            entries = facade.audit_log(self.request, project_id)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve this project's audit log."))
+            return []
+        # DataTable.get_object_id() does datum.id via plain attribute
+        # access (see ManageMembersSelfServiceView.get_data() above for
+        # the same issue) -- synthesize one, since a Loki log line has no
+        # natural id of its own and (timestamp, message) together are
+        # unique in practice.
+        return [
+            SimpleNamespace(id=f"{e['timestamp']}-{i}", **e)
+            for i, e in enumerate(entries)
+        ]
+
+
 class LeaveProjectView(horizon_forms.ModalFormView):
     """Lets any member remove themselves from a project, no admin rights
     needed -- see project-facade app.py's leave_project for why this is a

@@ -32,6 +32,12 @@ remove *themselves* (`POST .../leave`) without needing admin rights at
 all -- leaving is not an admin action -- subject to the same last-admin
 protection.
 
+`GET .../audit-log` exposes a read-only trail of who did what to a
+project (including denied attempts), read back out of this service's own
+request logs via Loki -- see `_query_loki_project_lines` -- rather than a
+separate datastore. Same admin-or-domain-admin authorization as member
+management.
+
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
 IPs) -- Keystone's own project delete has no idea these exist and would
@@ -62,6 +68,7 @@ the IAM hardening doc).
 import datetime
 import logging
 import os
+import re
 import time
 
 import requests
@@ -87,6 +94,14 @@ OS_DOMAIN_NAME = os.environ.get("OS_DOMAIN_NAME", "dcn")
 NOVA_URL = os.environ.get("NOVA_ENDPOINT", "http://nova-api.openstack.svc.cluster.local:8774/v2.1")
 CINDER_URL = os.environ.get("CINDER_ENDPOINT", "http://cinder-api.openstack.svc.cluster.local:8776/v3")
 NEUTRON_URL = os.environ.get("NEUTRON_ENDPOINT", "http://neutron-server.openstack.svc.cluster.local:9696/v2.0")
+# This service's own request logs (already emitted for every mutating
+# action, see the log.info/log.warning calls below) are the audit trail --
+# no separate datastore. Alloy ships stdout from every pod cluster-wide
+# into Loki already; this just reads it back out, scoped to this
+# service's own log stream.
+LOKI_URL = os.environ.get("LOKI_ENDPOINT", "http://loki.monitoring.svc.cluster.local:3100")
+LOKI_JOB_LABEL = os.environ.get("LOKI_JOB_LABEL", "openstack/project-facade")
+AUDIT_LOG_LOOKBACK_SECONDS = int(os.environ.get("AUDIT_LOG_LOOKBACK_SECONDS", str(30 * 24 * 3600)))
 
 PROJECT_CREATOR_ROLE = "project-creator"
 ADMIN_ROLE = "admin"
@@ -741,6 +756,117 @@ def leave_project(project_id):
     _revoke_direct_roles(project_id, user_id)
     log.info("left project project=%s user=%s(%s)", project_id, user_name, user_id)
     return "", 204
+
+
+# logging.basicConfig's default format is "LEVEL:logger name:message" --
+# matching that here is what separates real audit log lines from the app
+# server's separate, unrelated access-log stream (gunicorn's own request
+# logging, which has no such prefix and would otherwise also match the
+# plain-project_id substring filter in _query_loki_project_lines, e.g.
+# "POST /v1/projects/<id>/members HTTP/1.1 201").
+_LOG_LINE_RE = re.compile(r"^(INFO|WARNING|ERROR):project-facade:(.*)$")
+
+# Prefixes of the log.info/log.warning calls above, in the order they're
+# checked -- first match wins. Denials are classified by their own
+# "denied ..." prefix regardless of which action they're denying, since
+# the message text after that already says which.
+_AUDIT_LINE_PREFIXES = (
+    ("denied", "denied"),
+    ("created project", "create_project"),
+    ("updated project", "update_project"),
+    ("deleted project", "delete_project"),
+    ("set member roles", "set_member_roles"),
+    ("removed member", "remove_member"),
+    ("left project", "leave_project"),
+)
+
+
+def _classify_audit_line(message):
+    for prefix, action in _AUDIT_LINE_PREFIXES:
+        if message.startswith(prefix):
+            return action
+    return "other"
+
+
+def _query_loki_project_lines(project_id, limit):
+    # Filtering on the bare project_id string (rather than trying to match
+    # every log line's differently-named key -- some use `project=`,
+    # created project uses `id=`) is deliberate: it's a high-entropy UUID,
+    # so a substring match is already effectively exact, and it matches
+    # every current and future log line mentioning this project without
+    # having to keep this query in sync with every log statement's format.
+    end_ns = int(time.time() * 1_000_000_000)
+    start_ns = end_ns - AUDIT_LOG_LOOKBACK_SECONDS * 1_000_000_000
+    query = '{job="%s"} |= `%s`' % (LOKI_JOB_LABEL, project_id)
+    r = requests.get(
+        f"{LOKI_URL}/loki/api/v1/query_range",
+        params={
+            "query": query,
+            "start": start_ns,
+            "end": end_ns,
+            "limit": limit,
+            "direction": "backward",
+        },
+        timeout=10,
+    )
+    r.raise_for_status()
+    return r.json()["data"]["result"]
+
+
+@app.route("/v1/projects/<project_id>/audit-log", methods=["GET"])
+def project_audit_log(project_id):
+    """Read-only audit trail of self-service actions taken against this
+    project -- create/update/delete, member add/change/remove, leave,
+    including denied attempts -- sourced from this service's own request
+    logs via Loki rather than a separate datastore (every mutating action
+    above already logs project id, actor, and outcome). Same admin-or-
+    domain-admin authorization as member management (_authorize_member_
+    admin): this exposes who did what to the project, which is at least
+    as sensitive as the membership list itself."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+
+    _, _, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+
+    try:
+        limit = min(int(request.args.get("limit", 100)), 500)
+    except ValueError:
+        return jsonify(error="'limit' must be an integer"), 400
+
+    try:
+        # Over-fetch: most lines Loki matches on the bare project_id
+        # substring are this service's own unrelated access-log traffic
+        # (e.g. this very audit-log request, or a GET .../members poll),
+        # filtered out by _LOG_LINE_RE above, not the audit lines
+        # themselves -- asking Loki for exactly `limit` raw lines would
+        # often return far fewer than `limit` real audit entries.
+        streams = _query_loki_project_lines(project_id, min(limit * 5, 2000))
+    except requests.RequestException as exc:
+        log.warning("audit-log query failed project=%s: %s", project_id, exc)
+        return jsonify(error="audit log backend unavailable"), 502
+
+    entries = []
+    for stream in streams:
+        for ts_ns, line in stream.get("values", []):
+            m = _LOG_LINE_RE.match(line.strip())
+            if not m:
+                continue
+            level, message = m.groups()
+            entries.append(
+                {
+                    "timestamp": datetime.datetime.fromtimestamp(
+                        int(ts_ns) / 1_000_000_000, tz=datetime.timezone.utc
+                    ).isoformat(),
+                    "level": level,
+                    "action": _classify_audit_line(message),
+                    "message": message,
+                }
+            )
+    entries.sort(key=lambda e: e["timestamp"], reverse=True)
+    return jsonify(entries=entries[:limit])
 
 
 @app.route("/v1/domain-admin", methods=["GET"])

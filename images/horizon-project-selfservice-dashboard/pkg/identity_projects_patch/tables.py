@@ -310,6 +310,25 @@ class LeaveProjectSelfService(tables.LinkAction):
         return reverse(self.url, args=[project.id])
 
 
+class AuditLogSelfService(tables.LinkAction):
+    name = "audit_log_selfservice"
+    verbose_name = _("Audit Log")
+    url = "horizon:identity:projects:audit_log_selfservice"
+    icon = "list"
+
+    def allowed(self, request, project):
+        # Unconditional, same reasoning as every other self-service action
+        # in this table -- project-facade's own audit-log endpoint is the
+        # real gate (admin on this project or its domain, same check as
+        # Manage Members); a non-admin who follows this link sees that
+        # endpoint's own error message rather than an empty or misleading
+        # table.
+        return True
+
+    def get_link_url(self, project):
+        return reverse(self.url, args=[project.id])
+
+
 class TenantFilterAction(tables.FilterAction):
     filter_type = "server"
     filter_choices = (('name', _("Project Name ="), True),
@@ -366,7 +385,8 @@ class TenantsTable(tables.DataTable):
         row_actions = (UpdateGroupsLink, UpdateProject,
                        UsageLink, ModifyQuotas, DeleteTenantsAction,
                        DeleteProjectSelfService, ManageMembersSelfService,
-                       LeaveProjectSelfService, RescopeTokenToProject)
+                       AuditLogSelfService, LeaveProjectSelfService,
+                       RescopeTokenToProject)
         table_actions = (TenantFilterAction, CreateProject,
                          CreateProjectSelfService, DeleteTenantsAction)
         pagination_param = "tenant_marker"

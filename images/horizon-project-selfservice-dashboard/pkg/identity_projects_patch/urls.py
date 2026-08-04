@@ -20,10 +20,10 @@
 # permission tier: self-service project lifecycle"): `create_selfservice`
 # and, added later, `manage_members_selfservice`/
 # `manage_members_selfservice_add`/`manage_members_selfservice_change_role`/
-# `leave_selfservice` -- appended to the stock URL list below unchanged.
-# Kept as a full copy of the upstream file (rather than trying to
-# monkeypatch urlpatterns from outside it) so a diff against the real
-# upstream file shows exactly these additions.
+# `leave_selfservice`/`audit_log_selfservice` -- appended to the stock URL
+# list below unchanged. Kept as a full copy of the upstream file (rather
+# than trying to monkeypatch urlpatterns from outside it) so a diff
+# against the real upstream file shows exactly these additions.
 
 from django.urls import re_path
 
@@ -56,4 +56,7 @@ urlpatterns = [
     re_path(r'^(?P<project_id>[^/]+)/leave_selfservice$',
             selfservice_views.LeaveProjectView.as_view(),
             name='leave_selfservice'),
+    re_path(r'^(?P<project_id>[^/]+)/audit_log_selfservice$',
+            selfservice_views.AuditLogView.as_view(),
+            name='audit_log_selfservice'),
 ]
