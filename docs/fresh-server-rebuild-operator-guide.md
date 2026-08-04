@@ -208,7 +208,9 @@ ansible-playbook -i inventory/local/hosts.yml playbooks/60-verify.yml
 Create a disposable project and verify Keystone authentication, Glance image
 upload, VM boot and metadata, security groups, overlapping VPC CIDRs, SNAT and
 Floating IP, Cinder attach/write/reboot, Heat, Designate, Barbican, OVN and
-Amphora load balancers, and a Magnum workload cluster. Repeat critical checks
+Amphora load balancers, and a Magnum workload cluster. For the workload,
+verify a Kubernetes LoadBalancer Service uses the Octavia `ovn` provider with
+`SOURCE_IP_PORT` and serves real traffic through its floating IP. Repeat critical checks
 while draining or powering off controllers and storage nodes one at a time.
 
 Record the inventory commit/bundle checksums, Git revisions, command logs,

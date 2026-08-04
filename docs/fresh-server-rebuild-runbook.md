@@ -226,7 +226,8 @@ The build order is dependency-aware: independent OpenStack extensions,
 Magnum base, Magnum GitOps/writer, VPC binaries, complete Horizon,
 project-facade, and CAPO. The complete Horizon build starts from the pinned
 Airship image and installs Octavia Dashboard, VPC Dashboard, Designate
-Dashboard, and project self-service in one image. Historical Horizon
+Dashboard, Magnum UI, ENI integration, and project self-service in one image.
+Historical Horizon
 intermediate digests are not bootstrap inputs.
 
 Every emitted value is an immutable `repository:tag@sha256:...` reference.
@@ -257,6 +258,13 @@ Amphora resources, Horizon/Skyline extensions, and the VPC control
 plane/dashboard from their pinned repositories after their independent
 acceptance gates.
 
+`magnum-capi-gitops/reconcile-platform.sh` protects legacy project namespaces
+before updating the repository writer. Older rendered packages claimed the
+namespace as an Argo-owned object; skipping this migration can prune the cloud
+credential before CAPO finishes deleting Nova, Neutron and Octavia resources.
+Review `docs/namespace-ownership-migration.md` in that repository before the
+first reconcile of an upgraded installation.
+
 ## Phase 8 — Acceptance and failure tests
 
 ```bash
@@ -272,8 +280,13 @@ latest scheduled synthetic test must still be successful.
 In addition to script checks, create disposable tenants and verify identity,
 image upload, VM boot, metadata, security groups, isolated overlapping VPC
 CIDRs, SNAT/Floating IP Internet access, Cinder attach/mount/write/reboot,
-Heat, Designate, Barbican, OVN and Amphora load balancers, Ironic API, and a
-one-control-plane/one-worker Magnum cluster.
+Heat, Designate, Barbican, native OVN and Amphora load balancers, Ironic API,
+and a one-control-plane/one-worker Magnum cluster. Inside the workload cluster,
+create a Kubernetes `Service type=LoadBalancer` and require Octavia provider
+`ovn`, algorithm `SOURCE_IP_PORT`, a reachable floating IP, and real HTTP
+traffic. The cloud-provider values must include `lb-provider: ovn`,
+`lb-method: SOURCE_IP_PORT`, and
+`provider-requires-serial-api-calls: true`.
 
 The automated IAM acceptance creates disposable users for admin, operator,
 member, reader, network-operator, and security-operator groups. It verifies

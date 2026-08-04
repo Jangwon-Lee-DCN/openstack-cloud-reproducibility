@@ -10,7 +10,7 @@ External platform dependencies are owned by the sibling
 [`deployment/prerequisites/`](../prerequisites/README.md) workspace. Its
 component matrix defines which lifecycle belongs here and which does not.
 
-The PoC foundation deployment is in progress. As of 2026-07-25, the following
+The PoC foundation deployment is operational. As of 2026-08-04, the following
 OpenStack-Helm `2026.1.0` releases are installed and healthy in the `openstack`
 namespace:
 
@@ -31,6 +31,8 @@ namespace:
   `cloud-controller-0` is registered as the active KVM compute
 - `heat` with two API, CFN, and engine replicas
 - `horizon` with two dashboard replicas
+- `magnum` with the CAPI GitOps driver, backed by CAPI/CAPO/ORC, Argo CD,
+  Porch and the repository writer
 - control-only `ironic` with two API and two conductor replicas; PXE, HTTP boot,
   cleaning-network creation, image bootstrap, and hardware enrollment are disabled
 
@@ -75,8 +77,14 @@ Octavia, Designate, Barbican, monitoring, and logging have passed their PoC
 deployment phases. The exact Designate and PowerDNS chart fixes and packages
 are preserved in this repository.
 
-Magnum, CAPI, and CAPO are explicitly outside this deployment milestone. Their
-future feasibility work is documented at the project level.
+Horizon HA static asset behavior and its required verification are documented
+in [`18-horizon-ha-static-assets.md`](18-horizon-ha-static-assets.md).
+
+Magnum, CAPI, CAPO and ORC are part of the accepted managed-Kubernetes path.
+Magnum requests render approval-gated Git packages which Argo CD reconciles on
+the management cluster. The exact topology and operational contract are in
+[`magnum-capi.md`](magnum-capi.md); renderer source and migration procedures
+are pinned in the sibling `magnum-capi-gitops` repository.
 
 ## Repository Layout
 

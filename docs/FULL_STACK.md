@@ -56,6 +56,13 @@ zones, Octavia load balancers, every VPC panel, and Identity including the
 project self-service extension) loads for a real logged-in user, plus a
 full IAM persona regression pass.
 
+Horizon runs two replicas with database-backed sessions. Runtime compression
+remains enabled because its templates include the request-aware `/horizon`
+prefix, but compressor metadata is isolated in a pod-local cache to match the
+pod-local static volume. `verify-full-stack.sh` rejects divergent Angular
+preload bundle hashes across replicas; do not restore the former post-Helm
+ConfigMap mutation or a shared compressor cache.
+
 ## Environment boundary
 
 The release snapshots reproduce the current PoC, including environment-specific

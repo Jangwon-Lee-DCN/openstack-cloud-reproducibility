@@ -1,16 +1,17 @@
 # Reproducibility Model
 
-## Commit layers
+## Change layers
 
-- `4c3a128`: untouched OpenStack-Helm 2026.1.0 source and packages
-- `0f36024`: deployment-specific image, values, manifest, and encrypted
-  Secret corrections
-- `8b6ffc0`: deterministic base pins and executable reconciliation runbooks
+The current `main` branch, `release-lock.yaml`, SOPS release snapshots and
+digest-pinned image values together define the accepted deployment. Do not use
+old documentation commit IDs as rebuild inputs: record and bundle the exact
+commit selected for each new installation.
 
-Use `git diff 4c3a128..HEAD` to inspect every local addition. The upstream
-chart trees should remain unchanged unless a chart source patch is necessary.
-Such a patch must be a dedicated commit and a package must also be written to
-`helm/packages/patched` with checksums.
+Upstream chart trees should remain unchanged unless a chart source patch is
+necessary. Such a patch must be a dedicated commit, be represented in the
+locked package/checksum inventory, and have a render or runtime regression
+test. Use `git log --reverse` and the component records when auditing how the
+current state differs from the imported upstream baseline.
 
 ## Determinism boundaries
 

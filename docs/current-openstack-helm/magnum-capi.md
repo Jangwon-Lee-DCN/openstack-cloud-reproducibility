@@ -117,6 +117,13 @@ explicitly flagged. The details view reports workload access, compute capacity,
 effective labels, health and the Magnum -> Git -> Argo CD -> CAPI/CAPO flow;
 legacy Heat stack fields are not treated as the source of truth.
 
+Operational actions match that asynchronous lifecycle. Kubeconfig downloads
+use an explicit `_kubeconfig.yaml` filename, resize is presented as worker node
+group scaling, and rolling upgrade/resize actions are offered only from stable
+`*_COMPLETE` states. The detail page shows the six request-to-ready phases,
+GitOps ownership, node-group capacity, compatibility warnings and recovery
+guidance.
+
 The UI overlay is maintained under `images/horizon-magnum-dashboard`. Its
 patcher asserts the exact upstream 18.0.0 source shape and fails the image build
 if a future wheel cannot be patched completely. The same overlay is included
@@ -142,7 +149,20 @@ ONLINE load balancer and that its member targets the control-plane VM on TCP
 that the endpoint floating IP is associated directly with the control-plane
 Neutron port.
 
+Workload Kubernetes `Service type=LoadBalancer` resources use the OVN Octavia
+provider rather than Amphora. The vendored cloud-provider contract fixes
+`lb-provider: ovn`, `lb-method: SOURCE_IP_PORT`, and
+`provider-requires-serial-api-calls: true`; acceptance must confirm the
+provider and real floating-IP traffic, not merely creation of a Service object.
+
 ## Safe reconciliation
+
+- Before rolling a current repository writer over packages created by an
+  older renderer, run the namespace ownership protection described in
+  `magnum-capi-gitops/docs/namespace-ownership-migration.md`. The platform
+  reconcile entry point applies the protection automatically. Detach stale
+  Argo tracking only after every affected Application has synced a
+  namespace-free revision.
 
 - A Nova server in `ERROR` is not retried in place by CAPO. Correct the host or
   cloud cause, then delete only the owning CAPI `Machine`; the control-plane or
