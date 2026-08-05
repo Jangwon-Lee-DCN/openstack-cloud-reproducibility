@@ -8,13 +8,15 @@ BUILD_ID=${BUILD_ID:-$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)}
 VPC_DASHBOARD_REPO=${VPC_DASHBOARD_REPO:-$REPO_ROOT/../openstack-vpc-dashboard}
 VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
+TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
+S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 KANIKO_IMAGE=gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
 
 for command in kubectl sops git tar sha256sum go; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
-for repo in "$VPC_DASHBOARD_REPO" "$VPC_CONTROL_PLANE_REPO" "$MAGNUM_GITOPS_REPO"; do
+for repo in "$VPC_DASHBOARD_REPO" "$VPC_CONTROL_PLANE_REPO" "$MAGNUM_GITOPS_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO"; do
   git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
     echo "refusing to build from dirty source repository: $repo" >&2; exit 1;
   }
@@ -131,10 +133,14 @@ done
 # One upstream-rooted Horizon image replaces the historical private-image
 # layer chain. The wheel must be rebuilt from the locked dashboard checkout.
 (cd "$VPC_DASHBOARD_REPO" && python3 -m build && make verify-wheel)
+(cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
+(cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
 horizon_context="$WORK_DIR/horizon-complete"
 mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui"
 cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
 cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
+cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
+cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"
 cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$horizon_context/octavia-workflow/"
 cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
 cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
