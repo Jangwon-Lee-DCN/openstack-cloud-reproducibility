@@ -16,13 +16,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
-# Local change (see docs/proposals/iam-hardening/README.md, "New permission
-# tier: self-service project lifecycle"): IndexView.get_data() below gains
-# a fallback when the admin-style project listing call fails, right where
-# the original raised a generic error. Everything else is an unmodified
-# copy of the upstream file, kept whole (rather than monkeypatching the
-# method from outside it) so a diff against the real upstream file shows
-# exactly that one addition.
+# Local changes (see docs/proposals/iam-hardening/README.md, "New permission
+# tier: self-service project lifecycle"): IndexView.get_data() gains a
+# fallback when the admin-style project listing call fails, right where
+# the original raised a generic error. Later (see "Splitting Identity >
+# Projects into real vs. platform/service projects"), IndexView is
+# rebuilt on horizon.tables.MultiTableView -- the single get_data() call
+# becomes _fetch_and_split_tenants() (same fetch logic, unchanged) plus
+# classify_tenant() and two get_<table>_data() methods. Everything else
+# is an unmodified copy of the upstream file, kept whole (rather than
+# monkeypatching methods from outside it) so a diff against the real
+# upstream file shows exactly these additions.
 
 from django.conf import settings
 from django.urls import reverse
@@ -78,22 +82,102 @@ class TenantContextMixin(object):
         return context
 
 
-class IndexView(tables.DataTableView):
-    table_class = project_tables.TenantsTable
+# Domain this whole self-service line of features targets (see "New
+# permission tier: self-service project lifecycle") -- the only domain a
+# real end user would ever create/manage a project in through this UI.
+# Everything else (Default, service, magnum, heat, ...) exists for
+# OpenStack's own bootstrapping and per-service accounts, never touched
+# by a human through Identity > Projects in normal operation.
+_SELF_SERVICE_DOMAIN_NAME = "dcn"
+# Project name patterns openstack-helm/kolla-ansible bootstrapping is
+# known to create in THIS deployment, kept as a second signal alongside
+# the domain check above (belt-and-suspenders in case a service project
+# somehow ever lands inside the dcn domain, which none currently do).
+_SERVICE_PROJECT_NAMES = {"service", "admin"}
+_SERVICE_PROJECT_NAME_PREFIXES = ("internal_",)
+# Keystone's own bootstrap/service project descriptions -- observed live
+# ("Bootstrap project for initializing the cloud.", "Service Project for
+# <service>") -- checked as a prefix since the service name varies.
+_SERVICE_DESCRIPTION_PREFIXES = ("Bootstrap project", "Service Project for")
+
+
+class IndexView(tables.MultiTableView):
+    table_classes = (project_tables.TenantsTable, project_tables.ServiceProjectsTable)
     template_name = 'identity/projects/index.html'
     page_title = _("Projects")
+
+    @staticmethod
+    def classify_tenant(tenant, domain_name):
+        """True if `tenant` looks like an OpenStack-service/platform-
+        created project rather than a real one a human should be
+        editing through this self-service UI -- see the module-level
+        comment above each signal for where it comes from. Domain is
+        checked first and normally decides it alone (every project seen
+        live outside the dcn domain is a service project of some kind,
+        every real self-service project is created inside it); the
+        name/description checks are a safety net, not the primary
+        signal."""
+        if domain_name and domain_name.lower() != _SELF_SERVICE_DOMAIN_NAME:
+            return True
+        name = getattr(tenant, "name", "") or ""
+        if name in _SERVICE_PROJECT_NAMES or name.startswith(_SERVICE_PROJECT_NAME_PREFIXES):
+            return True
+        description = getattr(tenant, "description", "") or ""
+        return description.startswith(_SERVICE_DESCRIPTION_PREFIXES)
 
     def needs_filter_first(self, table):
         return self._needs_filter_first
 
     def has_more_data(self, table):
-        return self._more
+        return self._more.get(table._meta.name, False)
 
-    def get_data(self):
+    def get_filters(self, filters=None, filters_map=None):
+        # tables.DataTableView.get_filters() (the version this is adapted
+        # from) reads off self.table, a single memoized table instance
+        # that only exists on that single-table base class.
+        # MultiTableView has no such attribute -- there are two tables,
+        # so this sources filters from TenantsTable specifically (the
+        # "real projects" table), which is also the only one of the two
+        # still carrying a TenantFilterAction -- see ServiceProjectsTable
+        # for why the other one deliberately doesn't.
+        filters = filters or {}
+        filters_map = filters_map or {}
+        table = self.get_tables().get(project_tables.TenantsTable._meta.name)
+        filter_action = table._meta._filter_action if table else None
+        if filter_action:
+            filter_field = table.get_filter_field()
+            if filter_action.is_api_filter(filter_field):
+                filter_string = table.get_filter_string().strip()
+                if filter_field and filter_string:
+                    filter_map = filters_map.get(filter_field, {})
+                    filters[filter_field] = filter_string
+                    for k, v in filter_map.items():
+                        if filter_string.lower() == k:
+                            filters[filter_field] = v
+                            break
+        return filters
+
+    def _fetch_and_split_tenants(self):
+        # Same fetch as the original single-table get_data() (unchanged
+        # below), just followed by a classify_tenant() split instead of
+        # returning one flat list. Cached on the instance since
+        # MultiTableView calls get_tenants_data() and
+        # get_service_tenants_data() separately but both need the exact
+        # same underlying fetch -- fetching twice would double the
+        # Keystone calls and risk the two tables disagreeing if
+        # something changed between them.
+        if hasattr(self, "_split_tenants"):
+            return self._split_tenants
+
         tenants = []
-        marker = self.request.GET.get(
-            project_tables.TenantsTable._meta.pagination_param, None)
-        self._more = False
+        # Both tables' pagination markers are read here since whichever
+        # table's "next page" link was clicked is the one whose marker
+        # will be present; the other stays None (first page).
+        marker = (
+            self.request.GET.get(project_tables.TenantsTable._meta.pagination_param)
+            or self.request.GET.get(project_tables.ServiceProjectsTable._meta.pagination_param)
+        )
+        self._more = {}
         filters = self.get_filters()
 
         self._needs_filter_first = False
@@ -107,12 +191,13 @@ class IndexView(tables.DataTableView):
             if (setting_utils.get_dict_config(
                     'FILTER_DATA_FIRST', 'identity.projects') and not filters):
                 self._needs_filter_first = True
-                self._more = False
-                return tenants
+                self._split_tenants = ([], [])
+                return self._split_tenants
 
             domain_id = identity.get_domain_id_for_operation(self.request)
+            more = False
             try:
-                tenants, self._more = api.keystone.tenant_list(
+                tenants, more = api.keystone.tenant_list(
                     self.request,
                     domain=domain_id,
                     paginate=True,
@@ -141,7 +226,7 @@ class IndexView(tables.DataTableView):
                 # uses for users who never had list_projects in the
                 # first place, instead of surfacing that as an error.
                 try:
-                    tenants, self._more = api.keystone.tenant_list(
+                    tenants, more = api.keystone.tenant_list(
                         self.request,
                         user=self.request.user.id,
                         paginate=True,
@@ -153,8 +238,9 @@ class IndexView(tables.DataTableView):
                                       _("Unable to retrieve project list."))
         elif policy.check((("identity", "identity:list_user_projects"),),
                           self.request):
+            more = False
             try:
-                tenants, self._more = api.keystone.tenant_list(
+                tenants, more = api.keystone.tenant_list(
                     self.request,
                     user=self.request.user.id,
                     paginate=True,
@@ -165,6 +251,7 @@ class IndexView(tables.DataTableView):
                 exceptions.handle(self.request,
                                   _("Unable to retrieve project information."))
         else:
+            more = False
             msg = \
                 _("Insufficient privilege level to view project information.")
             messages.info(self.request, msg)
@@ -173,7 +260,33 @@ class IndexView(tables.DataTableView):
         for t in tenants:
             t.domain_name = domain_lookup.get(t.domain_id)
 
-        return tenants
+        real, service = [], []
+        for t in tenants:
+            (service if self.classify_tenant(t, t.domain_name) else real).append(t)
+
+        # Both tables report the same "more" flag from the single
+        # underlying paginated fetch -- there's no way to know
+        # separately whether more *real* vs. more *service* projects
+        # remain without fetching every page up front, which would
+        # defeat the point of pagination. Slightly imprecise (a "next"
+        # link might appear on a table that turns out to have no more
+        # matches once the next page is split), but never wrong in the
+        # unsafe direction: it undershoots into "click next and see",
+        # not into hiding real data.
+        self._more = {
+            project_tables.TenantsTable._meta.name: more,
+            project_tables.ServiceProjectsTable._meta.name: more,
+        }
+        self._split_tenants = (real, service)
+        return self._split_tenants
+
+    def get_tenants_data(self):
+        real, _service = self._fetch_and_split_tenants()
+        return real
+
+    def get_service_tenants_data(self):
+        _real, service = self._fetch_and_split_tenants()
+        return service
 
 
 class ProjectUsageView(usage.UsageView):

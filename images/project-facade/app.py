@@ -366,6 +366,48 @@ def user_has_domain_role(user_id, domain_id, role_name):
     return bool(user_groups & granted_groups)
 
 
+def user_has_system_admin_role(caller_token, user_id):
+    """True if this user directly holds `admin` at system scope -- the
+    real cloud-wide administrator (e.g. the bootstrap "admin" account,
+    confirmed live to hold exactly this), who should pass every
+    domain-admin check in this service for OS_DOMAIN_NAME same as any
+    other domain, without needing a direct or group-derived grant on
+    that specific domain.
+
+    Deliberately queries with the CALLER's own token, not this
+    service's domain-scoped service credential (keystone_headers()) --
+    confirmed live that the two give different answers for the exact
+    same query. This service's credential is intentionally scoped to
+    administer only OS_DOMAIN_NAME (see the module docstring), and
+    Keystone's role_assignments API enforces that boundary: querying
+    another user's assignments with it silently returns nothing for
+    anything outside that domain, including system-scope grants, even
+    though the data exists. The caller's own token, whatever scope it's
+    currently using, is allowed to see the caller's *own* full role
+    assignment set via Keystone's self-lookup allowance -- confirmed by
+    comparing both queries live for the same admin user.
+
+    Also checked separately from user_has_domain_role because Keystone's
+    role_assignments API on this deployment silently drops system-scoped
+    entries when effective=true is passed (confirmed live) -- so this
+    deliberately queries without it, at the cost of only seeing *direct*
+    system-scope grants, not group-derived ones (there's no
+    effective-expansion path here that doesn't also lose the
+    system-scope entries)."""
+    role_id = role_id_by_name(ADMIN_ROLE)
+    if not role_id:
+        return False
+    r = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers={"X-Auth-Token": caller_token},
+        params={"user.id": user_id},
+        timeout=10,
+    )
+    if r.status_code != 200:
+        return False
+    return any(a["role"]["id"] == role_id and "system" in a.get("scope", {}) for a in r.json()["role_assignments"])
+
+
 def user_has_project_role(user_id, project_id, role_name):
     role_id = role_id_by_name(role_name)
     if not role_id:
@@ -581,8 +623,10 @@ def _authorize_member_admin(caller_token, project_id):
     if not project:
         return None, None, (jsonify(error="project not found"), 404)
 
-    if user_has_project_role(user_id, project_id, ADMIN_ROLE) or user_has_domain_role(
-        user_id, project["domain_id"], ADMIN_ROLE
+    if (
+        user_has_project_role(user_id, project_id, ADMIN_ROLE)
+        or user_has_domain_role(user_id, project["domain_id"], ADMIN_ROLE)
+        or user_has_system_admin_role(caller_token, user_id)
     ):
         return (user_id, user_name), project, None
 
@@ -1238,7 +1282,10 @@ def check_domain_admin():
     (whatever-scope) token just to identify who they are, then answers the
     question itself via user_has_domain_role(), which already correctly
     resolves group-derived (federated) role membership -- the same check
-    create_project() uses for the project-creator role."""
+    create_project() uses for the project-creator role. Also true for the
+    real cloud-wide administrator (user_has_system_admin_role) even
+    though they hold no direct or group-derived grant on this specific
+    domain -- see that function's docstring."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
@@ -1248,7 +1295,9 @@ def check_domain_admin():
     user_id, _user_name = ident
 
     domain_id = get_domain_id(OS_DOMAIN_NAME)
-    is_admin = bool(domain_id) and user_has_domain_role(user_id, domain_id, ADMIN_ROLE)
+    is_admin = (bool(domain_id) and user_has_domain_role(user_id, domain_id, ADMIN_ROLE)) or user_has_system_admin_role(
+        caller_token, user_id
+    )
     return jsonify(is_domain_admin=is_admin, domain=OS_DOMAIN_NAME), 200
 
 
@@ -1282,7 +1331,9 @@ def simulate_access(project_id):
         return jsonify(error="project not found"), 404
 
     is_project_admin = user_has_project_role(user_id, project_id, ADMIN_ROLE)
-    is_domain_admin = user_has_domain_role(user_id, project["domain_id"], ADMIN_ROLE)
+    is_domain_admin = user_has_domain_role(user_id, project["domain_id"], ADMIN_ROLE) or user_has_system_admin_role(
+        caller_token, user_id
+    )
     is_member_admin_eligible = is_project_admin or is_domain_admin  # _authorize_member_admin's rule
     immutable = bool(project.get("options", {}).get("immutable"))
     admin_ids = _effective_admin_user_ids(project_id)
@@ -1449,7 +1500,9 @@ def domain_projects_overview():
     user_id, _user_name = ident
 
     domain_id = get_domain_id(OS_DOMAIN_NAME)
-    if not domain_id or not user_has_domain_role(user_id, domain_id, ADMIN_ROLE):
+    if not domain_id or not (
+        user_has_domain_role(user_id, domain_id, ADMIN_ROLE) or user_has_system_admin_role(caller_token, user_id)
+    ):
         return jsonify(error="forbidden: you are not an admin of this domain"), 403
 
     r = requests.get(

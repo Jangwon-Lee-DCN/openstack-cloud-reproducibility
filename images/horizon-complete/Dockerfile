@@ -64,6 +64,7 @@ COPY project-selfservice/project_selfservice_dashboard/ /var/lib/openstack/lib/p
 COPY project-selfservice/identity_projects_patch/tables.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tables.py
 COPY project-selfservice/identity_projects_patch/urls.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/urls.py
 COPY project-selfservice/identity_projects_patch/views.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/views.py
+COPY project-selfservice/identity_projects_patch/templates/projects/index.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/templates/projects/index.html
 COPY project-selfservice/enabled/_1800_project_selfservice_app.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1800_project_selfservice_app.py
 
 RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/enabled \

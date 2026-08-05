@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:5d1eae1d13ae37e37c3a155b7308491515742008e0456852574ea2716371a2f8
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon@sha256:4472855aeb2ac52ccae2124b9036edb2c77d527b23a60b968d326ab846a97327
 pod:
   image_pull_secrets:
     horizon:
@@ -31,6 +31,17 @@ conf:
               protocol: openid
         use_ssl: "True"
         endpoint_type: internalURL
+        # A bare YAML boolean here renders lowercase ("true"/"false") into
+        # local_settings.py's raw Python source via this chart's
+        # unquoted {{ .Values...enable_backup }} template (values.yaml
+        # line ~558) -- invalid Python (NameError: name 'true' is not
+        # defined), confirmed live: crash-looped every new Horizon pod
+        # during a routine digest bump, saved only by the disruption
+        # budget keeping one old-image replica alive throughout. Must be
+        # the quoted Python-literal string "True"/"False", matching the
+        # chart's own default (enable_backup: "True" in values.yaml).
+        openstack_cinder_features:
+          enable_backup: "True"
         csrf_cookie_secure: "True"
         session_cookie_secure: "True"
         secure_proxy_ssl_header: true

@@ -62,7 +62,7 @@ spec:
         - name: telemetry-harbor-push
       containers:
         - name: project-facade
-          image: registry.dcn.ssu.ac.kr/openstack/project-facade@sha256:24ccf2db073a8b5cdec61ec208eda2404b07d27d8ae29be5a962934cc524c2c1
+          image: registry.dcn.ssu.ac.kr/openstack/project-facade@sha256:19dcd97f5fd6c896177eec961c0becf2cff12060f29e05b973e249f622ffc3d0
           ports:
             - containerPort: 8080
               name: http

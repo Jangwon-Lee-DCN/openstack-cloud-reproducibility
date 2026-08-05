@@ -445,3 +445,31 @@ class TenantsTable(tables.DataTable):
                          DomainProjectsOverviewLink, RoleBundlesLink,
                          DeleteTenantsAction)
         pagination_param = "tenant_marker"
+
+
+class ServiceProjectsTable(TenantsTable):
+    """Same columns/actions as TenantsTable -- this is the identical
+    projects table, just fed the OpenStack-service/platform-created
+    subset instead of the self-service-relevant subset (see
+    identity_projects_patch/views.py's IndexView.classify_tenant for the
+    actual split). A distinct Meta.name is required by Horizon's
+    MultiTableView (each table on a page needs its own data-method
+    name); everything else deliberately unchanged -- an admin looking at
+    one of these should have exactly the same tools available as for any
+    other project. The one exception is TenantFilterAction (see Meta.
+    table_actions below): both tables are fed by a single shared
+    Keystone query (IndexView._fetch_and_split_tenants), which can only
+    ever apply one filter value, and TenantsTable's own filter box is
+    already that query's authoritative source (IndexView.get_filters)
+    -- a second, independent-looking filter box here that silently
+    doesn't do anything on its own would be worse than not having one.
+    """
+
+    class Meta(TenantsTable.Meta):
+        name = "service_tenants"
+        verbose_name = _("Platform / Service Projects")
+        # Distinct from TenantsTable's own "tenant_marker" -- two tables
+        # paginating on the same page must not share a marker param, or
+        # paging one would misapply its marker to the other.
+        pagination_param = "service_tenant_marker"
+        table_actions = tuple(a for a in TenantsTable.Meta.table_actions if a is not TenantFilterAction)
