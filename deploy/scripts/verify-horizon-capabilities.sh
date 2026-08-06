@@ -69,7 +69,7 @@ assert str(identity.get_panel("users").name) == "User Accounts"
 from openstack_dashboard.dashboards.identity.projects import tabs as project_tabs
 from openstack_dashboard.dashboards.identity.projects import views as project_views
 assert [tab.slug for tab in project_tabs.ProjectDetailTabs.tabs] == [
-    "overview", "members", "groups",
+    "overview", "members", "groups", "quota_usage",
 ]
 assert len(project_views.IndexView.table_classes) == 1
 assert project_views.IndexView.table_classes[0]._meta.name == "tenants"

@@ -139,6 +139,16 @@ def remove_project_group(request, project_id, group_id):
         raise FacadeError(_error_message(r))
 
 
+def quota_usage(request, project_id):
+    try:
+        r = requests.get(f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/quota-usage", headers=_headers(request), timeout=15)
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
 def add_member(request, project_id, username, roles):
     try:
         r = requests.post(

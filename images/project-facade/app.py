@@ -887,6 +887,60 @@ def remove_project_group(project_id, group_id):
     return "", 204
 
 
+def _quota_row(service, resource, used, limit):
+    unlimited = limit is None or int(limit) < 0
+    percent = 0 if unlimited or not limit else round((int(used) / int(limit)) * 100)
+    state = "unlimited" if unlimited else ("exhausted" if percent >= 100 else "warning" if percent >= 80 else "ok")
+    return {"service": service, "resource": resource, "used": int(used), "limit": -1 if unlimited else int(limit), "percent": percent, "state": state}
+
+
+@app.route("/v1/projects/<project_id>/quota-usage", methods=["GET"])
+def project_quota_usage(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    _ident, _project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    token = _get_project_scoped_token(project_id)
+    headers = {"X-Auth-Token": token}
+    rows, errors = [], []
+    try:
+        response = requests.get(f"{NOVA_URL}/limits", headers=headers, timeout=10)
+        response.raise_for_status()
+        limits = response.json()["limits"]["absolute"]
+        for resource, used_key, limit_key in (
+            ("Instances", "totalInstancesUsed", "maxTotalInstances"),
+            ("vCPUs", "totalCoresUsed", "maxTotalCores"),
+            ("RAM (MiB)", "totalRAMUsed", "maxTotalRAMSize"),
+        ):
+            rows.append(_quota_row("Compute", resource, limits.get(used_key, 0), limits.get(limit_key, -1)))
+    except Exception as exc:
+        errors.append(f"Compute: {exc}")
+    try:
+        response = requests.get(f"{CINDER_URL}/limits", headers=headers, timeout=10)
+        response.raise_for_status()
+        limits = response.json()["limits"]["absolute"]
+        for resource, used_key, limit_key in (
+            ("Volumes", "totalVolumesUsed", "maxTotalVolumes"),
+            ("Snapshots", "totalSnapshotsUsed", "maxTotalSnapshots"),
+            ("Storage (GiB)", "totalGigabytesUsed", "maxTotalVolumeGigabytes"),
+        ):
+            rows.append(_quota_row("Block Storage", resource, limits.get(used_key, 0), limits.get(limit_key, -1)))
+    except Exception as exc:
+        errors.append(f"Block Storage: {exc}")
+    try:
+        response = requests.get(f"{NEUTRON_URL}/quotas/{project_id}/details", headers=headers, timeout=10)
+        response.raise_for_status()
+        quota = response.json()["quota"]
+        for key, label in (("network", "Networks"), ("subnet", "Subnets"), ("port", "Ports"), ("router", "Routers"), ("floatingip", "Floating IPs"), ("security_group", "Security Groups")):
+            if key in quota:
+                rows.append(_quota_row("Network", label, quota[key].get("used", 0), quota[key].get("limit", -1)))
+    except Exception as exc:
+        errors.append(f"Network: {exc}")
+    return jsonify(rows=rows, errors=errors), 200
+
+
 def _project_tags(project_id):
     r = requests.get(f"{OS_AUTH_URL}/projects/{project_id}/tags", headers=keystone_headers(), timeout=10)
     r.raise_for_status()

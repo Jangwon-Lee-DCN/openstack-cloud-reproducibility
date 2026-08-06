@@ -109,6 +109,28 @@ class GroupsTab(tabs.TableTab):
             return []
 
 
+class QuotaUsageTab(tabs.TableTab):
+    table_classes = (selfservice_tables.QuotaUsageTable,)
+    name = _("Quota & Usage")
+    slug = "quota_usage"
+    template_name = "horizon/common/_detail_table.html"
+    preload = False
+
+    def __init__(self, tab_group, request):
+        tab_group.kwargs["project_id"] = tab_group.kwargs["project"].id
+        super().__init__(tab_group, request)
+
+    def get_quota_usage_data(self):
+        try:
+            result = facade.quota_usage(self.request, self.tab_group.kwargs["project"].id)
+            for error in result.get("errors", []):
+                exceptions.handle(self.request, _("Partial quota data unavailable: %s") % error)
+            return [SimpleNamespace(**row) for row in result["rows"]]
+        except facade.FacadeError:
+            exceptions.handle(self.request, _("Unable to retrieve project quota usage."))
+            return []
+
+
 class ProjectDetailTabs(tabs.DetailTabsGroup):
     slug = "project_details"
-    tabs = (OverviewTab, MembersTab, GroupsTab)
+    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab)

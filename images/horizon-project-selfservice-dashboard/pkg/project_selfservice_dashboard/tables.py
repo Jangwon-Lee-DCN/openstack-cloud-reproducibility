@@ -140,6 +140,33 @@ class ProjectGroupsTable(tables.DataTable):
         row_actions = (ChangeProjectGroupRoles, RemoveProjectGroup)
 
 
+def _quota_limit(row):
+    return _("Unlimited") if row.limit < 0 else row.limit
+
+
+def _quota_usage(row):
+    if row.limit < 0:
+        return str(row.used)
+    return _("%(used)s of %(limit)s (%(percent)s%%)") % {
+        "used": row.used, "limit": row.limit, "percent": row.percent,
+    }
+
+
+class QuotaUsageTable(tables.DataTable):
+    service = tables.Column("service", verbose_name=_("Service"))
+    resource = tables.Column("resource", verbose_name=_("Resource"))
+    usage = tables.Column(_quota_usage, verbose_name=_("Usage / Limit"))
+    state = tables.Column(
+        "state", verbose_name=_("State"), status=True,
+        status_choices=(("ok", True), ("unlimited", True), ("warning", None), ("exhausted", False)),
+    )
+
+    class Meta:
+        name = "quota_usage"
+        verbose_name = _("Quota & Usage")
+        multi_select = False
+
+
 class ExportAuditLogCSV(tables.LinkAction):
     name = "audit_log_export"
     verbose_name = _("Export CSV")
