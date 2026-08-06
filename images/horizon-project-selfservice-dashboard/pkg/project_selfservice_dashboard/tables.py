@@ -133,6 +133,20 @@ class AuditLogTable(tables.DataTable):
         table_actions = (ExportAuditLogCSV,)
 
 
+class RoleBundlesAuditLogTable(AuditLogTable):
+    """Same columns as AuditLogTable, minus ExportAuditLogCSV -- that
+    action's link URL needs a project_id table kwarg
+    (identity_projects_patch:audit_log_selfservice_export), which this
+    table's view (role bundles are domain-scoped, not project-scoped)
+    never has; reusing AuditLogTable's Meta unmodified would raise a
+    KeyError the moment the page tried to render that button."""
+
+    class Meta(AuditLogTable.Meta):
+        name = "role_bundles_audit_log"
+        verbose_name = _("Role Bundle History")
+        table_actions = ()
+
+
 # Shared by MyAccessTable and DomainProjectsOverviewTable below -- both
 # tables' rows carry a project_id, and "go manage this project's members"
 # is the same jump-off point from either one. project-facade's own
@@ -186,6 +200,13 @@ class CreateRoleBundle(tables.LinkAction):
     icon = "plus"
 
 
+class RoleBundlesAuditLogLink(tables.LinkAction):
+    name = "role_bundles_audit_log"
+    verbose_name = _("History")
+    url = "horizon:identity:projects:role_bundles_audit_log"
+    icon = "list"
+
+
 class DeleteRoleBundle(tables.DeleteAction):
     name = "delete_role_bundle"
 
@@ -214,7 +235,7 @@ class RoleBundlesTable(tables.DataTable):
     class Meta:
         name = "role_bundles"
         verbose_name = _("Role Bundles")
-        table_actions = (CreateRoleBundle,)
+        table_actions = (CreateRoleBundle, RoleBundlesAuditLogLink)
         row_actions = (DeleteRoleBundle,)
 
 

@@ -189,6 +189,34 @@ class CreateRoleBundleView(horizon_forms.ModalFormView):
     cancel_url = reverse_lazy("horizon:identity:projects:role_bundles")
 
 
+class RoleBundlesAuditLogView(horizon_tables.DataTableView):
+    """Who created/changed/deleted which role bundle, and when -- role
+    bundles are domain-scoped, not tied to any one project, so this
+    can't live in any project's own Audit Log the way everything else
+    does (see project-facade app.py's role_bundles_audit_log). Reuses
+    AuditLogTable's own columns/rendering; "source" is always the
+    literal "role-bundles" here since there is only ever the one origin,
+    unlike a project's own merged audit log.
+    """
+
+    table_class = tables.RoleBundlesAuditLogTable
+    page_title = _("Role Bundle History")
+
+    def get_data(self):
+        try:
+            entries = facade.role_bundles_audit_log(self.request)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve role bundle history."))
+            return []
+        return [
+            SimpleNamespace(id=f"{e['timestamp']}-{i}", source="role-bundles", **e)
+            for i, e in enumerate(entries)
+        ]
+
+
 class SimulateAccessView(horizon_tables.DataTableView):
     """Per-action dry run of the caller's own current access to a
     project -- "why can/can't I do this" without having to actually

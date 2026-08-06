@@ -156,6 +156,21 @@ def delete_role_bundle(request, name):
         raise FacadeError(_error_message(r))
 
 
+def role_bundles_audit_log(request, limit=100):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/role-bundles/audit-log",
+            headers=_headers(request),
+            params={"limit": limit},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["entries"]
+
+
 def simulate_access(request, project_id):
     try:
         r = requests.get(
