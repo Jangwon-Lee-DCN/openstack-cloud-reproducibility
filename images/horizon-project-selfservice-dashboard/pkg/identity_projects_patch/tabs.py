@@ -193,6 +193,50 @@ class AuditTab(tabs.TableTab):
             return []
 
 
+class ProjectHealthTab(tabs.TableTab):
+    table_classes = (selfservice_tables.ProjectHealthTable,)
+    name = _("Project Health")
+    slug = "health"
+    template_name = "horizon/common/_detail_table.html"
+    preload = False
+
+    def get_project_health_data(self):
+        project = self.tab_group.kwargs["project"]
+        findings = []
+        try:
+            members = facade.list_members(self.request, project.id)
+            if not members:
+                findings.append(("Critical", _("Project has no members."), _("Add at least one project administrator.")))
+            elif not any("admin" in member["roles"] for member in members):
+                findings.append(("Critical", _("Project has no administrator."), _("Grant Admin base access to a member.")))
+        except facade.FacadeError:
+            findings.append(("Warning", _("Membership health could not be evaluated."), _("Check project-facade availability.")))
+        try:
+            quota = facade.quota_usage(self.request, project.id)
+            for row in quota["rows"]:
+                if row["state"] in ("warning", "exhausted"):
+                    findings.append(("Critical" if row["state"] == "exhausted" else "Warning", _("%(service)s %(resource)s quota is %(percent)s%% used.") % row, _("Delete unused resources or request a quota change.")))
+        except facade.FacadeError:
+            pass
+        try:
+            for credential in facade.list_application_credentials(self.request):
+                if credential["project_id"] == project.id and credential["status"] != "active":
+                    findings.append(("Critical" if credential["status"] == "expired" else "Warning", _("Credential %(name)s is %(status)s.") % credential, _("Rotate or revoke the credential.")))
+        except facade.FacadeError:
+            pass
+        try:
+            for card in facade.resource_summary(self.request, project.id):
+                if card["problems"]:
+                    findings.append(("Warning", _("%(problems)s %(label)s resource(s) need attention.") % card, _("Open the linked service inventory and inspect failed resources.")))
+        except facade.FacadeError:
+            pass
+        if not project.enabled:
+            findings.append(("Critical", _("Project is disabled."), _("Re-enable it only after confirming the intended lifecycle state.")))
+        if not findings:
+            findings.append(("Info", _("No known project-level issues were detected."), _("Continue monitoring quota and credentials.")))
+        return [SimpleNamespace(id=index, severity=s, finding=f, recommendation=r) for index, (s, f, r) in enumerate(findings)]
+
+
 class ProjectDetailTabs(tabs.DetailTabsGroup):
     slug = "project_details"
-    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab, CredentialsTab, AuditTab)
+    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab, CredentialsTab, ProjectHealthTab, AuditTab)

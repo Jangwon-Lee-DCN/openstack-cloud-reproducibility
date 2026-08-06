@@ -167,6 +167,20 @@ class QuotaUsageTable(tables.DataTable):
         multi_select = False
 
 
+class ProjectHealthTable(tables.DataTable):
+    severity = tables.Column(
+        "severity", verbose_name=_("Severity"), status=True,
+        status_choices=(("Info", True), ("Warning", None), ("Critical", False)),
+    )
+    finding = tables.Column("finding", verbose_name=_("Finding"))
+    recommendation = tables.Column("recommendation", verbose_name=_("Recommended Action"))
+
+    class Meta:
+        name = "project_health"
+        verbose_name = _("Project Health")
+        multi_select = False
+
+
 class ExportAuditLogCSV(tables.LinkAction):
     name = "audit_log_export"
     verbose_name = _("Export CSV")
