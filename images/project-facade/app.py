@@ -59,9 +59,16 @@ hypothetical "what if I had role X" policy evaluator. `/v1/role-bundles`
 roles (e.g. "VPC Operator" = network-operator + security-operator),
 grantable as a single name via `add_member`/`bulk invite` instead of
 selecting each role individually -- see `_expand_role_bundles`, stored
-in a ConfigMap since this service runs multiple replicas. `.../audit-log`
-now also merges in vpc-facade's own richer audit history for the same
-project (`_vpc_facade_audit_entries`).
+in a ConfigMap since this service runs multiple replicas.
+`GET /v1/role-bundles/audit-log` is that domain-scoped resource's own
+audit trail (role bundles aren't tied to any one project, so this can't
+live in a project's own `.../audit-log` the way everything else does).
+`.../audit-log` itself now also merges in vpc-facade's own richer audit
+history for the same project (`_vpc_facade_audit_entries`) and a
+mutating/failed-request slice of Cinder/Nova/Neutron's own oslo.log
+output (`_openstack_service_audit_entries` -- coverage varies a lot by
+service, see that function's docstring for exactly what's real and
+what's a known gap).
 
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
@@ -771,7 +778,9 @@ def put_role_bundle(name):
     user_id, user_name = ident
 
     domain_id = get_domain_id(OS_DOMAIN_NAME)
-    if not domain_id or not user_has_domain_role(user_id, domain_id, ADMIN_ROLE):
+    if not domain_id or not (
+        user_has_domain_role(user_id, domain_id, ADMIN_ROLE) or user_has_system_admin_role(caller_token, user_id)
+    ):
         return jsonify(error="forbidden: you are not an admin of this domain"), 403
 
     name = name.strip()
@@ -812,7 +821,9 @@ def delete_role_bundle(name):
     user_id, user_name = ident
 
     domain_id = get_domain_id(OS_DOMAIN_NAME)
-    if not domain_id or not user_has_domain_role(user_id, domain_id, ADMIN_ROLE):
+    if not domain_id or not (
+        user_has_domain_role(user_id, domain_id, ADMIN_ROLE) or user_has_system_admin_role(caller_token, user_id)
+    ):
         return jsonify(error="forbidden: you are not an admin of this domain"), 403
 
     try:
@@ -827,6 +838,64 @@ def delete_role_bundle(name):
 
     log.info("deleted role bundle name=%s by=%s(%s)", name, user_name, user_id)
     return "", 204
+
+
+@app.route("/v1/role-bundles/audit-log", methods=["GET"])
+def role_bundles_audit_log():
+    """Who created/changed/deleted which role bundle, and when -- role
+    bundles are domain-scoped (see _load_role_bundles), not tied to any
+    one project, so this can't live in a project's own audit-log the way
+    every other action in this file does; there would otherwise be
+    nowhere in the UI a domain admin could ever see this history at all.
+    Domain-admin gated, same as create/delete themselves."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    domain_id = get_domain_id(OS_DOMAIN_NAME)
+    if not domain_id or not (
+        user_has_domain_role(user_id, domain_id, ADMIN_ROLE) or user_has_system_admin_role(caller_token, user_id)
+    ):
+        return jsonify(error="forbidden: you are not an admin of this domain"), 403
+
+    try:
+        limit = min(int(request.args.get("limit", 100)), 500)
+    except ValueError:
+        return jsonify(error="'limit' must be an integer"), 400
+
+    try:
+        # Matches "set role bundle" and "deleted role bundle" (see
+        # put_role_bundle/delete_role_bundle's own log.info calls) --
+        # "role bundle" alone, not the full prefix, so a single query
+        # catches both without needing two round trips.
+        streams = _query_loki_lines("role bundle", min(limit * 5, 2000))
+    except requests.RequestException as exc:
+        log.warning("role-bundles audit-log query failed: %s", exc)
+        return jsonify(error="audit log backend unavailable"), 502
+
+    entries = []
+    for stream in streams:
+        for ts_ns, line in stream.get("values", []):
+            m = _LOG_LINE_RE.match(line.strip())
+            if not m:
+                continue
+            level, message = m.groups()
+            entries.append(
+                {
+                    "timestamp": datetime.datetime.fromtimestamp(
+                        int(ts_ns) / 1_000_000_000, tz=datetime.timezone.utc
+                    ).isoformat(),
+                    "level": level,
+                    "action": _classify_audit_line(message),
+                    "message": message,
+                }
+            )
+    entries.sort(key=lambda e: e["timestamp"], reverse=True)
+    return jsonify(entries=entries[:limit]), 200
 
 
 @app.route("/v1/projects/<project_id>/members", methods=["POST"])
@@ -1102,6 +1171,8 @@ _AUDIT_LINE_PREFIXES = (
     ("left project", "leave_project"),
     ("transferred ownership", "transfer_ownership"),
     ("vpc-facade audit merge failed", "vpc_facade_unavailable"),
+    ("set role bundle", "set_role_bundle"),
+    ("deleted role bundle", "delete_role_bundle"),
 )
 
 
@@ -1112,16 +1183,19 @@ def _classify_audit_line(message):
     return "other"
 
 
-def _query_loki_project_lines(project_id, limit):
-    # Filtering on the bare project_id string (rather than trying to match
-    # every log line's differently-named key -- some use `project=`,
-    # created project uses `id=`) is deliberate: it's a high-entropy UUID,
-    # so a substring match is already effectively exact, and it matches
-    # every current and future log line mentioning this project without
-    # having to keep this query in sync with every log statement's format.
+def _query_loki_lines(match_string, limit):
+    # Filtering on a bare substring (rather than trying to match every
+    # log line's differently-named key -- some use `project=`, created
+    # project uses `id=`) is deliberate: project ids are high-entropy
+    # UUIDs, so a substring match is already effectively exact, and it
+    # matches every current and future log line mentioning it without
+    # having to keep this query in sync with every log statement's
+    # format. Also reused for non-project-id substrings (see
+    # role_bundles_audit_log) since the same reasoning applies to any
+    # sufficiently distinctive string.
     end_ns = int(time.time() * 1_000_000_000)
     start_ns = end_ns - AUDIT_LOG_LOOKBACK_SECONDS * 1_000_000_000
-    query = '{job="%s"} |= `%s`' % (LOKI_JOB_LABEL, project_id)
+    query = '{job="%s"} |= `%s`' % (LOKI_JOB_LABEL, match_string)
     r = requests.get(
         f"{LOKI_URL}/loki/api/v1/query_range",
         params={
@@ -1135,6 +1209,112 @@ def _query_loki_project_lines(project_id, limit):
     )
     r.raise_for_status()
     return r.json()["data"]["result"]
+
+
+# Other core OpenStack services this cluster runs also log through
+# oslo.log/oslo.context, which stamps every request-scoped log line with
+# a bracketed context -- "[<req-id(s)> <user_id> <project_id> - - <user
+# domain> <project domain>] <message>" -- regardless of which service
+# emits it. Parsed generically here rather than per-service, since the
+# bracket shape is the same everywhere (Neutron's pecan/wsgi stack
+# prefixes two req- ids instead of one; the regex doesn't care how many
+# tokens precede the two 32-hex user/project ids, just that they're
+# followed by " - - ").
+#
+# Coverage genuinely varies a lot by service, confirmed live rather than
+# assumed:
+# - Cinder's WSGI middleware logs a clean "METHOD <url>" request line and
+#   a "<url> returned with HTTP <status>" response line for every API
+#   call at INFO -- complete coverage.
+# - Nova and Neutron mostly only surface this bracketed context on
+#   errors/exceptions at INFO (their routine successful-request logging
+#   is at DEBUG, not enabled in this deployment) -- real entries, but
+#   skewed toward failures, not a full request history.
+# - Glance emits essentially nothing with this context at INFO (zero
+#   matches over a full week, confirmed live) and isn't wired up at all.
+# Raising any of these services' own log level cluster-wide to get
+# fuller coverage is a separate, bigger tradeoff (log volume, storage
+# cost, unrelated to this project's own audit trail) out of scope here.
+_OSLO_CONTEXT_LINE_RE = re.compile(r"\[[^\]]*?([0-9a-f]{32}) ([0-9a-f]{32}) - - [^\]]*\]\s*(.*)$")
+_MUTATING_HTTP_VERBS = ("POST", "PUT", "DELETE", "PATCH")
+_OPENSTACK_AUDIT_SOURCES = (
+    ("openstack/cinder-api", "cinder"),
+    ("openstack/nova-osapi", "nova"),
+    ("openstack/neutron-server", "neutron"),
+)
+
+
+def _is_audit_worthy_service_line(message):
+    """Filters request-line noise down to what's actually worth showing:
+    an attempted mutation (regardless of outcome) or any line that reads
+    as a failure/exception, regardless of verb -- plain successful GETs
+    and plain 200 "returned with HTTP" response lines are excluded, both
+    because they'd otherwise dominate the feed and because a bare
+    response line doesn't even carry the original method to classify."""
+    for verb in _MUTATING_HTTP_VERBS:
+        if message.startswith(verb + " "):
+            return True
+    lowered = message.lower()
+    return "exception" in lowered or "failed" in lowered or " error" in lowered
+
+
+def _classify_openstack_service_line(message):
+    for verb in _MUTATING_HTTP_VERBS:
+        if message.startswith(verb + " "):
+            return verb.lower()
+    return "denied_or_failed"
+
+
+def _openstack_service_audit_entries(project_id, limit):
+    """Merges in the mutating/failed-request slice of Cinder/Nova/
+    Neutron's own oslo.log output for this project -- see the constants
+    above for exactly what that does and doesn't cover. Uses this
+    service's own domain-scoped credential is irrelevant here (Loki has
+    no per-project authorization of its own; this project_id-substring
+    filter is what actually scopes results, same as
+    _query_loki_project_lines for this service's own logs)."""
+    entries = []
+    end_ns = int(time.time() * 1_000_000_000)
+    start_ns = end_ns - AUDIT_LOG_LOOKBACK_SECONDS * 1_000_000_000
+    for job_label, source in _OPENSTACK_AUDIT_SOURCES:
+        query = '{job="%s"} |= "%s"' % (job_label, project_id)
+        try:
+            r = requests.get(
+                f"{LOKI_URL}/loki/api/v1/query_range",
+                params={
+                    "query": query,
+                    "start": start_ns,
+                    "end": end_ns,
+                    "limit": min(limit * 5, 2000),
+                    "direction": "backward",
+                },
+                timeout=10,
+            )
+            r.raise_for_status()
+            streams = r.json()["data"]["result"]
+        except requests.RequestException as exc:
+            log.warning("%s audit merge failed project=%s: %s", source, project_id, exc)
+            continue
+        for stream in streams:
+            for ts_ns, line in stream.get("values", []):
+                m = _OSLO_CONTEXT_LINE_RE.search(line.strip())
+                if not m:
+                    continue
+                _user_id, proj, message = m.groups()
+                if proj != project_id or not _is_audit_worthy_service_line(message):
+                    continue
+                entries.append(
+                    {
+                        "timestamp": datetime.datetime.fromtimestamp(
+                            int(ts_ns) / 1_000_000_000, tz=datetime.timezone.utc
+                        ).isoformat(),
+                        "level": "WARNING" if _classify_openstack_service_line(message) == "denied_or_failed" else "INFO",
+                        "action": _classify_openstack_service_line(message),
+                        "message": message,
+                        "source": source,
+                    }
+                )
+    return entries
 
 
 def _vpc_facade_audit_entries(caller_token, project_id, limit):
@@ -1222,7 +1402,7 @@ def project_audit_log(project_id):
         # filtered out by _LOG_LINE_RE above, not the audit lines
         # themselves -- asking Loki for exactly `limit` raw lines would
         # often return far fewer than `limit` real audit entries.
-        streams = _query_loki_project_lines(project_id, min(limit * 5, 2000))
+        streams = _query_loki_lines(project_id, min(limit * 5, 2000))
     except requests.RequestException as exc:
         log.warning("audit-log query failed project=%s: %s", project_id, exc)
         return jsonify(error="audit log backend unavailable"), 502
@@ -1246,6 +1426,7 @@ def project_audit_log(project_id):
                 }
             )
     entries.extend(_vpc_facade_audit_entries(caller_token, project_id, limit))
+    entries.extend(_openstack_service_audit_entries(project_id, limit))
     entries.sort(key=lambda e: e["timestamp"], reverse=True)
     entries = entries[:limit]
 
