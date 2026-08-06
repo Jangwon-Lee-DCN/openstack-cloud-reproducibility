@@ -737,6 +737,61 @@ def list_members(project_id):
     return jsonify(members=list(members.values())), 200
 
 
+@app.route("/v1/projects/<project_id>/member-candidates", methods=["GET"])
+def member_candidates(project_id):
+    """Search domain users and annotate existing project membership."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    _ident, project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+
+    query = (request.args.get("q") or "").strip().lower()
+    users_response = requests.get(
+        f"{OS_AUTH_URL}/users",
+        headers=keystone_headers(),
+        params={"domain_id": project["domain_id"]},
+        timeout=10,
+    )
+    users_response.raise_for_status()
+
+    assignments_response = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"scope.project.id": project_id, "effective": "true", "include_names": "true"},
+        timeout=10,
+    )
+    assignments_response.raise_for_status()
+    roles_by_user = {}
+    for assignment in assignments_response.json()["role_assignments"]:
+        if "user" in assignment:
+            roles_by_user.setdefault(assignment["user"]["id"], set()).add(
+                assignment["role"]["name"]
+            )
+
+    candidates = []
+    for user in users_response.json()["users"]:
+        searchable = " ".join(
+            str(user.get(key) or "") for key in ("name", "email")
+        ).lower()
+        if query and query not in searchable:
+            continue
+        roles = sorted(roles_by_user.get(user["id"], set()))
+        candidates.append(
+            {
+                "user_id": user["id"],
+                "username": user["name"],
+                "email": user.get("email") or "",
+                "enabled": bool(user.get("enabled", True)),
+                "is_member": bool(roles),
+                "roles": roles,
+            }
+        )
+    candidates.sort(key=lambda item: item["username"].lower())
+    return jsonify(candidates=candidates[:100]), 200
+
+
 def _project_tags(project_id):
     r = requests.get(f"{OS_AUTH_URL}/projects/{project_id}/tags", headers=keystone_headers(), timeout=10)
     r.raise_for_status()

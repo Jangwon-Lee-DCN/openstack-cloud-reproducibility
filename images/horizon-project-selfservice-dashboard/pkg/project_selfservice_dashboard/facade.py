@@ -95,6 +95,21 @@ def list_members(request, project_id):
     return r.json()["members"]
 
 
+def member_candidates(request, project_id, query=""):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/member-candidates",
+            headers=_headers(request),
+            params={"q": query},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["candidates"]
+
+
 def add_member(request, project_id, username, roles):
     try:
         r = requests.post(

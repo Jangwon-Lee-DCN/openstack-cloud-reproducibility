@@ -64,7 +64,11 @@ def _bundle_choices(request):
 
 
 class AddMemberForm(horizon_forms.SelfHandlingForm):
-    username = forms.CharField(label=_("Username"))
+    username = forms.ChoiceField(
+        label=_("User"),
+        choices=[("", _("Select a user"))],
+        help_text=_("Only enabled users who are not already project members are selectable."),
+    )
     bundle = forms.ChoiceField(
         label=_("Role Bundle"),
         required=False,
@@ -83,6 +87,23 @@ class AddMemberForm(horizon_forms.SelfHandlingForm):
     def __init__(self, request, *args, **kwargs):
         super().__init__(request, *args, **kwargs)
         self.fields["bundle"].choices = _bundle_choices(request)
+        project_id = self.initial.get("project_id")
+        if project_id and not self.fields["username"].disabled:
+            try:
+                candidates = facade.member_candidates(request, project_id)
+                self.fields["username"].choices = [("", _("Select a user"))] + [
+                    (
+                        user["username"],
+                        "%s%s" % (
+                            user["username"],
+                            " <%s>" % user["email"] if user.get("email") else "",
+                        ),
+                    )
+                    for user in candidates
+                    if user.get("enabled") and not user.get("is_member")
+                ]
+            except facade.FacadeError:
+                self.fields["username"].choices = [("", _("User directory unavailable"))]
 
     def clean(self):
         cleaned = super().clean()
@@ -193,6 +214,25 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
         usernames = self._parse_usernames(self.cleaned_data["usernames"])
         if not usernames:
             raise forms.ValidationError(_("Enter at least one username."))
+        try:
+            candidates = facade.member_candidates(
+                self.request, self.initial["project_id"]
+            )
+        except facade.FacadeError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+        by_name = {candidate["username"]: candidate for candidate in candidates}
+        unknown = [name for name in usernames if name not in by_name]
+        disabled = [name for name in usernames if name in by_name and not by_name[name]["enabled"]]
+        existing = [name for name in usernames if name in by_name and by_name[name]["is_member"]]
+        errors = []
+        if unknown:
+            errors.append(_("Not found in this domain: %s") % ", ".join(unknown))
+        if disabled:
+            errors.append(_("Disabled users: %s") % ", ".join(disabled))
+        if existing:
+            errors.append(_("Already members: %s") % ", ".join(existing))
+        if errors:
+            raise forms.ValidationError(errors)
         return usernames
 
     def handle(self, request, data):
