@@ -38,12 +38,12 @@ def _error_message(response):
         return response.text or f"HTTP {response.status_code}"
 
 
-def create_project(request, name, description):
+def create_project(request, name, description, **options):
     try:
         r = requests.post(
             f"{PROJECT_FACADE_URL}/v1/projects",
             headers=_headers(request),
-            json={"name": name, "description": description},
+            json={"name": name, "description": description, **options},
             timeout=_TIMEOUT,
         )
     except requests.RequestException as exc:

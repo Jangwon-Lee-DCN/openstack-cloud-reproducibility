@@ -447,7 +447,18 @@ def user_has_system_admin_role(caller_token, user_id):
     system-scope grants, not group-derived ones (there's no
     effective-expansion path here that doesn't also lose the
     system-scope entries)."""
-    role_id = role_id_by_name(ADMIN_ROLE)
+    return user_has_system_role(caller_token, user_id, ADMIN_ROLE)
+
+
+def user_has_system_role(caller_token, user_id, role_name):
+    """Generalizes user_has_system_admin_role to any role name -- see its
+    docstring for why this deliberately uses the caller's own token
+    rather than this service's domain-scoped credential, and why
+    effective=true is never passed. Used for `reader`, recognizing a
+    dedicated read-only "auditor" persona (view domain-wide audit trails
+    and role bundle history without needing full domain-admin rights)
+    the same way ADMIN_ROLE is recognized for real administrators."""
+    role_id = role_id_by_name(role_name)
     if not role_id:
         return False
     r = requests.get(
@@ -499,6 +510,8 @@ def create_project():
     body = request.get_json(silent=True) or {}
     name = (body.get("name") or "").strip()
     description = (body.get("description") or "").strip()
+    tags = sorted({str(tag).strip() for tag in body.get("tags", []) if str(tag).strip()})
+    initial_members = sorted({str(name).strip() for name in body.get("initial_members", []) if str(name).strip()})
     domain_name = body.get("domain") or OS_DOMAIN_NAME
 
     if not name:
@@ -541,6 +554,27 @@ def create_project():
         timeout=10,
     )
     grant.raise_for_status()
+
+    try:
+        if tags:
+            tag_response = requests.put(
+                f"{OS_AUTH_URL}/projects/{new_project['id']}/tags",
+                headers=keystone_headers(), json={"tags": tags}, timeout=10,
+            )
+            tag_response.raise_for_status()
+        member_role_id = role_id_by_name("member")
+        for username in initial_members:
+            target = _find_user_by_name(username, domain_id)
+            if not target:
+                raise ValueError(f"initial member '{username}' does not exist in this domain")
+            member_response = requests.put(
+                f"{OS_AUTH_URL}/projects/{new_project['id']}/users/{target['id']}/roles/{member_role_id}",
+                headers=keystone_headers(), timeout=10,
+            )
+            member_response.raise_for_status()
+    except Exception as exc:
+        requests.delete(f"{OS_AUTH_URL}/projects/{new_project['id']}", headers=keystone_headers(), timeout=10)
+        return jsonify(error=f"project creation rolled back: {exc}"), 400
 
     log.info(
         "created project id=%s name=%s domain=%s owner=%s(%s)",
@@ -685,6 +719,37 @@ def _authorize_member_admin(caller_token, project_id):
 
     log.warning("denied member-management project=%s: user=%s missing admin", project_id, user_name)
     return None, None, (jsonify(error="forbidden: you are not admin on this project or its domain"), 403)
+
+
+def _authorize_audit_viewer(caller_token, project_id):
+    """Read-only variant of _authorize_member_admin, for audit-log
+    viewing specifically: everything that gate already allows, plus a
+    system-scoped `reader` -- a dedicated "auditor" persona (see
+    user_has_system_role) who can see this project's history without
+    holding admin anywhere. Never used for anything that writes."""
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return None, None, (jsonify(error="invalid or expired token"), 401)
+    user_id, user_name = ident
+
+    project = _load_target_project(project_id)
+    if not project:
+        return None, None, (jsonify(error="project not found"), 404)
+
+    if (
+        user_has_project_role(user_id, project_id, ADMIN_ROLE)
+        or user_has_domain_role(user_id, project["domain_id"], ADMIN_ROLE)
+        or user_has_system_admin_role(caller_token, user_id)
+        or user_has_system_role(caller_token, user_id, "reader")
+    ):
+        return (user_id, user_name), project, None
+
+    log.warning("denied audit-log view project=%s: user=%s missing admin/auditor", project_id, user_name)
+    return (
+        None,
+        None,
+        (jsonify(error="forbidden: you are not admin on this project/domain and not a system auditor"), 403),
+    )
 
 
 def _effective_admin_user_ids(project_id):
@@ -1882,14 +1947,16 @@ def project_audit_log(project_id):
     above already logs project id, actor, and outcome), merged with
     vpc-facade's own richer audit history for the same project (see
     _vpc_facade_audit_entries). Same admin-or-domain-admin authorization
-    as member management (_authorize_member_admin): this exposes who did
-    what to the project, which is at least as sensitive as the
-    membership list itself."""
+    as member management, plus a system-scoped `reader` auditor (see
+    _authorize_audit_viewer): this exposes who did what to the project,
+    which is at least as sensitive as the membership list itself, but a
+    read-only viewer shouldn't need real admin rights anywhere just to
+    see it."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
 
-    _, _, err = _authorize_member_admin(caller_token, project_id)
+    _, _, err = _authorize_audit_viewer(caller_token, project_id)
     if err:
         return err
 

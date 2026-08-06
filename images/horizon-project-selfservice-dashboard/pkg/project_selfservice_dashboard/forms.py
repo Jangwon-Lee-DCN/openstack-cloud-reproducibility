@@ -15,10 +15,31 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+    owner = forms.CharField(label=_("Owner"), help_text=_("Team or accountable person."))
+    environment = forms.ChoiceField(
+        label=_("Environment"),
+        choices=(("production", _("Production")), ("staging", _("Staging")), ("development", _("Development")), ("test", _("Test"))),
+    )
+    cost_center = forms.CharField(label=_("Cost Center"), required=False)
+    purpose = forms.CharField(label=_("Purpose"), required=False)
+    initial_members = forms.CharField(
+        label=_("Initial Members"), required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_("Optional usernames, one per line or comma-separated. They receive Member access."),
+    )
 
     def handle(self, request, data):
         try:
-            project = facade.create_project(request, data["name"], data.get("description", ""))
+            members = BulkAddMemberForm._parse_usernames(data.get("initial_members", ""))
+            project = facade.create_project(
+                request, data["name"], data.get("description", ""),
+                tags=[
+                    f"owner={data['owner']}", f"environment={data['environment']}",
+                    *([f"cost_center={data['cost_center']}"] if data.get("cost_center") else []),
+                    *([f"purpose={data['purpose']}"] if data.get("purpose") else []),
+                ],
+                initial_members=members,
+            )
         except facade.FacadeError as exc:
             self.api_error(str(exc))
             return False
