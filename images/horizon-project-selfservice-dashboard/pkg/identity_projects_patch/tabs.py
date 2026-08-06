@@ -24,15 +24,20 @@ from project_selfservice_dashboard import tables as selfservice_tables
 class OverviewTab(tabs.Tab):
     name = _("Overview")
     slug = "overview"
-    template_name = "identity/projects/_detail_overview.html"
+    template_name = "identity/projects/overview.html"
 
     def get_context_data(self, request):
         project = self.tab_group.kwargs["project"]
-        return {
+        context = {
             "project": project,
             "domain_name": self._get_domain_name(project),
             "extras": self._get_extras(project),
         }
+        try:
+            context["resource_cards"] = facade.resource_summary(request, project.id)
+        except facade.FacadeError:
+            context["resource_cards"] = []
+        return context
 
     def _get_domain_name(self, project):
         try:

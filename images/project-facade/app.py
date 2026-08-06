@@ -941,6 +941,35 @@ def project_quota_usage(project_id):
     return jsonify(rows=rows, errors=errors), 200
 
 
+@app.route("/v1/projects/<project_id>/resource-summary", methods=["GET"])
+def project_resource_summary(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    _ident, _project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    headers = {"X-Auth-Token": _get_project_scoped_token(project_id)}
+    cards = []
+
+    def collect(label, url, key, unhealthy, href):
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            items = response.json().get(key, [])
+            cards.append({"label": label, "count": len(items), "problems": sum(1 for item in items if unhealthy(item)), "href": href, "available": True})
+        except Exception:
+            cards.append({"label": label, "count": 0, "problems": 0, "href": href, "available": False})
+
+    collect("Instances", f"{NOVA_URL}/servers/detail", "servers", lambda item: item.get("status") not in ("ACTIVE", "SHUTOFF"), "/horizon/project/instances/")
+    collect("Volumes", f"{CINDER_URL}/volumes/detail", "volumes", lambda item: item.get("status") in ("error", "error_deleting", "error_restoring", "error_extending"), "/horizon/project/volumes/")
+    collect("Networks", f"{NEUTRON_URL}/networks?project_id={project_id}", "networks", lambda item: item.get("status") == "ERROR", "/horizon/project/vpcs/")
+    collect("Ports / ENIs", f"{NEUTRON_URL}/ports?project_id={project_id}", "ports", lambda item: item.get("status") == "ERROR", "/horizon/project/network_interfaces/")
+    collect("Routers", f"{NEUTRON_URL}/routers?project_id={project_id}", "routers", lambda item: item.get("status") == "ERROR", "/horizon/project/vpc_route_tables/")
+    collect("Floating IPs", f"{NEUTRON_URL}/floatingips?project_id={project_id}", "floatingips", lambda item: item.get("status") == "ERROR", "/horizon/project/elastic_ips/")
+    return jsonify(cards=cards), 200
+
+
 def _project_tags(project_id):
     r = requests.get(f"{OS_AUTH_URL}/projects/{project_id}/tags", headers=keystone_headers(), timeout=10)
     r.raise_for_status()

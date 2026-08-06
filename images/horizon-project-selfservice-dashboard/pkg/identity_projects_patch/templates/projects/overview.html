@@ -1,0 +1,15 @@
+{% load i18n %}
+<div class="row">
+{% for card in resource_cards %}
+  <div class="col-sm-4 col-md-2">
+    <a href="{{ card.href }}" class="panel panel-default" style="display:block;text-decoration:none">
+      <div class="panel-body">
+        <div class="text-muted">{{ card.label }}</div>
+        {% if card.available %}<strong style="font-size:24px">{{ card.count }}</strong>{% else %}<strong>Unavailable</strong>{% endif %}
+        {% if card.problems %}<div class="text-danger">{{ card.problems }} {% trans "need attention" %}</div>{% endif %}
+      </div>
+    </a>
+  </div>
+{% endfor %}
+</div>
+{% include 'identity/projects/_detail_overview.html' %}

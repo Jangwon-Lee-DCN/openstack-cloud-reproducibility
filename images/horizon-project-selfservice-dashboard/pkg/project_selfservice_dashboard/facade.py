@@ -149,6 +149,16 @@ def quota_usage(request, project_id):
     return r.json()
 
 
+def resource_summary(request, project_id):
+    try:
+        r = requests.get(f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/resource-summary", headers=_headers(request), timeout=15)
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["cards"]
+
+
 def add_member(request, project_id, username, roles):
     try:
         r = requests.post(
