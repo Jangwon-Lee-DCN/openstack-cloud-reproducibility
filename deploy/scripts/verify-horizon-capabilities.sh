@@ -23,10 +23,22 @@ import django
 django.setup()
 import openstack_dashboard.urls
 from django.conf import settings
+from django.template.loader import get_template
 from django.urls import reverse
 from horizon import Horizon
 
 assert settings.OPENSTACK_CINDER_FEATURES["enable_backup"] is True
+for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
+    assert app in settings.INSTALLED_APPS
+for template in (
+    "cloud_telemetry_dashboard/metrics.html",
+    "cloud_telemetry_dashboard/alarms.html",
+    "cloud_telemetry_dashboard/health.html",
+    "cloud_s3_dashboard/index.html",
+    "cloud_s3_dashboard/create_bucket.html",
+    "cloud_s3_dashboard/credential_created.html",
+):
+    get_template(template)
 for name in (
     "horizon:project:cloud_metrics:index",
     "horizon:project:cloud_alarms:index",
