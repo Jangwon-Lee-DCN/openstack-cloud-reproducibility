@@ -41,6 +41,29 @@ class CreateProjectSelfServiceView(horizon_forms.ModalFormView):
     submit_url = reverse_lazy("horizon:identity:projects:create_selfservice")
 
 
+class DecommissionProjectView(horizon_forms.ModalFormView):
+    form_class = forms.DecommissionProjectForm
+    template_name = "project_selfservice/decommission_project.html"
+    page_title = _("Decommission Project")
+    submit_label = _("Continue")
+    success_url = reverse_lazy("horizon:identity:projects:index")
+    cancel_url = reverse_lazy("horizon:identity:projects:index")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse("horizon:identity:projects:decommission", args=[self.kwargs["project_id"]])
+        try:
+            context["plan"] = facade.decommission_plan(self.request, self.kwargs["project_id"])
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            context["plan"] = {"blockers": []}
+        return context
+
+    def get_initial(self):
+        plan = facade.decommission_plan(self.request, self.kwargs["project_id"])
+        return {"project_id": self.kwargs["project_id"], "project_name": plan["project_name"]}
+
+
 class ManageMembersSelfServiceView(horizon_tables.DataTableView):
     """Reached from a "Manage Members (Self-Service)" row action added to
     the same stock table. Lists the calling project's members and lets its

@@ -81,6 +81,16 @@ def delete_project(request, project_id):
         raise FacadeError(_error_message(r))
 
 
+def decommission_plan(request, project_id):
+    try:
+        r = requests.get(f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/decommission-plan", headers=_headers(request), timeout=15)
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
 def list_members(request, project_id):
     try:
         r = requests.get(

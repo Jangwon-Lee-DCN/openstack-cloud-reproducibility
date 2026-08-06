@@ -290,6 +290,17 @@ class DeleteProjectSelfService(tables.DeleteAction):
         facade.delete_project(request, obj_id)
 
 
+class DecommissionProject(tables.LinkAction):
+    name = "decommission"
+    verbose_name = _("Decommission Project")
+    url = "horizon:identity:projects:decommission"
+    classes = ("ajax-modal",)
+    icon = "remove"
+
+    def get_link_url(self, project):
+        return reverse(self.url, args=[project.id])
+
+
 class LeaveProjectSelfService(tables.LinkAction):
     name = "leave_selfservice"
     verbose_name = _("Leave Project")
@@ -435,7 +446,7 @@ class TenantsTable(tables.DataTable):
         verbose_name = _("Projects")
         row_actions = (UpdateProject,
                        UsageLink, ModifyQuotas,
-                       DeleteProjectSelfService,
+                       DecommissionProject,
                        AuditLogSelfService, SimulateAccessSelfService,
                        LeaveProjectSelfService, RescopeTokenToProject)
         table_actions = (TenantFilterAction, CreateProjectSelfService)

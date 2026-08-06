@@ -1,0 +1,10 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+{% block modal-body-right %}
+  <p>{% trans "Disable for review is reversible. Permanent deletion is allowed only after dependent resources are removed." %}</p>
+  {% if plan.blockers %}
+    <div class="alert alert-danger"><strong>{% trans "Deletion blockers" %}</strong><ul>{% for blocker in plan.blockers %}<li>{{ blocker }}</li>{% endfor %}</ul></div>
+  {% else %}
+    <div class="alert alert-success">{% trans "No Nova, Cinder, or Neutron deletion blockers were found." %}</div>
+  {% endif %}
+{% endblock %}

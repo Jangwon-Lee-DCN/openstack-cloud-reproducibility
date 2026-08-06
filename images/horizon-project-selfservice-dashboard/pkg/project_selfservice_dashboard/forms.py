@@ -53,6 +53,37 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
         return project
 
 
+class DecommissionProjectForm(horizon_forms.SelfHandlingForm):
+    project_id = forms.CharField(widget=forms.HiddenInput)
+    project_name = forms.CharField(widget=forms.HiddenInput)
+    action = forms.ChoiceField(
+        label=_("Action"), widget=forms.RadioSelect,
+        choices=(("disable", _("Disable for review")), ("delete", _("Permanently delete"))),
+        initial="disable",
+    )
+    confirmation = forms.CharField(
+        label=_("Type the project name to confirm"),
+    )
+
+    def clean_confirmation(self):
+        value = self.cleaned_data["confirmation"]
+        if value != self.initial["project_name"]:
+            raise forms.ValidationError(_("Project name does not match."))
+        return value
+
+    def handle(self, request, data):
+        try:
+            if data["action"] == "disable":
+                facade.update_project(request, data["project_id"], enabled=False)
+            else:
+                facade.delete_project(request, data["project_id"])
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        messages.success(request, _("Project lifecycle action completed."))
+        return True
+
+
 # Matches project-facade/app.py's ALLOWED_MEMBER_ROLES. The first three
 # are the base access tiers; the rest are the platform's additive marker
 # roles (reconcile-iam-dcn.sh) -- a member typically wants a base tier

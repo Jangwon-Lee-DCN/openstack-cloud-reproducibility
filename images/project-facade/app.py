@@ -365,6 +365,20 @@ def _active_resource_blockers(project_id):
     return blockers
 
 
+@app.route("/v1/projects/<project_id>/decommission-plan", methods=["GET"])
+def decommission_plan(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    return jsonify(
+        project_id=project_id, project_name=project["name"], enabled=project.get("enabled", True),
+        blockers=_active_resource_blockers(project_id),
+    ), 200
+
+
 def _user_group_ids(user_id):
     # GET /v3/role_assignments?user.id=...&effective=true (used here until
     # 2026-08-03) never sees federated *expiring* group membership --

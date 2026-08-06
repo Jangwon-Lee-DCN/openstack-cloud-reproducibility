@@ -42,6 +42,8 @@ urlpatterns = [
     re_path(r'^create_selfservice$',
             selfservice_views.CreateProjectSelfServiceView.as_view(),
             name='create_selfservice'),
+    re_path(r'^(?P<project_id>[^/]+)/decommission$',
+            selfservice_views.DecommissionProjectView.as_view(), name='decommission'),
     re_path(r'^my_access$',
             selfservice_views.MyAccessView.as_view(),
             name='my_access'),
