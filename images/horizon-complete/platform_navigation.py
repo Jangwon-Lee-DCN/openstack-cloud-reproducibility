@@ -44,6 +44,16 @@ def _order_panels(dashboard, group_slug, slugs, keep_unlisted=True):
     group.panels = ordered
 
 
+def _hide_panels(dashboard, slugs):
+    """Remove unsupported duplicate/advanced panels from this dashboard."""
+    for slug in slugs:
+        try:
+            panel = dashboard.get_panel(slug)
+        except base.NotRegistered:
+            continue
+        dashboard._unregister(panel.__class__)
+
+
 project = horizon.get_dashboard("project")
 _rename_group(project, "compute", "Compute")
 _rename_group(project, "vpc", "Networking (VPC)")
@@ -114,6 +124,17 @@ _order_panels(
 _order_panels(project, "share", ("shares", "share_snapshots", "share_networks"), keep_unlisted=False)
 _order_panels(project, "object_store", ("cloud_s3", "containers"))
 _order_panels(project, "observability", ("cloud_metrics", "cloud_alarms"))
+_hide_panels(
+    project,
+    (
+        "load_balancer",
+        "security_services",
+        "share_groups",
+        "share_group_snapshots",
+        "user_messages",
+        "resource_locks",
+    ),
+)
 
 identity = horizon.get_dashboard("identity")
 identity.name = "Identity & Access"
