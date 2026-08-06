@@ -408,14 +408,24 @@ class ManageProjectTagsForm(horizon_forms.SelfHandlingForm):
     `required_tag` checks against."""
 
     project_id = forms.CharField(widget=forms.HiddenInput)
-    tags = forms.CharField(
-        label=_("Tags"),
+    owner = forms.CharField(label=_("Owner"), required=False)
+    environment = forms.ChoiceField(
+        label=_("Environment"), required=False,
+        choices=(("", _("Not set")), ("production", _("Production")), ("staging", _("Staging")), ("development", _("Development")), ("test", _("Test"))),
+    )
+    cost_center = forms.CharField(label=_("Cost Center"), required=False)
+    purpose = forms.CharField(label=_("Purpose"), required=False)
+    extra_tags = forms.CharField(
+        label=_("Additional Tags"),
         required=False,
-        help_text=_("Comma-separated (e.g. \"prod-env, team-network\")."),
+        help_text=_("Comma-separated labels without '='."),
     )
 
     def handle(self, request, data):
-        tags = [t.strip() for t in data.get("tags", "").split(",") if t.strip()]
+        tags = [t.strip() for t in data.get("extra_tags", "").split(",") if t.strip()]
+        for key in ("owner", "environment", "cost_center", "purpose"):
+            if data.get(key):
+                tags.append("%s=%s" % (key, data[key].strip()))
         try:
             saved = facade.set_project_tags(request, data["project_id"], tags)
         except facade.FacadeError as exc:

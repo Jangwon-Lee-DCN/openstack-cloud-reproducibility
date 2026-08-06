@@ -431,7 +431,7 @@ class ManageProjectTagsView(horizon_forms.ModalFormView):
     success_url = reverse_lazy("horizon:identity:projects:domain_projects_overview")
 
     def get_success_url(self):
-        return str(self.success_url)
+        return reverse("horizon:identity:projects:detail", args=[self.kwargs["project_id"]])
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -450,7 +450,14 @@ class ManageProjectTagsView(horizon_forms.ModalFormView):
             messages.error(self.request, str(exc))
         except Exception:
             exceptions.handle(self.request, _("Unable to retrieve this project's tags."))
-        return {"project_id": project_id, "tags": ", ".join(tags)}
+        structured, extra = {}, []
+        for tag in tags:
+            if "=" in tag and tag.split("=", 1)[0] in {"owner", "environment", "cost_center", "purpose"}:
+                key, value = tag.split("=", 1)
+                structured[key] = value
+            else:
+                extra.append(tag)
+        return {"project_id": project_id, "extra_tags": ", ".join(extra), **structured}
 
 
 class ApplicationCredentialsView(horizon_tables.DataTableView):

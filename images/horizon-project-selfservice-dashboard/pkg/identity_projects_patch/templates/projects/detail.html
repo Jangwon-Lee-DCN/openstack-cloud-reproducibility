@@ -14,6 +14,8 @@
           {% if project.enabled %}{% trans "Enabled" %}{% else %}{% trans "Disabled" %}{% endif %}
         </span>
         {% for role in current_roles %}<span class="label label-info">{{ role }}</span>{% endfor %}
+        {% for tag in project_tags %}<span class="label label-default">{{ tag }}</span>{% endfor %}
+        <a class="btn btn-link btn-xs" href="{% url 'horizon:identity:projects:manage_project_tags' project.id %}">{% trans "Edit ownership & tags" %}</a>
       </div>
       <div class="col-sm-4 text-right">{{ actions }}</div>
     </div>

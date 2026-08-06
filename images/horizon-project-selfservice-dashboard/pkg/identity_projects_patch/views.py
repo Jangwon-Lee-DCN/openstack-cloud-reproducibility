@@ -408,6 +408,11 @@ class DetailProjectView(tabs.TabView):
             _("Platform / Service") if context["is_platform_project"] else _("User Project")
         )
         context["current_roles"] = []
+        context["project_tags"] = []
+        try:
+            context["project_tags"] = facade.list_project_tags(self.request, project.id)
+        except Exception:
+            pass
         try:
             for access in facade.my_access(self.request):
                 if access.get("project_id") == project.id:
