@@ -164,6 +164,30 @@ class CredentialsTab(tabs.TableTab):
             return []
 
 
+class AuditTab(tabs.TableTab):
+    table_classes = (selfservice_tables.AuditLogTable,)
+    name = _("Audit History")
+    slug = "audit"
+    template_name = "horizon/common/_detail_table.html"
+    preload = False
+
+    def __init__(self, tab_group, request):
+        tab_group.kwargs["project_id"] = tab_group.kwargs["project"].id
+        super().__init__(tab_group, request)
+
+    def get_audit_log_data(self):
+        try:
+            return [
+                SimpleNamespace(id=f"{item['timestamp']}-{index}", **item)
+                for index, item in enumerate(
+                    facade.audit_log(self.request, self.tab_group.kwargs["project"].id, limit=250)
+                )
+            ]
+        except facade.FacadeError:
+            exceptions.handle(self.request, _("Unable to retrieve project audit history."))
+            return []
+
+
 class ProjectDetailTabs(tabs.DetailTabsGroup):
     slug = "project_details"
-    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab, CredentialsTab)
+    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab, CredentialsTab, AuditTab)

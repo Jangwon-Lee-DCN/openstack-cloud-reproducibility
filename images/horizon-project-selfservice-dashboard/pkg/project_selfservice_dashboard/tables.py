@@ -205,7 +205,7 @@ class AuditLogTable(tables.DataTable):
         # here for a project admin to add, edit, or delete; this table is
         # read-only by design (see facade.audit_log's docstring).
         multi_select = False
-        table_actions = (ExportAuditLogCSV,)
+        table_actions = (tables.FilterAction, ExportAuditLogCSV)
 
 
 class RoleBundlesAuditLogTable(AuditLogTable):
