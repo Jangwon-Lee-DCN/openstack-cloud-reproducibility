@@ -280,10 +280,21 @@ class RoleBundleForm(horizon_forms.SelfHandlingForm):
         choices=ROLE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
     )
+    required_tag = forms.CharField(
+        label=_("Required Project Tag"),
+        required=False,
+        help_text=_(
+            "If set, this bundle can only be granted on a project carrying this exact "
+            "tag (see \"Manage Tags\" on Domain Projects Overview). Leave blank for no "
+            "restriction."
+        ),
+    )
 
     def handle(self, request, data):
         try:
-            bundle = facade.put_role_bundle(request, data["name"], data.get("description", ""), data["roles"])
+            bundle = facade.put_role_bundle(
+                request, data["name"], data.get("description", ""), data["roles"], data.get("required_tag", "")
+            )
         except facade.FacadeError as exc:
             self.api_error(str(exc))
             return False
@@ -296,3 +307,72 @@ class RoleBundleForm(horizon_forms.SelfHandlingForm):
             % {"name": bundle["name"], "roles": ", ".join(bundle["roles"])},
         )
         return bundle
+
+
+class ManageProjectTagsForm(horizon_forms.SelfHandlingForm):
+    """Keystone's own native project tags (see project-facade app.py's
+    list_project_tags/set_project_tags) -- surfaced here mainly so a
+    domain admin has somewhere to set the tag a role bundle's
+    `required_tag` checks against."""
+
+    project_id = forms.CharField(widget=forms.HiddenInput)
+    tags = forms.CharField(
+        label=_("Tags"),
+        required=False,
+        help_text=_("Comma-separated (e.g. \"prod-env, team-network\")."),
+    )
+
+    def handle(self, request, data):
+        tags = [t.strip() for t in data.get("tags", "").split(",") if t.strip()]
+        try:
+            saved = facade.set_project_tags(request, data["project_id"], tags)
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to save this project's tags."))
+            return False
+        messages.success(request, _("Saved tags: %s") % (", ".join(saved) or _("(none)")))
+        return True
+
+
+class CreateApplicationCredentialForm(horizon_forms.SelfHandlingForm):
+    """Self-service, not admin-gated -- see project-facade app.py's
+    module docstring for why Keystone's own application-credentials API
+    is self-only regardless of role. The one thing this form adds beyond
+    Keystone's own defaults: an expiration is mandatory, there is no
+    "never expires" option."""
+
+    name = forms.CharField(label=_("Name"), max_length=255)
+    description = forms.CharField(label=_("Description"), required=False)
+    expires_in_days = forms.IntegerField(
+        label=_("Expires In (days)"),
+        min_value=1,
+        max_value=365,
+        initial=90,
+        help_text=_(
+            "Application credentials must have an expiration -- there is no "
+            "\"never expires\" option for self-service credentials."
+        ),
+    )
+
+    def handle(self, request, data):
+        try:
+            cred = facade.create_application_credential(
+                request, data["name"], data.get("description", ""), data["expires_in_days"]
+            )
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to create application credential."))
+            return False
+        messages.success(
+            request,
+            _(
+                'Created application credential "%(name)s". Its secret is shown only '
+                "once -- copy it now, it cannot be retrieved again: %(secret)s"
+            )
+            % {"name": cred["name"], "secret": cred["secret"]},
+        )
+        return cred

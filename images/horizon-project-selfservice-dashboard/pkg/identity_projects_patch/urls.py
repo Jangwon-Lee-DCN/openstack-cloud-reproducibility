@@ -24,11 +24,12 @@
 # `manage_members_selfservice_transfer_ownership`/`leave_selfservice`/
 # `audit_log_selfservice`/`audit_log_selfservice_export`/`my_access`/
 # `domain_projects_overview`/`role_bundles`/`create_role_bundle`/
-# `role_bundles_audit_log`/`simulate_access_selfservice` -- appended to
-# the stock URL list below unchanged. Kept as a full copy of the
-# upstream file (rather than trying to monkeypatch urlpatterns from
-# outside it) so a diff against the real upstream file shows exactly
-# these additions.
+# `role_bundles_audit_log`/`simulate_access_selfservice`/
+# `manage_project_tags`/`application_credentials`/
+# `create_application_credential` -- appended to the stock URL list below
+# unchanged. Kept as a full copy of the upstream file (rather than
+# trying to monkeypatch urlpatterns from outside it) so a diff against
+# the real upstream file shows exactly these additions.
 
 from django.urls import re_path
 
@@ -56,6 +57,12 @@ urlpatterns = [
     re_path(r'^role_bundles/audit_log$',
             selfservice_views.RoleBundlesAuditLogView.as_view(),
             name='role_bundles_audit_log'),
+    re_path(r'^application_credentials$',
+            selfservice_views.ApplicationCredentialsView.as_view(),
+            name='application_credentials'),
+    re_path(r'^application_credentials/create$',
+            selfservice_views.CreateApplicationCredentialView.as_view(),
+            name='create_application_credential'),
     re_path(r'^(?P<tenant_id>[^/]+)/update/$',
             views.UpdateProjectView.as_view(), name='update'),
     re_path(r'^(?P<project_id>[^/]+)/usage/$',
@@ -91,4 +98,7 @@ urlpatterns = [
     re_path(r'^(?P<project_id>[^/]+)/simulate_access_selfservice$',
             selfservice_views.SimulateAccessView.as_view(),
             name='simulate_access_selfservice'),
+    re_path(r'^(?P<project_id>[^/]+)/manage_project_tags$',
+            selfservice_views.ManageProjectTagsView.as_view(),
+            name='manage_project_tags'),
 ]

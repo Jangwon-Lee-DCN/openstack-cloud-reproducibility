@@ -174,7 +174,8 @@ class RoleBundlesView(horizon_tables.DataTableView):
             return []
         return [
             SimpleNamespace(id=name, name=name, description=b.get("description") or "-",
-                             roles=", ".join(sorted(b["roles"])))
+                             roles=", ".join(sorted(b["roles"])),
+                             required_tag=b.get("required_tag") or "")
             for name, b in bundles.items()
         ]
 
@@ -365,6 +366,86 @@ class DomainProjectsOverviewView(horizon_tables.DataTableView):
             )
             for p in projects
         ]
+
+
+class ManageProjectTagsView(horizon_forms.ModalFormView):
+    """Reached from "Manage Tags" on Domain Projects Overview -- edits
+    Keystone's own native project tags (see facade.list_project_tags/
+    set_project_tags). Its only real consumer today is a role bundle's
+    optional required_tag (see forms.RoleBundleForm), but this stays a
+    plain per-project tag editor, not itself aware of role bundles.
+    """
+
+    form_class = forms.ManageProjectTagsForm
+    template_name = "project_selfservice/manage_project_tags.html"
+    page_title = _("Manage Project Tags")
+    submit_label = _("Save Tags")
+    success_url = reverse_lazy("horizon:identity:projects:domain_projects_overview")
+
+    def get_success_url(self):
+        return str(self.success_url)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:manage_project_tags", args=[self.kwargs["project_id"]]
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        project_id = self.kwargs["project_id"]
+        tags = []
+        try:
+            tags = facade.list_project_tags(self.request, project_id)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve this project's tags."))
+        return {"project_id": project_id, "tags": ", ".join(tags)}
+
+
+class ApplicationCredentialsView(horizon_tables.DataTableView):
+    """Self-service -- always the logged-in user's own application
+    credentials, regardless of which project they're scoped into right
+    now (Keystone ties a credential to whatever project the token that
+    created it was scoped to; see project-facade app.py's module
+    docstring for why this can't be an admin-facing, per-project view).
+    """
+
+    table_class = tables.ApplicationCredentialsTable
+    page_title = _("My Application Credentials")
+
+    def get_data(self):
+        try:
+            creds = facade.list_application_credentials(self.request)
+        except facade.FacadeError as exc:
+            messages.error(self.request, str(exc))
+            return []
+        except Exception:
+            exceptions.handle(self.request, _("Unable to retrieve your application credentials."))
+            return []
+        return [
+            SimpleNamespace(
+                id=c["id"],
+                name=c["name"],
+                project_id=c["project_id"],
+                roles=", ".join(c["roles"]),
+                expires_at=c.get("expires_at") or "-",
+                status=c["status"],
+            )
+            for c in creds
+        ]
+
+
+class CreateApplicationCredentialView(horizon_forms.ModalFormView):
+    form_class = forms.CreateApplicationCredentialForm
+    template_name = "project_selfservice/create_application_credential.html"
+    page_title = _("Create Application Credential")
+    submit_label = _("Create")
+    submit_url = reverse_lazy("horizon:identity:projects:create_application_credential")
+    success_url = reverse_lazy("horizon:identity:projects:application_credentials")
+    cancel_url = reverse_lazy("horizon:identity:projects:application_credentials")
 
 
 class AuditLogView(horizon_tables.DataTableView):

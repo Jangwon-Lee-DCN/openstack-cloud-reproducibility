@@ -128,12 +128,12 @@ def list_role_bundles(request):
     return r.json()["bundles"]
 
 
-def put_role_bundle(request, name, description, roles):
+def put_role_bundle(request, name, description, roles, required_tag=""):
     try:
         r = requests.put(
             f"{PROJECT_FACADE_URL}/v1/role-bundles/{name}",
             headers=_headers(request),
-            json={"description": description, "roles": list(roles)},
+            json={"description": description, "roles": list(roles), "required_tag": required_tag},
             timeout=_TIMEOUT,
         )
     except requests.RequestException as exc:
@@ -211,6 +211,77 @@ def domain_projects_overview(request):
     if r.status_code != 200:
         raise FacadeError(_error_message(r))
     return r.json()["projects"]
+
+
+def list_project_tags(request, project_id):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/tags",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["tags"]
+
+
+def set_project_tags(request, project_id, tags):
+    try:
+        r = requests.put(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/tags",
+            headers=_headers(request),
+            json={"tags": list(tags)},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["tags"]
+
+
+def list_application_credentials(request):
+    try:
+        r = requests.get(
+            f"{PROJECT_FACADE_URL}/v1/application-credentials",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()["application_credentials"]
+
+
+def create_application_credential(request, name, description, expires_in_days):
+    try:
+        r = requests.post(
+            f"{PROJECT_FACADE_URL}/v1/application-credentials",
+            headers=_headers(request),
+            json={"name": name, "description": description, "expires_in_days": expires_in_days},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 201:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
+def delete_application_credential(request, credential_id):
+    try:
+        r = requests.delete(
+            f"{PROJECT_FACADE_URL}/v1/application-credentials/{credential_id}",
+            headers=_headers(request),
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code not in (204, 404):
+        raise FacadeError(_error_message(r))
 
 
 def is_domain_admin(request):

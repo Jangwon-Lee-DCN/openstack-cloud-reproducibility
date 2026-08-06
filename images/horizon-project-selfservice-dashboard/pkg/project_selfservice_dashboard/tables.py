@@ -162,6 +162,13 @@ class ViewProjectMembers(tables.LinkAction):
         return reverse(self.url, args=[datum.project_id])
 
 
+class ManageApplicationCredentialsLink(tables.LinkAction):
+    name = "application_credentials"
+    verbose_name = _("Application Credentials")
+    url = "horizon:identity:projects:application_credentials"
+    icon = "key"
+
+
 class MyAccessTable(tables.DataTable):
     project_name = tables.Column("project_name", verbose_name=_("Project"))
     project_id = tables.Column("project_id", verbose_name=_("Project ID"))
@@ -171,7 +178,19 @@ class MyAccessTable(tables.DataTable):
         name = "my_access"
         verbose_name = _("My Access")
         multi_select = False
+        table_actions = (ManageApplicationCredentialsLink,)
         row_actions = (ViewProjectMembers,)
+
+
+class ManageProjectTags(tables.LinkAction):
+    name = "manage_project_tags"
+    verbose_name = _("Manage Tags")
+    url = "horizon:identity:projects:manage_project_tags"
+    classes = ("ajax-modal",)
+    icon = "tag"
+
+    def get_link_url(self, datum):
+        return reverse(self.url, args=[datum.project_id])
 
 
 class DomainProjectsOverviewTable(tables.DataTable):
@@ -179,6 +198,12 @@ class DomainProjectsOverviewTable(tables.DataTable):
     project_id = tables.Column("project_id", verbose_name=_("Project ID"))
     admins = tables.Column("admins", verbose_name=_("Admin(s)"))
     member_count = tables.Column("member_count", verbose_name=_("Members"))
+    # Keystone's native project tags -- see project-facade app.py's
+    # list_project_tags/set_project_tags. Their main consumer is role
+    # bundles' optional required_tag (see RoleBundlesTable below), but
+    # shown here since this is the one page a domain admin sees every
+    # project in the domain at once.
+    tags = tables.Column("tags", verbose_name=_("Tags"), empty_value=_("no tags"))
     last_activity = tables.Column(
         "last_activity",
         verbose_name=_("Last Self-Service Activity"),
@@ -189,7 +214,7 @@ class DomainProjectsOverviewTable(tables.DataTable):
         name = "domain_projects_overview"
         verbose_name = _("Domain Projects Overview")
         multi_select = False
-        row_actions = (ViewProjectMembers,)
+        row_actions = (ViewProjectMembers, ManageProjectTags)
 
 
 class CreateRoleBundle(tables.LinkAction):
@@ -231,6 +256,12 @@ class RoleBundlesTable(tables.DataTable):
     name = tables.Column("name", verbose_name=_("Bundle Name"))
     description = tables.Column("description", verbose_name=_("Description"))
     roles = tables.Column("roles", verbose_name=_("Expands To"))
+    # Optional permission boundary -- see project-facade app.py's
+    # _expand_role_bundles. Empty for every bundle created before this
+    # field existed, same as description defaulting to "".
+    required_tag = tables.Column(
+        "required_tag", verbose_name=_("Requires Project Tag"), empty_value="-"
+    )
 
     class Meta:
         name = "role_bundles"
@@ -253,3 +284,52 @@ class SimulateAccessTable(tables.DataTable):
         name = "simulate_access"
         verbose_name = _("What Can I Do Here?")
         multi_select = False
+
+
+class CreateApplicationCredential(tables.LinkAction):
+    name = "create_application_credential"
+    verbose_name = _("Create Application Credential")
+    url = "horizon:identity:projects:create_application_credential"
+    classes = ("ajax-modal",)
+    icon = "plus"
+
+
+class RevokeApplicationCredential(tables.DeleteAction):
+    name = "revoke_application_credential"
+
+    @staticmethod
+    def action_present(count):
+        return ngettext_lazy("Revoke Credential", "Revoke Credentials", count)
+
+    @staticmethod
+    def action_past(count):
+        return ngettext_lazy("Revoked Credential", "Revoked Credentials", count)
+
+    def allowed(self, request, credential):
+        # Unconditional -- project-facade forwards this straight to
+        # Keystone's own self-only application-credentials API, which
+        # already refuses to delete anything not owned by the caller.
+        return True
+
+    def delete(self, request, obj_id):
+        facade.delete_application_credential(request, obj_id)
+
+
+class ApplicationCredentialsTable(tables.DataTable):
+    name = tables.Column("name", verbose_name=_("Name"))
+    project_id = tables.Column("project_id", verbose_name=_("Project ID"))
+    roles = tables.Column("roles", verbose_name=_("Roles"))
+    expires_at = tables.Column("expires_at", verbose_name=_("Expires"), empty_value="-")
+    status = tables.Column(
+        "status",
+        verbose_name=_("Status"),
+        status=True,
+        status_choices=(("active", True), ("expired", False)),
+    )
+
+    class Meta:
+        name = "application_credentials"
+        verbose_name = _("My Application Credentials")
+        multi_select = False
+        table_actions = (CreateApplicationCredential,)
+        row_actions = (RevokeApplicationCredential,)

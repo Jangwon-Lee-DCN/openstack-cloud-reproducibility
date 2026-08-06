@@ -1,0 +1,6 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+
+{% block modal-body-right %}
+  <p>{% trans "Project admins and domain admins only. These are Keystone's own native project tags -- mainly used to restrict which projects a tag-scoped role bundle can be granted on (see Role Bundles' \"Required Project Tag\")." %}</p>
+{% endblock %}
