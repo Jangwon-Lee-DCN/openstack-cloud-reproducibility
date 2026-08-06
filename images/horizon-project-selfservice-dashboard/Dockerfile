@@ -65,7 +65,7 @@ COPY pkg/identity_projects_patch/templates/projects/detail.html /var/lib/opensta
 COPY pkg/identity_projects_patch/templates/projects/overview.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/templates/identity/projects/overview.html
 
 COPY pkg/enabled/_1800_project_selfservice_app.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1800_project_selfservice_app.py
-COPY pkg/enabled/_2620_admin_project_operations.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2620_admin_project_operations.py
+COPY pkg/enabled/_2850_admin_project_operations.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2850_admin_project_operations.py
 
 RUN python3 -c "import project_selfservice_dashboard" \
     && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard/apps.py \
