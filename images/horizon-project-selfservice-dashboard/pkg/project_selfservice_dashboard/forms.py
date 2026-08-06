@@ -39,15 +39,19 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
 # since the marker roles alone don't grant ordinary project CRUD in
 # vpc-facade's own authorization classes. This form doesn't enforce that
 # combination; it just lets the project admin pick any set.
-ROLE_CHOICES = [
+BASE_ROLE_CHOICES = [
     ("admin", _("Admin")),
     ("member", _("Member")),
-    ("reader", _("Reader")),
+    ("reader", _("Read Only")),
+]
+CAPABILITY_ROLE_CHOICES = [
     ("network-operator", _("Network Operator")),
     ("security-operator", _("Security Operator")),
     ("load-balancer_admin", _("Load Balancer Operator")),
     ("monitoring", _("Monitoring")),
 ]
+# Role-bundle administration still needs the complete primitive role catalog.
+ROLE_CHOICES = BASE_ROLE_CHOICES + CAPABILITY_ROLE_CHOICES
 
 
 def _bundle_choices(request):
@@ -76,12 +80,19 @@ class AddMemberForm(horizon_forms.SelfHandlingForm):
         help_text=_("A named preset combining several roles at once -- see Role Bundles to define one. "
                      "Combines with any individually-checked roles below."),
     )
-    roles = forms.MultipleChoiceField(
-        label=_("Roles"),
-        choices=ROLE_CHOICES,
+    base_role = forms.ChoiceField(
+        label=_("Base Access"),
+        choices=BASE_ROLE_CHOICES,
+        widget=forms.RadioSelect,
+        initial="member",
+        help_text=_("Choose exactly one baseline permission tier."),
+    )
+    capabilities = forms.MultipleChoiceField(
+        label=_("Additional Capabilities"),
+        choices=CAPABILITY_ROLE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
-        initial=["member"],
         required=False,
+        help_text=_("Optional service-specific operator permissions added to the base access."),
     )
 
     def __init__(self, request, *args, **kwargs):
@@ -107,13 +118,13 @@ class AddMemberForm(horizon_forms.SelfHandlingForm):
 
     def clean(self):
         cleaned = super().clean()
-        if not cleaned.get("bundle") and not cleaned.get("roles"):
-            raise forms.ValidationError(_("Pick a role bundle, at least one individual role, or both."))
+        if not cleaned.get("base_role"):
+            raise forms.ValidationError(_("Choose one base access tier."))
         return cleaned
 
     @staticmethod
     def _combined_roles(data):
-        roles = list(data.get("roles") or [])
+        roles = [data["base_role"]] + list(data.get("capabilities") or [])
         if data.get("bundle"):
             roles.append(data["bundle"])
         return roles
@@ -176,12 +187,17 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
         choices=[("", "")],
         help_text=_("Combines with any individually-checked roles below. Applied to every username above."),
     )
-    roles = forms.MultipleChoiceField(
-        label=_("Roles"),
-        help_text=_("Applied to every username above -- to give people different roles, invite them separately."),
-        choices=ROLE_CHOICES,
+    base_role = forms.ChoiceField(
+        label=_("Base Access"),
+        choices=BASE_ROLE_CHOICES,
+        widget=forms.RadioSelect,
+        initial="member",
+    )
+    capabilities = forms.MultipleChoiceField(
+        label=_("Additional Capabilities"),
+        help_text=_("Applied to every username above."),
+        choices=CAPABILITY_ROLE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
-        initial=["member"],
         required=False,
     )
 
@@ -191,8 +207,8 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
 
     def clean(self):
         cleaned = super().clean()
-        if not cleaned.get("bundle") and not cleaned.get("roles"):
-            raise forms.ValidationError(_("Pick a role bundle, at least one individual role, or both."))
+        if not cleaned.get("base_role"):
+            raise forms.ValidationError(_("Choose one base access tier."))
         return cleaned
 
     @staticmethod
@@ -237,7 +253,7 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
 
     def handle(self, request, data):
         project_id = self.initial["project_id"]
-        roles = list(data.get("roles") or [])
+        roles = [data["base_role"]] + list(data.get("capabilities") or [])
         if data.get("bundle"):
             roles.append(data["bundle"])
         added, failed = [], []

@@ -3,4 +3,12 @@
 
 {% block modal-body-right %}
   <p>{% trans "Select an enabled user from this project's domain. Existing members are intentionally excluded; change their roles from the Members table instead." %}</p>
+  <hr>
+  <p><strong>{% trans "Base access" %}</strong></p>
+  <ul>
+    <li><strong>{% trans "Admin" %}</strong>: {% trans "manages the project, members, and ordinary resources." %}</li>
+    <li><strong>{% trans "Member" %}</strong>: {% trans "creates and operates ordinary project resources." %}</li>
+    <li><strong>{% trans "Read Only" %}</strong>: {% trans "inspects resources without changing them." %}</li>
+  </ul>
+  <p>{% trans "Additional capabilities grant service-specific operations and do not replace base access." %}</p>
 {% endblock %}

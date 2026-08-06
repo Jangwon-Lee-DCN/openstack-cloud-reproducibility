@@ -148,7 +148,14 @@ class ChangeMemberRoleView(horizon_forms.ModalFormView):
             messages.error(self.request, str(exc))
         except Exception:
             exceptions.handle(self.request, _("Unable to retrieve this member's current roles."))
-        return {"project_id": project_id, "username": username, "roles": current_roles}
+        base_role = next((r for r in ("admin", "member", "reader") if r in current_roles), "member")
+        capabilities = [r for r in current_roles if r not in {"admin", "member", "reader"}]
+        return {
+            "project_id": project_id,
+            "username": username,
+            "base_role": base_role,
+            "capabilities": capabilities,
+        }
 
 
 class RoleBundlesView(horizon_tables.DataTableView):
