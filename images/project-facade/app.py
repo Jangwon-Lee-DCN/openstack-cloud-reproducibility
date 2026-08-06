@@ -1285,7 +1285,9 @@ def role_bundles_audit_log():
     one project, so this can't live in a project's own audit-log the way
     every other action in this file does; there would otherwise be
     nowhere in the UI a domain admin could ever see this history at all.
-    Domain-admin gated, same as create/delete themselves."""
+    Domain-admin gated, same as create/delete themselves -- plus a
+    system-scoped `reader` auditor (see user_has_system_role), who may
+    view but never create/delete a bundle."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
@@ -1296,7 +1298,9 @@ def role_bundles_audit_log():
 
     domain_id = get_domain_id(OS_DOMAIN_NAME)
     if not domain_id or not (
-        user_has_domain_role(user_id, domain_id, ADMIN_ROLE) or user_has_system_admin_role(caller_token, user_id)
+        user_has_domain_role(user_id, domain_id, ADMIN_ROLE)
+        or user_has_system_admin_role(caller_token, user_id)
+        or user_has_system_role(caller_token, user_id, "reader")
     ):
         return jsonify(error="forbidden: you are not an admin of this domain"), 403
 
@@ -2066,6 +2070,33 @@ def check_domain_admin():
     return jsonify(is_domain_admin=is_admin, domain=OS_DOMAIN_NAME), 200
 
 
+@app.route("/v1/system-auditor", methods=["GET"])
+def check_system_auditor():
+    """Companion to check_domain_admin: tells a caller whether they hold
+    the read-only "auditor" persona this endpoint recognizes -- a
+    system-scoped `reader` (see user_has_system_role), or a real system
+    admin (who trivially has everything an auditor has). Used by Horizon
+    to decide whether to show audit-oriented pages/links to someone who
+    isn't a domain admin. A True here does not grant anything by
+    itself -- domain_projects_overview/role_bundles_audit_log/
+    project_audit_log re-check the same thing server-side on every
+    request, same as every other UI-visibility-only check in this
+    service (see "Authority boundaries" in docs/proposals/iam-hardening/
+    README.md)."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    is_auditor = user_has_system_role(caller_token, user_id, "reader") or user_has_system_admin_role(
+        caller_token, user_id
+    )
+    return jsonify(is_system_auditor=is_auditor), 200
+
+
 @app.route("/v1/projects/<project_id>/simulate-access", methods=["GET"])
 def simulate_access(project_id):
     """Dry-run breakdown of what the caller can actually do to this
@@ -2255,7 +2286,10 @@ def domain_projects_overview():
     project's Manage Members panel one at a time. Same domain-admin
     authorization as check_domain_admin (user_has_domain_role), since
     this exposes membership summaries across every project in the
-    domain, not just one a caller already administers."""
+    domain, not just one a caller already administers -- plus a
+    system-scoped `reader` auditor (see user_has_system_role), the same
+    read-only exception role_bundles_audit_log and project_audit_log
+    make."""
     caller_token = request.headers.get("X-Auth-Token")
     if not caller_token:
         return jsonify(error="missing X-Auth-Token header"), 401
@@ -2266,7 +2300,9 @@ def domain_projects_overview():
 
     domain_id = get_domain_id(OS_DOMAIN_NAME)
     if not domain_id or not (
-        user_has_domain_role(user_id, domain_id, ADMIN_ROLE) or user_has_system_admin_role(caller_token, user_id)
+        user_has_domain_role(user_id, domain_id, ADMIN_ROLE)
+        or user_has_system_admin_role(caller_token, user_id)
+        or user_has_system_role(caller_token, user_id, "reader")
     ):
         return jsonify(error="forbidden: you are not an admin of this domain"), 403
 
