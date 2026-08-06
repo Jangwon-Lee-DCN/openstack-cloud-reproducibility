@@ -389,16 +389,34 @@ class UpdateQuotasView(workflows.WorkflowView):
 
 class DetailProjectView(tabs.TabView):
     tab_group_class = project_tabs.ProjectDetailTabs
-    template_name = 'horizon/common/_detail.html'
+    template_name = 'identity/projects/detail.html'
     page_title = "{{ project.name }}"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         project = self.get_data()
+        domain_name = api.keystone.domain_lookup(self.request).get(project.domain_id, "")
+        project.domain_name = domain_name
         table = project_tables.TenantsTable(self.request)
         context["project"] = project
         context["url"] = reverse(INDEX_URL)
         context["actions"] = table.render_row_actions(project)
+        context["is_platform_project"] = IndexView.classify_tenant(
+            project, getattr(project, "domain_name", "")
+        )
+        context["project_type"] = (
+            _("Platform / Service") if context["is_platform_project"] else _("User Project")
+        )
+        context["current_roles"] = []
+        try:
+            for access in facade.my_access(self.request):
+                if access.get("project_id") == project.id:
+                    context["current_roles"] = sorted(access.get("roles", []))
+                    break
+        except Exception:
+            # The detail and membership workflow must remain usable when the
+            # supplementary role-summary endpoint is temporarily unavailable.
+            pass
 
         return context
 

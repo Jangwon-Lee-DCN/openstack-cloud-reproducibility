@@ -61,6 +61,7 @@ COPY pkg/identity_projects_patch/tables.py /var/lib/openstack/lib/python3.12/sit
 COPY pkg/identity_projects_patch/urls.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/urls.py
 COPY pkg/identity_projects_patch/views.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/views.py
 COPY pkg/identity_projects_patch/tabs.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py
+COPY pkg/identity_projects_patch/templates/projects/detail.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/templates/identity/projects/detail.html
 
 COPY pkg/enabled/_1800_project_selfservice_app.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1800_project_selfservice_app.py
 
