@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: project-management-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: project-management.availability
+      rules:
+        - alert: ProjectFacadeUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="openstack",deployment="project-facade"} < 2
+          for: 5m
+          labels:
+            severity: critical
+            service: project-management
+          annotations:
+            summary: Project membership and lifecycle API is degraded
+            runbook: docs/project-management-notification-contract.md
+        - alert: ProjectFacadeRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="openstack",container="project-facade"}[15m]) > 2
+          for: 10m
+          labels:
+            severity: warning
+            service: project-management
+          annotations:
+            summary: Project management controller is repeatedly restarting
+            runbook: docs/project-management-notification-contract.md
