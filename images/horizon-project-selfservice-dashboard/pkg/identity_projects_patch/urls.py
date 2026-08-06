@@ -107,4 +107,7 @@ urlpatterns = [
     re_path(r'^(?P<project_id>[^/]+)/manage_project_tags$',
             selfservice_views.ManageProjectTagsView.as_view(),
             name='manage_project_tags'),
+    re_path(r'^(?P<project_id>[^/]+)/request_quota_increase$',
+            selfservice_views.RequestQuotaIncreaseView.as_view(),
+            name='request_quota_increase'),
 ]

@@ -84,6 +84,12 @@ class RemoveMember(tables.DeleteAction):
 class MembersTable(tables.DataTable):
     username = tables.Column("username", verbose_name=_("Username"))
     roles = tables.Column("roles", verbose_name=_("Roles"))
+    # "Direct" for a plain per-user grant, or the group name(s) a role
+    # was inherited through -- see project-facade app.py's list_members
+    # for how this is derived from Keystone's own "membership" link on
+    # effective role_assignments entries, now that group role
+    # assignment (Project Groups above) is itself a first-class action.
+    source = tables.Column("source", verbose_name=_("Source"))
 
     class Meta:
         name = "members"
@@ -152,6 +158,17 @@ def _quota_usage(row):
     }
 
 
+class RequestQuotaIncrease(tables.LinkAction):
+    name = "request_quota_increase"
+    verbose_name = _("Request Quota Increase")
+    url = "horizon:identity:projects:request_quota_increase"
+    classes = ("ajax-modal",)
+    icon = "plus"
+
+    def get_link_url(self, datum=None):
+        return reverse(self.url, args=[self.table.kwargs["project_id"]])
+
+
 class QuotaUsageTable(tables.DataTable):
     service = tables.Column("service", verbose_name=_("Service"))
     resource = tables.Column("resource", verbose_name=_("Resource"))
@@ -165,6 +182,7 @@ class QuotaUsageTable(tables.DataTable):
         name = "quota_usage"
         verbose_name = _("Quota & Usage")
         multi_select = False
+        table_actions = (RequestQuotaIncrease,)
 
 
 class ProjectHealthTable(tables.DataTable):

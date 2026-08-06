@@ -159,6 +159,21 @@ def quota_usage(request, project_id):
     return r.json()
 
 
+def request_quota_increase(request, project_id, resource, requested_amount, justification):
+    try:
+        r = requests.post(
+            f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/quota-request",
+            headers=_headers(request),
+            json={"resource": resource, "requested_amount": requested_amount, "justification": justification},
+            timeout=_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 201:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
 def resource_summary(request, project_id):
     try:
         r = requests.get(f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/resource-summary", headers=_headers(request), timeout=15)

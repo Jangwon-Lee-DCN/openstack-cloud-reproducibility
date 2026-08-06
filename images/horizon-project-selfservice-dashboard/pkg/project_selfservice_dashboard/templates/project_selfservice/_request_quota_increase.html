@@ -1,0 +1,6 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+
+{% block modal-body-right %}
+  <p>{% trans "This does not change your quota -- it logs a request, visible to this project's domain admin in its Audit Log, who can apply the change manually after reviewing it." %}</p>
+{% endblock %}

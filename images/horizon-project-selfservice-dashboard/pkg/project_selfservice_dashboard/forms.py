@@ -530,3 +530,44 @@ class CreateApplicationCredentialForm(horizon_forms.SelfHandlingForm):
             % {"name": cred["name"], "secret": cred["secret"]},
         )
         return cred
+
+
+class RequestQuotaIncreaseForm(horizon_forms.SelfHandlingForm):
+    """Does not change any quota itself -- see project-facade app.py's
+    request_quota_increase for why. Just durably logs the request so a
+    domain admin sees it (in this project's own Audit Log) instead of
+    it arriving as a message that gets lost."""
+
+    project_id = forms.CharField(widget=forms.HiddenInput)
+    resource = forms.CharField(
+        label=_("Resource"),
+        help_text=_('E.g. "vCPUs", "Volumes", "Storage (GiB)" -- see the Quota & Usage tab for exact names.'),
+    )
+    requested_amount = forms.CharField(label=_("Requested Amount"))
+    justification = forms.CharField(
+        label=_("Justification"),
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    def handle(self, request, data):
+        try:
+            facade.request_quota_increase(
+                request,
+                data["project_id"],
+                data["resource"],
+                data["requested_amount"],
+                data.get("justification", ""),
+            )
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        except Exception:
+            exceptions.handle(request, _("Unable to submit this quota request."))
+            return False
+        messages.success(
+            request,
+            _('Requested %(amount)s for "%(resource)s". Visible to this project\'s domain admin in its Audit Log.')
+            % {"amount": data["requested_amount"], "resource": data["resource"]},
+        )
+        return True

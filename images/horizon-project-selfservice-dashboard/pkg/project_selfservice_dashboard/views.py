@@ -22,6 +22,19 @@ from . import tables
 SETTABLE_ROLES = {"admin", "member", "reader", "network-operator", "security-operator", "load-balancer_admin", "monitoring"}
 
 
+def _member_source_label(member):
+    """"Direct" if every one of this member's roles is a plain per-user
+    grant, the group name(s) if any come from group membership instead
+    (see project-facade app.py's list_members for how direct_roles/
+    group_sources are derived), or a combination of both when a member
+    holds some roles directly and others via a group."""
+    parts = []
+    if member.get("direct_roles"):
+        parts.append(_("Direct"))
+    parts.extend(sorted(f"Group: {name}" for name in (member.get("group_sources") or {})))
+    return ", ".join(parts) or _("Direct")
+
+
 class CreateProjectSelfServiceView(horizon_forms.ModalFormView):
     """Reached from a "Create Project (Self-Service)" action added to the
     stock Identity > Projects table (see identity_projects_patch/tables.py)
@@ -91,7 +104,12 @@ class ManageMembersSelfServiceView(horizon_tables.DataTableView):
         # Mapping objects) but not for that, so use a simple attribute-
         # holding object instead of a dict here.
         return [
-            SimpleNamespace(id=m["user_id"], username=m["username"], roles=", ".join(sorted(m["roles"])))
+            SimpleNamespace(
+                id=m["user_id"],
+                username=m["username"],
+                roles=", ".join(sorted(m["roles"])),
+                source=_member_source_label(m),
+            )
             for m in members
         ]
 
@@ -481,6 +499,32 @@ class ManageProjectTagsView(horizon_forms.ModalFormView):
             else:
                 extra.append(tag)
         return {"project_id": project_id, "extra_tags": ", ".join(extra), **structured}
+
+
+class RequestQuotaIncreaseView(horizon_forms.ModalFormView):
+    """Reached from "Request Quota Increase" on the Quota & Usage tab.
+    Deliberately does not touch any actual quota -- see
+    forms.RequestQuotaIncreaseForm / project-facade app.py's
+    request_quota_increase for why this only logs a durable request."""
+
+    form_class = forms.RequestQuotaIncreaseForm
+    template_name = "project_selfservice/request_quota_increase.html"
+    page_title = _("Request Quota Increase")
+    submit_label = _("Submit Request")
+
+    def get_success_url(self):
+        return reverse("horizon:identity:projects:detail", args=[self.kwargs["project_id"]])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["submit_url"] = reverse(
+            "horizon:identity:projects:request_quota_increase", args=[self.kwargs["project_id"]]
+        )
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        return {"project_id": self.kwargs["project_id"]}
 
 
 class ApplicationCredentialsView(horizon_tables.DataTableView):
