@@ -83,6 +83,7 @@ COPY project-selfservice/project_selfservice_dashboard/ /var/lib/openstack/lib/p
 COPY project-selfservice/identity_projects_patch/tables.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tables.py
 COPY project-selfservice/identity_projects_patch/urls.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/urls.py
 COPY project-selfservice/identity_projects_patch/views.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/views.py
+COPY project-selfservice/identity_projects_patch/tabs.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py
 COPY project-selfservice/identity_projects_patch/templates/projects/index.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/templates/projects/index.html
 COPY project-selfservice/enabled/_1800_project_selfservice_app.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1800_project_selfservice_app.py
 
@@ -107,6 +108,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
     && test -f "$local_enabled/_1930_project_s3.py" \
     && test -f "$local_enabled/_9999_platform_navigation.py" \
+    && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py \
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \

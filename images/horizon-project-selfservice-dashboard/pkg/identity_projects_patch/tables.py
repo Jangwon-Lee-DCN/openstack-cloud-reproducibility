@@ -410,6 +410,8 @@ class TenantsTable(tables.DataTable):
     id = tables.Column('id', verbose_name=_('Project ID'))
     domain_name = tables.Column(
         'domain_name', verbose_name=_('Domain Name'))
+    project_type = tables.Column(
+        'project_type', verbose_name=_('Project Type'))
     enabled = tables.Column('enabled', verbose_name=_('Enabled'), status=True,
                             filters=(filters.yesno, filters.capfirst),
                             form_field=forms.BooleanField(
@@ -417,13 +419,10 @@ class TenantsTable(tables.DataTable):
                                 required=False))
 
     def get_project_detail_link(self, project):
-        # this method is an ugly monkey patch, needed because
-        # the column link method does not provide access to the request
-        if policy.check((("identity", "identity:get_project"),),
-                        self.request, target={"project": project}):
-            return reverse("horizon:identity:projects:detail",
-                           args=(project.id,))
-        return None
+        # Every listed project is already authorized by the list operation.
+        # The detail page is now the primary workflow (Overview + Members),
+        # so policy/UI mismatches must not turn its name into plain text.
+        return reverse("horizon:identity:projects:detail", args=(project.id,))
 
     def __init__(self, request, data=None, needs_form_wrapper=None, **kwargs):
         super().__init__(request, data=data,
@@ -434,16 +433,12 @@ class TenantsTable(tables.DataTable):
     class Meta(object):
         name = "tenants"
         verbose_name = _("Projects")
-        row_class = UpdateRow
-        row_actions = (UpdateGroupsLink, UpdateProject,
-                       UsageLink, ModifyQuotas, DeleteTenantsAction,
-                       DeleteProjectSelfService, ManageMembersSelfService,
+        row_actions = (UpdateProject,
+                       UsageLink, ModifyQuotas,
+                       DeleteProjectSelfService,
                        AuditLogSelfService, SimulateAccessSelfService,
                        LeaveProjectSelfService, RescopeTokenToProject)
-        table_actions = (TenantFilterAction, CreateProject,
-                         CreateProjectSelfService, MyAccessLink,
-                         DomainProjectsOverviewLink, RoleBundlesLink,
-                         DeleteTenantsAction)
+        table_actions = (TenantFilterAction, CreateProjectSelfService)
         pagination_param = "tenant_marker"
 
 

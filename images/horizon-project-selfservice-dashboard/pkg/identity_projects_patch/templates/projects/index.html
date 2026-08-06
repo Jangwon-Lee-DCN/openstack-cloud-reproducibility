@@ -7,6 +7,8 @@
 {% endblock page_header %}
 
 {% block main %}
+  <div class="alert alert-info">
+    {% trans "One project inventory is shown below. User Project identifies tenant workloads; Platform / Service identifies OpenStack-operated projects that should normally be changed only by operators." %}
+  </div>
   {{ tenants_table.render }}
-  {{ service_tenants_table.render }}
 {% endblock %}

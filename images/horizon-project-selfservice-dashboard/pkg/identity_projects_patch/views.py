@@ -102,7 +102,10 @@ _SERVICE_DESCRIPTION_PREFIXES = ("Bootstrap project", "Service Project for")
 
 
 class IndexView(tables.MultiTableView):
-    table_classes = (project_tables.TenantsTable, project_tables.ServiceProjectsTable)
+    # One inventory with an explicit Project Type column.  The earlier two
+    # stacked tables duplicated controls and made the classification look like
+    # two different resources even though both are Keystone projects.
+    table_classes = (project_tables.TenantsTable,)
     template_name = 'identity/projects/index.html'
     page_title = _("Projects")
 
@@ -262,7 +265,9 @@ class IndexView(tables.MultiTableView):
 
         real, service = [], []
         for t in tenants:
-            (service if self.classify_tenant(t, t.domain_name) else real).append(t)
+            is_service = self.classify_tenant(t, t.domain_name)
+            t.project_type = _("Platform / Service") if is_service else _("User Project")
+            (service if is_service else real).append(t)
 
         # Both tables report the same "more" flag from the single
         # underlying paginated fetch -- there's no way to know
@@ -281,8 +286,8 @@ class IndexView(tables.MultiTableView):
         return self._split_tenants
 
     def get_tenants_data(self):
-        real, _service = self._fetch_and_split_tenants()
-        return real
+        real, service = self._fetch_and_split_tenants()
+        return real + service
 
     def get_service_tenants_data(self):
         _real, service = self._fetch_and_split_tenants()

@@ -45,11 +45,32 @@ They are related but not interchangeable:
 - deleting a user is an identity lifecycle operation affecting every project.
 
 The primary workflow is therefore `Identity & Access > Projects & Members`:
-select a project and use `Manage Members` to add/remove users and change roles.
+select a project and open its `Members` tab to add/remove users and change roles.
 `User Accounts` remains a distinct domain-administrator inventory for creating,
 disabling or deleting identities. It is not a second membership screen and is
 renamed to make that boundary explicit. `User Groups` and `Access Roles` follow
 the same vocabulary.
+
+### Projects and members screen contract
+
+`Projects & Members` uses one project inventory. `User Project` and
+`Platform / Service` are values in a `Project Type` column, not separate
+stacked tables: they are both Keystone projects and duplicated table controls
+made that relationship harder to understand. User projects sort before
+platform/service projects, and explanatory text warns that service projects
+are operator-managed.
+
+Selecting the project name opens its detail view. The detail tabs are:
+
+- **Overview:** identity and status of the project;
+- **Members:** the authoritative project-facade membership list, with add,
+  bulk invite, role change, ownership transfer and remove actions; and
+- **Group Assignments:** advanced Keystone group-derived assignments.
+
+There is no separate read-only `Users` tab and no duplicate `Manage Members`
+row action. The Members tab replaces both. The project list toolbar contains
+only search/filter and `Create Project`; project-scoped operations live on the
+selected project instead of being repeated as unrelated top-level buttons.
 
 ## Shared File Storage
 
