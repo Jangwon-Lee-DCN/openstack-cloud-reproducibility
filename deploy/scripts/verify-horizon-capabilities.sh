@@ -48,6 +48,24 @@ for name in (
     "horizon:masakaridashboard:segments:index",
 ):
     assert reverse(name).startswith("/horizon/")
+project = Horizon.get_dashboard("project")
+assert list(project.get_panel_groups()) == [
+    "compute", "vpc", "volumes", "share", "object_store",
+    "container_infra", "dns", "observability", "default",
+]
+assert project.get_panel_group("share").panels == [
+    "shares", "share_snapshots", "share_networks",
+]
+assert project.get_panel_group("observability").panels == [
+    "cloud_metrics", "cloud_alarms",
+]
+assert str(project.get_panel_group("observability").name) == "Monitoring & Alarms"
+assert str(project.get_panel("cloud_metrics").name) == "Metric Coverage"
+assert str(project.get_panel("cloud_s3").name) == "S3 Access & Credentials"
+identity = Horizon.get_dashboard("identity")
+assert str(identity.name) == "Identity & Access"
+assert str(identity.get_panel("projects").name) == "Projects & Members"
+assert str(identity.get_panel("users").name) == "User Accounts"
 assert ("instance-ha", "context_is_admin") in Horizon.get_dashboard("masakaridashboard").policy_rules
 PY
   '

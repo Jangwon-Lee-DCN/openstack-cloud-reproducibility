@@ -24,13 +24,15 @@ WORK_DIR=$(mktemp -d /tmp/dcn-horizon-rebuild.XXXXXX)
 cleanup() { rm -rf "$WORK_DIR"; }
 trap cleanup EXIT
 context="$WORK_DIR/context"
-mkdir -p "$context/octavia-workflow" "$context/project-selfservice" "$context/magnum-ui"
+mkdir -p "$context/octavia-workflow" "$context/project-selfservice" "$context/magnum-ui" "$context/enabled"
 
 (cd "$VPC_DASHBOARD_REPO" && python3 -m build && make verify-wheel)
 (cd "$TELEMETRY_DASHBOARD_REPO" && python3 -m build && make verify)
 (cd "$S3_DASHBOARD_REPO" && python3 -m build && make verify)
 
 cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$context/Dockerfile"
+cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$context/platform_navigation.py"
+cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$context/enabled/_9999_platform_navigation.py"
 cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$context/openstack_vpc_dashboard.whl"
 cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$context/openstack_telemetry_dashboard.whl"
 cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$context/openstack_s3_dashboard.whl"

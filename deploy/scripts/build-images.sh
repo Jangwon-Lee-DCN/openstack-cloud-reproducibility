@@ -136,8 +136,10 @@ done
 (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
 (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
 horizon_context="$WORK_DIR/horizon-complete"
-mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui"
+mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled"
 cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
+cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
+cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
 cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
 cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
 cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"

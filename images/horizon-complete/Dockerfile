@@ -18,6 +18,8 @@ COPY openstack_vpc_dashboard.whl /tmp/openstack_vpc_dashboard.whl
 COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
+COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/platform_navigation.py
+COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
 
 RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
     && echo "5937bb7c901f59142d97afc14dd7e48b9e80ea679e9c25d214d5eb88b632716c  /tmp/designate_dashboard.whl" | sha256sum -c - \
@@ -104,7 +106,9 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_1620_project_alarms.py" \
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
     && test -f "$local_enabled/_1930_project_s3.py" \
+    && test -f "$local_enabled/_9999_platform_navigation.py" \
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \
+    && grep -q 'platform_navigation' "$local_enabled/_9999_platform_navigation.py" \
     && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py"
