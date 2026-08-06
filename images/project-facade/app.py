@@ -1238,6 +1238,8 @@ def _application_credential_view(c, now):
                 parsed = parsed.replace(tzinfo=datetime.timezone.utc)
             if parsed <= now:
                 status = "expired"
+            elif parsed <= now + datetime.timedelta(days=7):
+                status = "expiring-soon"
         except ValueError:
             pass
     return {

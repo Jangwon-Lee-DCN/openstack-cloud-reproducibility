@@ -368,6 +368,10 @@ class CreateApplicationCredential(tables.LinkAction):
     classes = ("ajax-modal",)
     icon = "plus"
 
+    def allowed(self, request, datum=None):
+        selected = self.table.kwargs.get("project_id")
+        return not selected or selected == request.user.project_id
+
 
 class RevokeApplicationCredential(tables.DeleteAction):
     name = "revoke_application_credential"
@@ -399,7 +403,7 @@ class ApplicationCredentialsTable(tables.DataTable):
         "status",
         verbose_name=_("Status"),
         status=True,
-        status_choices=(("active", True), ("expired", False)),
+        status_choices=(("active", True), ("expiring-soon", None), ("expired", False)),
     )
 
     class Meta:

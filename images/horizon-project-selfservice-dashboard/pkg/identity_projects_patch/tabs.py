@@ -131,6 +131,39 @@ class QuotaUsageTab(tabs.TableTab):
             return []
 
 
+class CredentialsTab(tabs.TableTab):
+    table_classes = (selfservice_tables.ApplicationCredentialsTable,)
+    name = _("API Credentials")
+    slug = "credentials"
+    template_name = "project_selfservice/project_credentials_tab.html"
+    preload = False
+
+    def __init__(self, tab_group, request):
+        tab_group.kwargs["project_id"] = tab_group.kwargs["project"].id
+        super().__init__(tab_group, request)
+
+    def get_context_data(self, request, **kwargs):
+        context = super().get_context_data(request, **kwargs)
+        context["project"] = self.tab_group.kwargs["project"]
+        return context
+
+    def get_application_credentials_data(self):
+        project_id = self.tab_group.kwargs["project"].id
+        try:
+            credentials = facade.list_application_credentials(self.request)
+            return [
+                SimpleNamespace(
+                    id=item["id"], name=item["name"], project_id=item["project_id"],
+                    roles=", ".join(item["roles"]), expires_at=item.get("expires_at") or "-",
+                    status=item["status"],
+                )
+                for item in credentials if item["project_id"] == project_id
+            ]
+        except facade.FacadeError:
+            exceptions.handle(self.request, _("Unable to retrieve API credentials."))
+            return []
+
+
 class ProjectDetailTabs(tabs.DetailTabsGroup):
     slug = "project_details"
-    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab)
+    tabs = (OverviewTab, MembersTab, GroupsTab, QuotaUsageTab, CredentialsTab)
