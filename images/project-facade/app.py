@@ -806,13 +806,36 @@ def list_members(project_id):
         timeout=10,
     )
     r.raise_for_status()
+    group_names = {g["group_id"]: g["name"] for g in _project_group_assignments(project_id).values()}
     members = {}
     for a in r.json()["role_assignments"]:
         if "user" not in a:
             continue  # group-derived grant, not a directly addable/removable member
         uid = a["user"]["id"]
-        entry = members.setdefault(uid, {"user_id": uid, "username": a["user"]["name"], "roles": []})
+        entry = members.setdefault(
+            uid,
+            {"user_id": uid, "username": a["user"]["name"], "roles": [], "direct_roles": [], "group_sources": {}},
+        )
         entry["roles"].append(a["role"]["name"])
+        # Keystone marks an effective assignment expanded from a group
+        # membership with a "membership" link (absent on a plain direct
+        # grant) -- confirmed live: a direct grant's only link is
+        # "assignment" (.../users/<id>/roles/<id>), a group-derived one
+        # adds "membership" (.../groups/<id>/users/<id>). Extracting the
+        # group id from that URL is free provenance Keystone already
+        # computed, instead of cross-referencing each group's member list.
+        membership_link = a.get("links", {}).get("membership")
+        if membership_link:
+            group_id = membership_link.rstrip("/").split("/groups/")[-1].split("/users/")[0]
+            group_name = group_names.get(group_id, group_id)
+            entry["group_sources"].setdefault(group_name, []).append(a["role"]["name"])
+        else:
+            entry["direct_roles"].append(a["role"]["name"])
+    for entry in members.values():
+        entry["roles"] = sorted(set(entry["roles"]))
+        entry["direct_roles"] = sorted(set(entry["direct_roles"]))
+        for group_name in entry["group_sources"]:
+            entry["group_sources"][group_name] = sorted(set(entry["group_sources"][group_name]))
     return jsonify(members=list(members.values())), 200
 
 
