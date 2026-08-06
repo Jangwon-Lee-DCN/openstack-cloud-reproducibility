@@ -365,6 +365,84 @@ def _active_resource_blockers(project_id):
     return blockers
 
 
+@app.route("/v1/projects/<project_id>/quota", methods=["GET"])
+def project_quota(project_id):
+    """Cinder and Neutron quota (limit + current usage), normalized into
+    one flat list -- confirmed live that both accept this service's own
+    domain-scoped credential directly for *any* project in its domain,
+    no elevation needed. Nova's own quota-detail endpoint is deliberately
+    NOT included: confirmed live it 403s a domain-scoped token outright
+    ("Policy doesn't allow os_compute_api:os-quota-sets:detail"), the
+    same project-scope-only restriction _active_resource_blockers above
+    already works around via a temporary self-grant for the pre-delete
+    check. Doing that same grant/revoke cycle on every routine quota page
+    view (far more frequent, much lower-stakes than a one-time delete)
+    isn't a good trade -- documented gap, same as Nova's audit-log
+    coverage elsewhere in this file, rather than silently working around
+    it here too."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    _ident, _project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+
+    quotas = []
+
+    r = requests.get(
+        f"{CINDER_URL}/os-quota-sets/{project_id}", headers=keystone_headers(), params={"usage": "True"}, timeout=10
+    )
+    r.raise_for_status()
+    for resource, detail in r.json()["quota_set"].items():
+        if not isinstance(detail, dict) or "limit" not in detail:
+            continue  # "id" key alongside the real per-resource entries
+        quotas.append(
+            {"service": "cinder", "resource": resource, "limit": detail["limit"], "in_use": detail.get("in_use", 0)}
+        )
+
+    r = requests.get(f"{NEUTRON_URL}/quotas/{project_id}/details.json", headers=keystone_headers(), timeout=10)
+    r.raise_for_status()
+    for resource, detail in r.json()["quota"].items():
+        quotas.append(
+            {"service": "neutron", "resource": resource, "limit": detail["limit"], "in_use": detail.get("used", 0)}
+        )
+
+    quotas.sort(key=lambda q: (q["service"], q["resource"]))
+    return jsonify(quotas=quotas), 200
+
+
+@app.route("/v1/projects/<project_id>/quota-request", methods=["POST"])
+def request_quota_increase(project_id):
+    """Deliberately does not change anything in Nova/Cinder/Neutron --
+    actually raising a quota is a real capacity-planning decision a
+    domain admin should make deliberately, not something this endpoint
+    should rubber-stamp. Just durably logs the request (picked up by the
+    existing project_audit_log/Loki mechanism like every other action in
+    this file -- see _AUDIT_LINE_PREFIXES), so it's visible to whoever
+    manages this project's domain instead of arriving as a Slack message
+    that gets lost."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, _project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    user_id, user_name = ident
+
+    body = request.get_json(silent=True) or {}
+    resource = (body.get("resource") or "").strip()
+    requested_amount = (body.get("requested_amount") or "").strip()
+    justification = (body.get("justification") or "").strip()
+    if not resource or not requested_amount:
+        return jsonify(error="'resource' and 'requested_amount' are required"), 400
+
+    log.info(
+        "requested quota increase project=%s resource=%s requested_amount=%s justification=%s by=%s(%s)",
+        project_id, resource, requested_amount, justification or "-", user_name, user_id,
+    )
+    return jsonify(status="logged", resource=resource, requested_amount=requested_amount), 201
+
+
 @app.route("/v1/projects/<project_id>/decommission-plan", methods=["GET"])
 def decommission_plan(project_id):
     caller_token = request.headers.get("X-Auth-Token")
@@ -1782,6 +1860,7 @@ _AUDIT_LINE_PREFIXES = (
     ("vpc-facade audit merge failed", "vpc_facade_unavailable"),
     ("set role bundle", "set_role_bundle"),
     ("deleted role bundle", "delete_role_bundle"),
+    ("requested quota increase", "quota_request"),
 )
 
 
