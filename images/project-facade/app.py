@@ -70,6 +70,35 @@ output (`_openstack_service_audit_entries` -- coverage varies a lot by
 service, see that function's docstring for exactly what's real and
 what's a known gap).
 
+A role bundle can also carry an optional `required_tag`: if set, the
+bundle only expands (in `add_member`) on a project that itself carries
+that exact Keystone project tag, checked in `_expand_role_bundles`.
+`GET/PUT /v1/projects/<id>/tags` let a project's own admin (or a domain
+admin) manage that project's tags -- Keystone's own native project-tags
+API (`/v3/projects/<id>/tags`), not something invented here. This is
+narrow, deliberately-scoped ABAC: only role-bundle grants are gated by a
+tag, and only an exact-match single tag, nothing like AWS IAM's general
+tag-based policy conditions.
+
+`GET/POST /v1/application-credentials` and
+`DELETE /v1/application-credentials/<id>` are a different shape from
+every other endpoint in this file: they forward the caller's own token
+straight to Keystone's native application-credentials API
+(`/v3/users/<id>/application_credentials`) rather than using this
+service's own elevated domain-scoped credential, because Keystone's
+policy for that API is strictly self-only -- confirmed live that even a
+system-scoped admin token cannot list another user's application
+credentials, and this service's own domain-scoped credential can't even
+list its *own* (`identity:list_application_credentials` requires either
+`user_id:%(target.user.id)s` or system scope, and there is no
+domain-scope carve-out). So there is nothing for this service to
+authorize or elevate here; it only adds one thing Keystone's own API
+doesn't enforce by default -- every credential created through this
+endpoint must carry an expiration (`expires_in_days`, capped at
+`APP_CREDENTIAL_MAX_TTL_DAYS`), since an unexpiring self-service
+credential is exactly the standing-secret risk this whole engagement
+has been closing off elsewhere.
+
 DELETE also refuses to remove a project that still has active Nova/
 Cinder/Neutron resources (instances, volumes, networks, routers, floating
 IPs) -- Keystone's own project delete has no idea these exist and would
@@ -173,6 +202,11 @@ ALLOWED_MEMBER_ROLES = {
     "monitoring",
 }
 
+# Self-service application credentials must expire -- see the module
+# docstring for why this service enforces that itself rather than
+# relying on Keystone (which defaults to no expiration at all).
+APP_CREDENTIAL_MAX_TTL_DAYS = 365
+
 _service_token_cache = {"token": None, "expires_at": 0.0}
 _role_id_cache = {}
 _own_user_id_cache = {"id": None}
@@ -181,6 +215,18 @@ _own_user_id_cache = {"id": None}
 def _parse_expires_at(expires_at_str):
     fmt = "%Y-%m-%dT%H:%M:%S.%f%z" if "." in expires_at_str else "%Y-%m-%dT%H:%M:%S%z"
     return datetime.datetime.strptime(expires_at_str, fmt).timestamp()
+
+
+def _keystone_error(response):
+    """Surfaces Keystone's own error message for the pass-through
+    application-credential endpoints below, which -- unlike everything
+    else in this file -- can genuinely fail on a well-formed request
+    (duplicate name, quota limit), not just on caller error this service
+    already validated itself."""
+    try:
+        return response.json()["error"]["message"]
+    except (ValueError, KeyError):
+        return response.text or f"Keystone returned HTTP {response.status_code}"
 
 
 def get_service_token():
@@ -691,6 +737,55 @@ def list_members(project_id):
     return jsonify(members=list(members.values())), 200
 
 
+def _project_tags(project_id):
+    r = requests.get(f"{OS_AUTH_URL}/projects/{project_id}/tags", headers=keystone_headers(), timeout=10)
+    r.raise_for_status()
+    return set(r.json()["tags"])
+
+
+@app.route("/v1/projects/<project_id>/tags", methods=["GET"])
+def list_project_tags(project_id):
+    """Keystone's own native project-tags feature (`/v3/projects/<id>/
+    tags`), exposed here mainly so `_expand_role_bundles` below has
+    something to check against -- see put_role_bundle's `required_tag`.
+    Same authorization as member management: project-scoped admin, or a
+    domain admin of the project's own domain."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    return jsonify(tags=sorted(_project_tags(project_id))), 200
+
+
+@app.route("/v1/projects/<project_id>/tags", methods=["PUT"])
+def set_project_tags(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident, project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    tags = sorted({(t or "").strip() for t in (body.get("tags") or [])} - {""})
+    invalid = [t for t in tags if "," in t or "/" in t]
+    if invalid:
+        return jsonify(error=f"invalid tag(s) {invalid}: tags cannot contain ',' or '/'"), 400
+
+    r = requests.put(
+        f"{OS_AUTH_URL}/projects/{project_id}/tags",
+        headers=keystone_headers(),
+        json={"tags": tags},
+        timeout=10,
+    )
+    r.raise_for_status()
+
+    log.info("set project tags project=%s tags=%s by=%s(%s)", project_id, tags, ident[1], ident[0])
+    return jsonify(tags=tags), 200
+
+
 def _k8s_token():
     with open(f"{K8S_SA_DIR}/token") as f:
         return f.read().strip()
@@ -731,21 +826,46 @@ def _save_role_bundles(bundles):
     r.raise_for_status()
 
 
-def _expand_role_bundles(roles):
+def _expand_role_bundles(roles, project_id):
     """Replace any bundle name in `roles` with its underlying role set,
     leaving ordinary role names untouched. If the ConfigMap can't be
     read for any reason, degrades to a no-op rather than failing the
     whole request -- a name that was genuinely meant to be a bundle then
     just falls through to add_member's normal "invalid role" rejection,
-    same as a typo would."""
+    same as a typo would.
+
+    A bundle may carry a `required_tag`: if set, expanding it is refused
+    unless `project_id` itself carries that exact Keystone project tag
+    (see list_project_tags/set_project_tags above) -- a narrow permission
+    boundary ("this bundle only grants on projects tagged X"), not a
+    general policy condition engine. Returns (expanded_roles, None) on
+    success, or (None, error_message) if a tag requirement isn't met.
+    """
     try:
         bundles = _load_role_bundles()
     except requests.RequestException:
-        return roles
+        return roles, None
     expanded = set()
+    project_tags = None
     for r in roles:
-        expanded.update(bundles[r]["roles"] if r in bundles else [r])
-    return sorted(expanded)
+        if r not in bundles:
+            expanded.add(r)
+            continue
+        bundle = bundles[r]
+        required_tag = (bundle.get("required_tag") or "").strip()
+        if required_tag:
+            if project_tags is None:
+                try:
+                    project_tags = _project_tags(project_id)
+                except requests.RequestException:
+                    return None, f"could not verify project tags to check bundle '{r}'"
+            if required_tag not in project_tags:
+                return None, (
+                    f"bundle '{r}' requires this project to carry the tag "
+                    f"'{required_tag}', which it doesn't have"
+                )
+        expanded.update(bundle["roles"])
+    return sorted(expanded), None
 
 
 @app.route("/v1/role-bundles", methods=["GET"])
@@ -791,23 +911,29 @@ def put_role_bundle(name):
 
     body = request.get_json(silent=True) or {}
     description = (body.get("description") or "").strip()
+    required_tag = (body.get("required_tag") or "").strip()
     roles = sorted({(r or "").strip() for r in (body.get("roles") or [])} - {""})
     if not roles:
         return jsonify(error="'roles' must be a non-empty list"), 400
     invalid = [r for r in roles if r not in ALLOWED_MEMBER_ROLES]
     if invalid:
         return jsonify(error=f"invalid role(s) {invalid}; must be one of {sorted(ALLOWED_MEMBER_ROLES)}"), 400
+    if required_tag and ("," in required_tag or "/" in required_tag):
+        return jsonify(error="'required_tag' cannot contain ',' or '/' (Keystone project tag constraint)"), 400
 
     try:
         bundles = _load_role_bundles()
-        bundles[name] = {"description": description, "roles": roles}
+        bundles[name] = {"description": description, "roles": roles, "required_tag": required_tag}
         _save_role_bundles(bundles)
     except requests.RequestException as exc:
         log.warning("role-bundles write failed: %s", exc)
         return jsonify(error="role bundle storage unavailable"), 502
 
-    log.info("set role bundle name=%s roles=%s by=%s(%s)", name, roles, user_name, user_id)
-    return jsonify(name=name, description=description, roles=roles), 200
+    log.info(
+        "set role bundle name=%s roles=%s required_tag=%s by=%s(%s)",
+        name, roles, required_tag or "-", user_name, user_id,
+    )
+    return jsonify(name=name, description=description, roles=roles, required_tag=required_tag), 200
 
 
 @app.route("/v1/role-bundles/<name>", methods=["DELETE"])
@@ -898,6 +1024,144 @@ def role_bundles_audit_log():
     return jsonify(entries=entries[:limit]), 200
 
 
+def _application_credential_view(c, now):
+    expires_at = c.get("expires_at")
+    status = "active"
+    if expires_at:
+        try:
+            parsed = datetime.datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+            if parsed <= now:
+                status = "expired"
+        except ValueError:
+            pass
+    return {
+        "id": c["id"],
+        "name": c["name"],
+        "description": c.get("description") or "",
+        "project_id": c["project_id"],
+        "expires_at": expires_at,
+        "roles": sorted(role["name"] for role in c.get("roles", [])),
+        "status": status,
+    }
+
+
+@app.route("/v1/application-credentials", methods=["GET"])
+def list_application_credentials():
+    """Self-service only -- see the module docstring for why this
+    forwards the caller's own token straight to Keystone instead of
+    using this service's elevated credential: Keystone's own policy for
+    `identity:list_application_credentials` is self-only, confirmed live
+    to refuse even a system-scoped admin token asking about someone
+    else, so there is nothing for this service to usefully gate or
+    elevate here."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, _user_name = ident
+
+    r = requests.get(
+        f"{OS_AUTH_URL}/users/{user_id}/application_credentials",
+        headers={"X-Auth-Token": caller_token},
+        timeout=10,
+    )
+    if r.status_code != 200:
+        return jsonify(error=_keystone_error(r)), r.status_code
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    creds = [_application_credential_view(c, now) for c in r.json()["application_credentials"]]
+    creds.sort(key=lambda c: c["expires_at"] or "", reverse=True)
+    return jsonify(application_credentials=creds), 200
+
+
+@app.route("/v1/application-credentials", methods=["POST"])
+def create_application_credential():
+    """Unlike Keystone's own API (expires_at optional, defaults to never),
+    this endpoint requires an expiration -- see APP_CREDENTIAL_MAX_TTL_DAYS
+    and the module docstring. Computed from the caller-supplied
+    `expires_in_days` against this service's own clock rather than
+    accepting an absolute timestamp from the client, to sidestep client
+    clock skew."""
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, user_name = ident
+
+    body = request.get_json(silent=True) or {}
+    name = (body.get("name") or "").strip()
+    description = (body.get("description") or "").strip()
+    if not name:
+        return jsonify(error="'name' is required"), 400
+    try:
+        expires_in_days = int(body.get("expires_in_days"))
+    except (TypeError, ValueError):
+        return jsonify(error="'expires_in_days' must be an integer"), 400
+    if not (1 <= expires_in_days <= APP_CREDENTIAL_MAX_TTL_DAYS):
+        return (
+            jsonify(error=f"'expires_in_days' must be between 1 and {APP_CREDENTIAL_MAX_TTL_DAYS}"),
+            400,
+        )
+
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=expires_in_days)
+    create_body = {
+        "application_credential": {
+            "name": name,
+            "description": description,
+            # Keystone's own parser for this field is strict -- confirmed
+            # live that datetime.isoformat()'s default output (microseconds,
+            # "+00:00" offset) is rejected outright ("Timestamp not in
+            # expected format"), while this plain "...Z" form is accepted.
+            "expires_at": expires_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+    }
+    r = requests.post(
+        f"{OS_AUTH_URL}/users/{user_id}/application_credentials",
+        headers={"X-Auth-Token": caller_token, "Content-Type": "application/json"},
+        json=create_body,
+        timeout=10,
+    )
+    if r.status_code != 201:
+        return jsonify(error=_keystone_error(r)), r.status_code
+
+    cred = r.json()["application_credential"]
+    log.info(
+        "created application credential id=%s name=%s expires_at=%s by=%s(%s)",
+        cred["id"], name, cred.get("expires_at"), user_name, user_id,
+    )
+    view = _application_credential_view(cred, datetime.datetime.now(datetime.timezone.utc))
+    view["secret"] = cred["secret"]
+    return jsonify(**view), 201
+
+
+@app.route("/v1/application-credentials/<credential_id>", methods=["DELETE"])
+def delete_application_credential(credential_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    ident = validate_caller_token(caller_token)
+    if not ident:
+        return jsonify(error="invalid or expired token"), 401
+    user_id, user_name = ident
+
+    r = requests.delete(
+        f"{OS_AUTH_URL}/users/{user_id}/application_credentials/{credential_id}",
+        headers={"X-Auth-Token": caller_token},
+        timeout=10,
+    )
+    if r.status_code not in (204, 404):
+        return jsonify(error=_keystone_error(r)), r.status_code
+
+    log.info("deleted application credential id=%s by=%s(%s)", credential_id, user_name, user_id)
+    return "", 204
+
+
 @app.route("/v1/projects/<project_id>/members", methods=["POST"])
 def add_member(project_id):
     """Adds a new member, or -- if the named user is already a member --
@@ -927,8 +1191,12 @@ def add_member(project_id):
     roles = sorted({(r or "").strip() for r in (body.get("roles") or [])} - {""})
     # A name here can be a real role or a role-bundle name (see
     # _expand_role_bundles) -- expanded before validation so the rest of
-    # this function never has to know the difference.
-    roles = _expand_role_bundles(roles)
+    # this function never has to know the difference. A bundle carrying
+    # a required_tag this project doesn't have is refused here, before
+    # any Keystone write.
+    roles, bundle_err = _expand_role_bundles(roles, project_id)
+    if bundle_err:
+        return jsonify(error=bundle_err), 403
     if not username:
         return jsonify(error="'username' is required"), 400
     if not roles:
@@ -1702,6 +1970,10 @@ def domain_projects_overview():
                 "admins": admins,
                 "member_count": member_count,
                 "last_activity": last_activity.get(project["id"]),
+                # Already present on every project object returned by
+                # GET /v3/projects -- confirmed live, no extra Keystone
+                # call needed per project.
+                "tags": sorted(project.get("tags") or []),
             }
         )
     overview.sort(key=lambda p: p["project_name"])
