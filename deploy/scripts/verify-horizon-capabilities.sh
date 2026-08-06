@@ -44,6 +44,7 @@ for name in (
     "horizon:project:cloud_alarms:index",
     "horizon:project:cloud_s3:index",
     "horizon:admin:cloud_telemetry_health:index",
+    "horizon:admin:project_operations:index",
     "horizon:project:shares:index",
     "horizon:masakaridashboard:segments:index",
 ):
