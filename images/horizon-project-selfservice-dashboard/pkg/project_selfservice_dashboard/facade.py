@@ -110,6 +110,35 @@ def member_candidates(request, project_id, query=""):
     return r.json()["candidates"]
 
 
+def project_groups(request, project_id):
+    try:
+        r = requests.get(f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/groups", headers=_headers(request), timeout=_TIMEOUT)
+    except requests.RequestException as exc:
+        raise FacadeError(_("Could not reach the project service: %s") % exc) from exc
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
+def set_project_group(request, project_id, group_id, roles):
+    r = requests.put(
+        f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/groups",
+        headers=_headers(request), json={"group_id": group_id, "roles": roles}, timeout=_TIMEOUT,
+    )
+    if r.status_code != 200:
+        raise FacadeError(_error_message(r))
+    return r.json()
+
+
+def remove_project_group(request, project_id, group_id):
+    r = requests.delete(
+        f"{PROJECT_FACADE_URL}/v1/projects/{project_id}/groups/{group_id}",
+        headers=_headers(request), timeout=_TIMEOUT,
+    )
+    if r.status_code not in (204, 404):
+        raise FacadeError(_error_message(r))
+
+
 def add_member(request, project_id, username, roles):
     try:
         r = requests.post(

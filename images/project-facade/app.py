@@ -792,6 +792,101 @@ def member_candidates(project_id):
     return jsonify(candidates=candidates[:100]), 200
 
 
+def _project_group_assignments(project_id):
+    response = requests.get(
+        f"{OS_AUTH_URL}/role_assignments",
+        headers=keystone_headers(),
+        params={"scope.project.id": project_id, "include_names": "true"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    result = {}
+    for assignment in response.json()["role_assignments"]:
+        if "group" not in assignment:
+            continue
+        group = assignment["group"]
+        entry = result.setdefault(
+            group["id"], {"group_id": group["id"], "name": group.get("name", group["id"]), "roles": []}
+        )
+        entry["roles"].append(assignment["role"]["name"])
+    for entry in result.values():
+        entry["roles"] = sorted(set(entry["roles"]))
+    return result
+
+
+@app.route("/v1/projects/<project_id>/groups", methods=["GET", "PUT"])
+def project_groups(project_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    _ident, project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    if request.method == "GET":
+        assigned = _project_group_assignments(project_id)
+        groups_response = requests.get(
+            f"{OS_AUTH_URL}/groups",
+            headers=keystone_headers(),
+            params={"domain_id": project["domain_id"]},
+            timeout=10,
+        )
+        groups_response.raise_for_status()
+        candidates = [
+            {"group_id": group["id"], "name": group["name"], "assigned": group["id"] in assigned}
+            for group in groups_response.json()["groups"]
+        ]
+        return jsonify(assignments=list(assigned.values()), candidates=candidates), 200
+
+    body = request.get_json(silent=True) or {}
+    group_id = (body.get("group_id") or "").strip()
+    roles = sorted(set(body.get("roles") or []))
+    if not group_id or not roles or any(role not in ALLOWED_MEMBER_ROLES for role in roles):
+        return jsonify(error="valid group_id and roles are required"), 400
+    existing_response = requests.get(
+        f"{OS_AUTH_URL}/projects/{project_id}/groups/{group_id}/roles",
+        headers=keystone_headers(), timeout=10,
+    )
+    existing_response.raise_for_status()
+    existing = {role["name"]: role["id"] for role in existing_response.json()["roles"]}
+    for name, role_id in existing.items():
+        if name in ALLOWED_MEMBER_ROLES and name not in roles:
+            requests.delete(
+                f"{OS_AUTH_URL}/projects/{project_id}/groups/{group_id}/roles/{role_id}",
+                headers=keystone_headers(), timeout=10,
+            ).raise_for_status()
+    for name in roles:
+        if name not in existing:
+            response = requests.put(
+                f"{OS_AUTH_URL}/projects/{project_id}/groups/{group_id}/roles/{role_id_by_name(name)}",
+                headers=keystone_headers(), timeout=10,
+            )
+            response.raise_for_status()
+    return jsonify(group_id=group_id, roles=roles), 200
+
+
+@app.route("/v1/projects/<project_id>/groups/<group_id>", methods=["DELETE"])
+def remove_project_group(project_id, group_id):
+    caller_token = request.headers.get("X-Auth-Token")
+    if not caller_token:
+        return jsonify(error="missing X-Auth-Token header"), 401
+    _ident, _project, err = _authorize_member_admin(caller_token, project_id)
+    if err:
+        return err
+    response = requests.get(
+        f"{OS_AUTH_URL}/projects/{project_id}/groups/{group_id}/roles",
+        headers=keystone_headers(), timeout=10,
+    )
+    response.raise_for_status()
+    for role in response.json()["roles"]:
+        delete = requests.delete(
+            f"{OS_AUTH_URL}/projects/{project_id}/groups/{group_id}/roles/{role['id']}",
+            headers=keystone_headers(), timeout=10,
+        )
+        if delete.status_code not in (204, 404):
+            delete.raise_for_status()
+    return "", 204
+
+
 def _project_tags(project_id):
     r = requests.get(f"{OS_AUTH_URL}/projects/{project_id}/tags", headers=keystone_headers(), timeout=10)
     r.raise_for_status()

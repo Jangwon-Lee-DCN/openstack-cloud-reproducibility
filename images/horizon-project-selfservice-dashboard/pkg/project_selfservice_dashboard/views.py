@@ -158,6 +158,47 @@ class ChangeMemberRoleView(horizon_forms.ModalFormView):
         }
 
 
+class ProjectGroupView(horizon_forms.ModalFormView):
+    form_class = forms.ProjectGroupForm
+    template_name = "project_selfservice/project_group.html"
+    page_title = _("Configure Group Assignment")
+    submit_label = _("Save Group Assignment")
+
+    def get_success_url(self):
+        return reverse("horizon:identity:projects:detail", args=[self.kwargs["project_id"]]) + "?tab=project_details__groups"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        route = "change_project_group_roles" if self.kwargs.get("group_id") else "add_project_group"
+        args = [self.kwargs["project_id"]]
+        if self.kwargs.get("group_id"):
+            args.append(self.kwargs["group_id"])
+        context["submit_url"] = reverse(f"horizon:identity:projects:{route}", args=args)
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_initial(self):
+        initial = {"project_id": self.kwargs["project_id"]}
+        group_id = self.kwargs.get("group_id")
+        if not group_id:
+            return initial
+        initial["group_id"] = group_id
+        try:
+            assignment = next(
+                item for item in facade.project_groups(self.request, self.kwargs["project_id"])["assignments"]
+                if item["group_id"] == group_id
+            )
+            initial["base_role"] = next(
+                (role for role in ("admin", "member", "reader") if role in assignment["roles"]), "member"
+            )
+            initial["capabilities"] = [
+                role for role in assignment["roles"] if role not in {"admin", "member", "reader"}
+            ]
+        except (facade.FacadeError, StopIteration):
+            messages.error(self.request, _("Unable to load this group assignment."))
+        return initial
+
+
 class RoleBundlesView(horizon_tables.DataTableView):
     """Named presets of the existing roles (e.g. "VPC Operator" =
     network-operator + security-operator), managed here and selectable

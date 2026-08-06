@@ -92,6 +92,54 @@ class MembersTable(tables.DataTable):
         row_actions = (ChangeRole, TransferOwnership, RemoveMember)
 
 
+class AddProjectGroup(tables.LinkAction):
+    name = "add_project_group"
+    verbose_name = _("Add Group")
+    url = "horizon:identity:projects:add_project_group"
+    classes = ("ajax-modal",)
+    icon = "plus"
+
+    def get_link_url(self, datum=None):
+        return reverse(self.url, args=[self.table.kwargs["project_id"]])
+
+
+class ChangeProjectGroupRoles(tables.LinkAction):
+    name = "change_project_group_roles"
+    verbose_name = _("Change Roles")
+    url = "horizon:identity:projects:change_project_group_roles"
+    classes = ("ajax-modal",)
+    icon = "pencil"
+
+    def get_link_url(self, group):
+        return reverse(self.url, args=[self.table.kwargs["project_id"], group.id])
+
+
+class RemoveProjectGroup(tables.DeleteAction):
+    name = "remove_project_group"
+
+    @staticmethod
+    def action_present(count):
+        return ngettext_lazy("Remove Group", "Remove Groups", count)
+
+    @staticmethod
+    def action_past(count):
+        return ngettext_lazy("Removed Group", "Removed Groups", count)
+
+    def delete(self, request, obj_id):
+        facade.remove_project_group(request, self.table.kwargs["project_id"], obj_id)
+
+
+class ProjectGroupsTable(tables.DataTable):
+    name = tables.Column("name", verbose_name=_("Group"))
+    roles = tables.Column("roles", verbose_name=_("Roles"))
+
+    class Meta:
+        name = "project_groups"
+        verbose_name = _("Group Assignments")
+        table_actions = (AddProjectGroup,)
+        row_actions = (ChangeProjectGroupRoles, RemoveProjectGroup)
+
+
 class ExportAuditLogCSV(tables.LinkAction):
     name = "audit_log_export"
     verbose_name = _("Export CSV")

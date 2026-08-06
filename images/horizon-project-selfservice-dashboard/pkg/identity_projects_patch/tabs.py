@@ -16,7 +16,6 @@ from horizon import tabs
 
 from openstack_dashboard import api
 from openstack_dashboard import policy
-from openstack_dashboard.dashboards.identity.projects.groups import tables as groups_tables
 
 from project_selfservice_dashboard import facade
 from project_selfservice_dashboard import tables as selfservice_tables
@@ -86,34 +85,28 @@ class MembersTab(tabs.TableTab):
 class GroupsTab(tabs.TableTab):
     """Advanced group-derived assignments, kept separate from people."""
 
-    table_classes = (groups_tables.GroupsTable,)
+    table_classes = (selfservice_tables.ProjectGroupsTable,)
     name = _("Group Assignments")
     slug = "groups"
     template_name = "horizon/common/_detail_table.html"
     preload = False
 
-    def get_groupstable_data(self):
-        groups_in_project = []
+    def __init__(self, tab_group, request):
+        tab_group.kwargs["project_id"] = tab_group.kwargs["project"].id
+        super().__init__(tab_group, request)
+
+    def get_project_groups_data(self):
         project = self.tab_group.kwargs["project"]
         try:
-            domain_id = project.domain_id
-            project_groups_roles = api.keystone.get_project_groups_roles(
-                self.request, project=project.id
-            )
-            roles = api.keystone.role_list(self.request)
-            groups = {
-                group.id: group
-                for group in api.keystone.group_list(self.request, domain=domain_id)
-            }
-            for group_id, role_ids in project_groups_roles.items():
-                if group_id not in groups:
-                    continue
-                group = groups[group_id]
-                group.roles = [role.name for role in roles if role.id in role_ids]
-                groups_in_project.append(group)
-        except Exception:
+            return [
+                SimpleNamespace(
+                    id=item["group_id"], name=item["name"], roles=", ".join(item["roles"])
+                )
+                for item in facade.project_groups(self.request, project.id)["assignments"]
+            ]
+        except facade.FacadeError:
             exceptions.handle(self.request, _("Unable to display project group assignments."))
-        return groups_in_project
+            return []
 
 
 class ProjectDetailTabs(tabs.DetailTabsGroup):

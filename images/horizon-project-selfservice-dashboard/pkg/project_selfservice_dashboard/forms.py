@@ -280,6 +280,42 @@ class BulkAddMemberForm(horizon_forms.SelfHandlingForm):
         return added or not failed
 
 
+class ProjectGroupForm(horizon_forms.SelfHandlingForm):
+    group_id = forms.ChoiceField(label=_("Group"), choices=[])
+    base_role = forms.ChoiceField(
+        label=_("Base Access"), choices=BASE_ROLE_CHOICES, widget=forms.RadioSelect, initial="member"
+    )
+    capabilities = forms.MultipleChoiceField(
+        label=_("Additional Capabilities"), choices=CAPABILITY_ROLE_CHOICES,
+        widget=forms.CheckboxSelectMultiple, required=False,
+    )
+
+    def __init__(self, request, *args, **kwargs):
+        super().__init__(request, *args, **kwargs)
+        try:
+            groups = facade.project_groups(request, self.initial["project_id"])
+            editing = self.initial.get("group_id")
+            self.fields["group_id"].choices = [
+                (group["group_id"], group["name"])
+                for group in groups["candidates"]
+                if editing == group["group_id"] or not group["assigned"]
+            ]
+            if editing:
+                self.fields["group_id"].disabled = True
+        except facade.FacadeError:
+            self.fields["group_id"].choices = []
+
+    def handle(self, request, data):
+        roles = [data["base_role"]] + list(data.get("capabilities") or [])
+        try:
+            return facade.set_project_group(
+                request, self.initial["project_id"], data["group_id"], roles
+            )
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+
+
 class TransferOwnershipForm(horizon_forms.SelfHandlingForm):
     # Read-only, same reasoning as ChangeMemberRoleForm.username above --
     # the target is fixed by the row action that opened this form.
