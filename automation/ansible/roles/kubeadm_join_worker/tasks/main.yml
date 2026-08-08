@@ -1,4 +1,13 @@
 ---
+- name: Resolve the bootstrap API name directly during kubeadm join
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "\\s{{ kubernetes_api_fqdn | regex_escape }}(?:\\s|$)"
+    line: >-
+      {{ hostvars[groups['control_plane'][0]].node_ip |
+         default(hostvars[groups['control_plane'][0]].ansible_host) }}
+      {{ kubernetes_api_fqdn }}
+
 - name: Join Kubernetes worker node
   ansible.builtin.command: >-
     {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
@@ -9,6 +18,12 @@
   register: kubeadm_worker_join
   failed_when: false
   no_log: true
+
+- name: Restore the routed Kubernetes API address after join
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "\\s{{ kubernetes_api_fqdn | regex_escape }}(?:\\s|$)"
+    line: "{{ kubernetes_api_vip }} {{ kubernetes_api_fqdn }}"
 
 - name: Report a sanitized worker join failure
   ansible.builtin.assert:
