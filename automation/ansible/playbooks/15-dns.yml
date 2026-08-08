@@ -1,6 +1,6 @@
 ---
 - name: Configure BIND primary and secondary servers
-  hosts: control_plane
+  hosts: "{{ dns_server_group | default('control_plane') }}"
   become: true
   gather_facts: true
   roles:
@@ -17,7 +17,7 @@
         authoritative_dns_addresses: >-
           {{ (authoritative_dns_addresses | default([]))
              + [hostvars[item].node_ip | default(hostvars[item].ansible_host)] }}
-      loop: "{{ groups['control_plane'] }}"
+      loop: "{{ groups[dns_server_group | default('control_plane')] }}"
       when: hostvars[item].dns_role is defined
 
     - name: Remove obsolete global resolver override
@@ -41,8 +41,8 @@
           [Service]
           Type=oneshot
           RemainAfterExit=yes
-          ExecStart=/usr/bin/resolvectl dns {{ management_interface }} {{ authoritative_dns_addresses | join(' ') }}
-          ExecStart=/usr/bin/resolvectl domain {{ management_interface }} ~. ~{{ dns_domain }}
+          ExecStart=/usr/bin/resolvectl dns {{ dns_resolver_interface | default(management_interface) }} {{ authoritative_dns_addresses | join(' ') }}
+          ExecStart=/usr/bin/resolvectl domain {{ dns_resolver_interface | default(management_interface) }} ~. ~{{ dns_domain }}
 
           [Install]
           WantedBy=multi-user.target

@@ -1,0 +1,71 @@
+---
+- name: Build the authoritative DNS record host list
+  ansible.builtin.set_fact:
+    dns_record_hosts: >-
+      {{ dns_record_groups | map('extract', groups) | flatten | unique | list }}
+
+- name: Install BIND
+  ansible.builtin.apt:
+    name: [bind9, bind9-utils, dnsutils]
+    state: present
+    update_cache: true
+
+- name: Create primary zone directory
+  ansible.builtin.file:
+    path: /etc/bind/zones
+    state: directory
+    owner: root
+    group: bind
+    mode: '0750'
+  when: dns_role == 'primary'
+
+- name: Render rack-aware BIND configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  loop:
+    - {src: rack-named.conf.options.j2, dest: /etc/bind/named.conf.options}
+    - {src: rack-named.conf.local.j2, dest: /etc/bind/named.conf.local}
+  notify: Validate and reload rack-aware BIND
+
+- name: Render the rack-aware primary forward zone
+  ansible.builtin.template:
+    src: rack-db.forward.j2
+    dest: "/etc/bind/zones/db.{{ dns_domain }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+  notify: Validate and reload rack-aware BIND
+
+- name: Render primary per-rack reverse zones
+  ansible.builtin.template:
+    src: rack-db.reverse.j2
+    dest: "/etc/bind/zones/db.{{ item.zone }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  loop: "{{ dns_reverse_zones }}"
+  when: dns_role == 'primary'
+  notify: Validate and reload rack-aware BIND
+
+- name: Enable BIND
+  ansible.builtin.systemd_service:
+    name: named
+    enabled: true
+    state: started
+
+- name: Apply and validate rack-aware DNS immediately
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify every inventory hostname locally
+  ansible.builtin.command: "dig +short @127.0.0.1 {{ item }}.{{ dns_domain }} A"
+  loop: "{{ dns_record_hosts }}"
+  register: rack_dns_answer
+  changed_when: false
+  until: hostvars[item].node_ip in rack_dns_answer.stdout_lines
+  retries: 15
+  delay: 2

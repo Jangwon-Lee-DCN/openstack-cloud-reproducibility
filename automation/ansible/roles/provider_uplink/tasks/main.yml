@@ -24,6 +24,14 @@
     that: provider_routes.stdout | from_json | length == 0
     fail_msg: Remove Layer 3 routes from the provider interface before continuing.
 
+- name: Accept an externally rendered Layer 2 provider interface
+  ansible.builtin.assert:
+    that: confirm_provider_bridge_change | bool
+    fail_msg: >-
+      Review the externally rendered provider VLAN and set
+      confirm_provider_bridge_change=true before acceptance.
+  when: provider_interface_preconfigured | default(false) | bool
+
 - name: Render the provider-link Netplan candidate
   ansible.builtin.template:
     src: 60-dcn-provider-uplink.yaml.j2
@@ -31,6 +39,7 @@
     owner: root
     group: root
     mode: '0600'
+  when: not (provider_interface_preconfigured | default(false) | bool)
 
 - name: Install the approved provider-link Netplan
   ansible.builtin.copy:
@@ -40,7 +49,9 @@
     owner: root
     group: root
     mode: '0600'
-  when: confirm_provider_bridge_change | bool
+  when:
+    - confirm_provider_bridge_change | bool
+    - not (provider_interface_preconfigured | default(false) | bool)
   notify: Validate and apply provider Netplan
 
 - name: Explain an unapproved provider-link candidate
@@ -49,4 +60,6 @@
       Candidate rendered only. Review it with console access, then set
       confirm_provider_bridge_change=true to install it. OpenStack-Helm OVS
       later creates br-ex and attaches this Layer 2-only interface.
-  when: not confirm_provider_bridge_change | bool
+  when:
+    - not confirm_provider_bridge_change | bool
+    - not (provider_interface_preconfigured | default(false) | bool)

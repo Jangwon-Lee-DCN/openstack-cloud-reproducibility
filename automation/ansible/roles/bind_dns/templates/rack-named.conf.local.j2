@@ -1,0 +1,27 @@
+{% if dns_role == 'primary' %}
+zone "{{ dns_domain }}" {
+  type primary;
+  file "/etc/bind/zones/db.{{ dns_domain }}";
+  allow-transfer {
+{% for node in groups[dns_server_group] if hostvars[node].dns_role == 'secondary' %}
+    {{ hostvars[node].node_ip }};
+{% endfor %}
+  };
+};
+{% for reverse in dns_reverse_zones %}
+zone "{{ reverse.zone }}" {
+  type primary;
+  file "/etc/bind/zones/db.{{ reverse.zone }}";
+  allow-transfer {
+{% for node in groups[dns_server_group] if hostvars[node].dns_role == 'secondary' %}
+    {{ hostvars[node].node_ip }};
+{% endfor %}
+  };
+};
+{% endfor %}
+{% else %}
+zone "{{ dns_domain }}" { type secondary; primaries { {% for node in groups[dns_server_group] if hostvars[node].dns_role == 'primary' %}{{ hostvars[node].node_ip }}; {% endfor %} }; file "db.{{ dns_domain }}"; };
+{% for reverse in dns_reverse_zones %}
+zone "{{ reverse.zone }}" { type secondary; primaries { {% for node in groups[dns_server_group] if hostvars[node].dns_role == 'primary' %}{{ hostvars[node].node_ip }}; {% endfor %} }; file "db.{{ reverse.zone }}"; };
+{% endfor %}
+{% endif %}

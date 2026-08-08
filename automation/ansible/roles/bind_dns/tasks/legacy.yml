@@ -1,0 +1,144 @@
+---
+- name: Install BIND
+  ansible.builtin.apt:
+    name: [bind9, bind9-utils, dnsutils]
+    state: present
+    update_cache: true
+
+- name: Create primary zone directory
+  ansible.builtin.file:
+    path: /etc/bind/zones
+    state: directory
+    owner: root
+    group: bind
+    mode: '0750'
+  when: dns_role == 'primary'
+
+- name: Render BIND options
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    owner: root
+    group: bind
+    mode: '0644'
+  notify: Validate and reload BIND
+
+- name: Render BIND zone declarations
+  ansible.builtin.template:
+    src: named.conf.local.j2
+    dest: /etc/bind/named.conf.local
+    owner: root
+    group: bind
+    mode: '0644'
+  notify: Validate and reload BIND
+
+- name: Read the deployed primary SOA serial
+  ansible.builtin.shell: >-
+    set -o pipefail &&
+    dig +short @127.0.0.1 {{ dns_domain }} SOA | awk '{print $3}'
+  args:
+    executable: /bin/bash
+  when: dns_role == 'primary'
+  register: deployed_dns_zone_serial
+  changed_when: false
+  failed_when: false
+
+- name: Render the forward-zone candidate on the primary
+  ansible.builtin.template:
+    src: db.forward.j2
+    dest: "/etc/bind/zones/db.{{ dns_domain }}.candidate"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+
+- name: Render the reverse-zone candidate on the primary
+  ansible.builtin.template:
+    src: db.reverse.j2
+    dest: "/etc/bind/zones/db.{{ dns_reverse_zone }}.candidate"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+
+- name: Compare the forward-zone candidate with the deployed zone
+  ansible.builtin.command: >-
+    cmp -s /etc/bind/zones/db.{{ dns_domain }}.candidate
+    /etc/bind/zones/db.{{ dns_domain }}
+  when: dns_role == 'primary'
+  register: forward_zone_comparison
+  changed_when: false
+  failed_when: false
+
+- name: Compare the reverse-zone candidate with the deployed zone
+  ansible.builtin.command: >-
+    cmp -s /etc/bind/zones/db.{{ dns_reverse_zone }}.candidate
+    /etc/bind/zones/db.{{ dns_reverse_zone }}
+  when: dns_role == 'primary'
+  register: reverse_zone_comparison
+  changed_when: false
+  failed_when: false
+
+- name: Require an increased SOA serial before changing a deployed zone
+  ansible.builtin.assert:
+    that: dns_zone_serial | int > deployed_dns_zone_serial.stdout | int
+    fail_msg: >-
+      A zone changed but dns_zone_serial did not increase beyond the
+      deployed SOA serial. Increment the serial before adding or changing hosts.
+  when:
+    - dns_role == 'primary'
+    - >-
+      (forward_zone_comparison.rc | default(0) != 0) or
+      (reverse_zone_comparison.rc | default(0) != 0)
+    - deployed_dns_zone_serial.stdout | default('') | length > 0
+
+- name: Install the approved forward zone on the primary
+  ansible.builtin.copy:
+    src: "/etc/bind/zones/db.{{ dns_domain }}.candidate"
+    remote_src: true
+    dest: "/etc/bind/zones/db.{{ dns_domain }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+  notify: Validate and reload BIND
+
+- name: Install the approved reverse zone on the primary
+  ansible.builtin.copy:
+    src: "/etc/bind/zones/db.{{ dns_reverse_zone }}.candidate"
+    remote_src: true
+    dest: "/etc/bind/zones/db.{{ dns_reverse_zone }}"
+    owner: root
+    group: bind
+    mode: '0644'
+  when: dns_role == 'primary'
+  notify: Validate and reload BIND
+
+- name: Enable BIND
+  ansible.builtin.systemd_service:
+    name: named
+    enabled: true
+    state: started
+
+- name: Apply validated DNS configuration now
+  ansible.builtin.meta: flush_handlers
+
+- name: Force secondary zones to retransfer after primary reconciliation
+  ansible.builtin.command: "rndc retransfer {{ item }}"
+  loop:
+    - "{{ dns_domain }}"
+    - "{{ dns_reverse_zone }}"
+  when: dns_role == 'secondary'
+  changed_when: false
+
+- name: Verify every inventory node in the authoritative forward zone
+  ansible.builtin.command: >-
+    dig +short @127.0.0.1 {{ item }}.{{ dns_domain }} A
+  loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique }}"
+  register: authoritative_node_answer
+  changed_when: false
+  until: >-
+    (hostvars[item].node_ip | default(hostvars[item].ansible_host))
+    in authoritative_node_answer.stdout_lines
+  retries: 15
+  delay: 2

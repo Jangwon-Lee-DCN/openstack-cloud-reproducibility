@@ -1,0 +1,19 @@
+acl internal-networks {
+{% for network in dns_allowed_networks %}
+  {{ network }};
+{% endfor %}
+};
+options {
+  directory "/var/cache/bind";
+  recursion yes;
+  allow-query { internal-networks; };
+  allow-recursion { internal-networks; };
+  listen-on { any; };
+  listen-on-v6 { none; };
+  dnssec-validation auto;
+  forwarders {
+{% for address in dns_forwarders %}
+    {{ address }};
+{% endfor %}
+  };
+};

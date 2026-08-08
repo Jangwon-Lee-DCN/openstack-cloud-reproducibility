@@ -1,0 +1,15 @@
+$TTL 300
+@ IN SOA ns1.{{ dns_domain }}. hostmaster.{{ dns_domain }}. (
+  {{ dns_zone_serial }} 300 120 604800 300 )
+{% for node in groups[dns_server_group] %}
+@ IN NS ns{{ loop.index }}.{{ dns_domain }}.
+ns{{ loop.index }} IN A {{ hostvars[node].node_ip }}
+{% endfor %}
+{% for node in dns_record_hosts %}
+{{ node }} IN A {{ hostvars[node].node_ip }}
+{% endfor %}
+{{ kubernetes_api_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ kubernetes_api_vip }}
+{{ openstack_public_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ openstack_public_gateway_ip }}
+{{ openstack_internal_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ openstack_internal_gateway_ip }}
+{{ platform_gateway_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ platform_gateway_ip }}
+{{ registry_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ registry_gateway_ip }}

@@ -1,0 +1,8 @@
+---
+dns_server_group: control_plane
+dns_record_groups: [control_plane, workers, ceph_nodes]
+dns_allowed_networks:
+  - 127.0.0.0/8
+  - "{{ external_network_cidr }}"
+  - "{{ pod_cidr }}"
+  - "{{ service_cidr }}"

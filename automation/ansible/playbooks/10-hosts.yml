@@ -11,4 +11,17 @@
   hosts: control_plane
   become: true
   roles:
-    - api_load_balancer
+    - role: api_load_balancer
+      when: api_endpoint_mode | default('keepalived_l2') == 'keepalived_l2'
+
+- name: Validate the Kubernetes API endpoint ownership contract
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Require a supported API endpoint mode
+      ansible.builtin.assert:
+        that:
+          - api_endpoint_mode | default('keepalived_l2') in ['external_load_balancer', 'keepalived_l2']
+        fail_msg: >-
+          Use keepalived_l2 only for a shared API Layer-2 network, or
+          external_load_balancer after the external endpoint is accepted.

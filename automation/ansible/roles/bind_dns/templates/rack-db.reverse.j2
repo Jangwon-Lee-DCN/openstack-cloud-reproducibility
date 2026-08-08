@@ -1,0 +1,9 @@
+$TTL 300
+@ IN SOA ns1.{{ dns_domain }}. hostmaster.{{ dns_domain }}. (
+  {{ dns_zone_serial }} 300 120 604800 300 )
+{% for node in groups[dns_server_group] %}
+@ IN NS ns{{ loop.index }}.{{ dns_domain }}.
+{% endfor %}
+{% for node in dns_record_hosts if hostvars[node].rack == item.rack %}
+{{ hostvars[node].node_ip.split('.')[-1] }} IN PTR {{ node }}.{{ dns_domain }}.
+{% endfor %}

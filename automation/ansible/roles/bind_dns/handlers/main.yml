@@ -21,3 +21,19 @@
     name: named
     state: reloaded
   listen: Validate and reload BIND
+
+- name: Validate and reload rack-aware BIND
+  ansible.builtin.shell: |
+    set -euo pipefail
+    named-checkconf
+    {% if dns_role == 'primary' %}
+    named-checkzone {{ dns_domain }} /etc/bind/zones/db.{{ dns_domain }}
+    {% for reverse in dns_reverse_zones %}
+    named-checkzone {{ reverse.zone }} /etc/bind/zones/db.{{ reverse.zone }}
+    {% endfor %}
+    {% endif %}
+    systemctl reload named
+  args:
+    executable: /bin/bash
+  changed_when: true
+  listen: Validate and reload rack-aware BIND
