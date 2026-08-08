@@ -47,5 +47,6 @@
 - name: Join worker and storage-only nodes
   hosts: workers:ceph_nodes:!control_plane
   become: true
+  serial: 1
   roles:
     - kubeadm_join_worker
