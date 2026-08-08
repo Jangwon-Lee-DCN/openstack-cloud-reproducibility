@@ -34,15 +34,38 @@
     mode: '0600'
   when: not ansible_check_mode or kubeadm_admin_conf.stat.exists
 
+- name: Create a direct bootstrap kubeconfig for kubeadm API writes
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    remote_src: true
+    dest: /root/kubeadm-bootstrap.conf
+    owner: root
+    group: root
+    mode: '0600'
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Pin bootstrap kubeadm API writes to the first control-plane node
+  ansible.builtin.replace:
+    path: /root/kubeadm-bootstrap.conf
+    regexp: 'server: https://[^:]+:[0-9]+'
+    replace: 'server: https://{{ node_ip | default(ansible_host) }}:6443'
+  when: not ansible_check_mode
+  no_log: true
+
 - name: Create worker join command
-  ansible.builtin.command: kubeadm token create --ttl 2h --print-join-command
+  ansible.builtin.command: >-
+    kubeadm token create --ttl 2h --print-join-command
+    --kubeconfig /root/kubeadm-bootstrap.conf
   register: worker_join
   changed_when: false
   when: not ansible_check_mode
   no_log: true
 
 - name: Upload control-plane certificates
-  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
+  ansible.builtin.command: >-
+    kubeadm init phase upload-certs --upload-certs
+    --kubeconfig /root/kubeadm-bootstrap.conf
   register: cert_upload
   changed_when: false
   when: not ansible_check_mode
@@ -63,3 +86,10 @@
       sha256:0000000000000000000000000000000000000000000000000000000000000000
     kubeadm_certificate_key: '0000000000000000000000000000000000000000000000000000000000000000'
   when: ansible_check_mode
+
+- name: Remove the direct bootstrap kubeconfig
+  ansible.builtin.file:
+    path: /root/kubeadm-bootstrap.conf
+    state: absent
+  when: not ansible_check_mode
+  no_log: true
