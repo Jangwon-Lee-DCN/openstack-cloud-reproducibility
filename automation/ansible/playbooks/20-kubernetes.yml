@@ -11,6 +11,7 @@
         dest: "{{ playbook_dir }}/../artifacts/admin.conf"
         flat: true
       no_log: true
+      when: not ansible_check_mode
 
 - name: Join the remaining control-plane nodes
   hosts: control_plane[1:]
