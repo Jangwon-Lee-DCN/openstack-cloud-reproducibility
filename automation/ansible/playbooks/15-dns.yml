@@ -20,10 +20,13 @@
       loop: "{{ groups[dns_server_group | default('control_plane')] }}"
       when: hostvars[item].dns_role is defined
 
-    - name: Remove obsolete global resolver override
+    - name: Remove obsolete bootstrap and global resolver overrides
       ansible.builtin.file:
-        path: /etc/systemd/resolved.conf.d/dcn-cloud.conf
+        path: "{{ item }}"
         state: absent
+      loop:
+        - /etc/systemd/resolved.conf.d/20-dcn-bootstrap.conf
+        - /etc/systemd/resolved.conf.d/dcn-cloud.conf
       notify:
         - Restart systemd-resolved after global override removal
         - Reload and apply resolver preference
