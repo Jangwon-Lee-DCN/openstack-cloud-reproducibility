@@ -1,0 +1,66 @@
+---
+- name: Reset one explicitly selected partial kubeadm node
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: 1
+  pre_tasks:
+    - name: Require an explicit reset confirmation
+      ansible.builtin.assert:
+        that:
+          - confirm_kubeadm_partial_reset | default(false) | bool
+          - ansible_limit is defined
+          - ansible_limit | length > 0
+          - ansible_play_hosts_all | length == 1
+        fail_msg: >-
+          Select exactly one node with --limit and pass
+          -e confirm_kubeadm_partial_reset=true.
+
+    - name: Refuse to reset the first control-plane node
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname != groups['control_plane'][0]
+        fail_msg: Phase 19 does not reset the bootstrap control-plane node.
+
+    - name: Detect completed stacked-etcd membership
+      ansible.builtin.stat:
+        path: /etc/kubernetes/manifests/etcd.yaml
+      register: stacked_etcd_manifest
+      check_mode: false
+
+    - name: Reset only an incomplete kubeadm node
+      ansible.builtin.assert:
+        that:
+          - not stacked_etcd_manifest.stat.exists
+        fail_msg: >-
+          This node has an etcd manifest and may be an active member; use the documented
+          etcd member replacement procedure instead of Phase 19.
+
+  tasks:
+    - name: Reset incomplete kubeadm state
+      ansible.builtin.command: kubeadm reset --force
+      when: not ansible_check_mode
+
+    - name: Remove kubeadm-managed partial state left after reset
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes
+        - /var/lib/kubelet
+      when: not ansible_check_mode
+
+    - name: Recreate the kubelet state directory
+      ansible.builtin.file:
+        path: /var/lib/kubelet
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: not ansible_check_mode
+
+    - name: Restart kubelet after reset
+      ansible.builtin.systemd_service:
+        name: kubelet
+        state: restarted
+      when: not ansible_check_mode

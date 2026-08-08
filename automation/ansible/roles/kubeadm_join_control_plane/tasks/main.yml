@@ -1,4 +1,25 @@
 ---
+- name: Inspect control-plane join completion files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/kubernetes/admin.conf
+    - /etc/kubernetes/kubelet.conf
+    - /etc/kubernetes/manifests/etcd.yaml
+    - /var/lib/kubelet/config.yaml
+  register: control_plane_join_files
+  check_mode: false
+
+- name: Reject a partial control-plane join
+  ansible.builtin.assert:
+    that:
+      - >-
+        (control_plane_join_files.results | map(attribute='stat.exists') | select('equalto', true) | list | length)
+        in [0, control_plane_join_files.results | length]
+    fail_msg: >-
+      Partial kubeadm control-plane state detected. Run Phase 19 against only this host with
+      -e confirm_kubeadm_partial_reset=true, then rerun Phase 20.
+
 - name: Join additional control-plane node
   ansible.builtin.command: >-
     {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
@@ -6,5 +27,5 @@
     --certificate-key {{ hostvars[groups['control_plane'][0]].kubeadm_certificate_key }}
     --cri-socket {{ kubernetes_cri_socket | default('unix:///var/run/crio/crio.sock') }}
   args:
-    creates: /etc/kubernetes/admin.conf
+    creates: /etc/kubernetes/manifests/etcd.yaml
   no_log: true
