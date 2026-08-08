@@ -1,0 +1,58 @@
+---
+- name: Guard reset of an empty newly initialized cluster
+  hosts: control_plane[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Require explicit empty-cluster reset confirmation
+      ansible.builtin.assert:
+        that:
+          - confirm_no_workloads_and_reset_cluster | default(false) | bool
+        fail_msg: Pass -e confirm_no_workloads_and_reset_cluster=true only for a new empty cluster.
+
+    - name: List non-system namespaces
+      ansible.builtin.command: >-
+        kubectl get namespace -o jsonpath={range .items[*]}{.metadata.name}{'\n'}{end}
+      register: cluster_namespaces
+      changed_when: false
+      check_mode: false
+
+    - name: Refuse reset when workload namespaces exist
+      ansible.builtin.assert:
+        that:
+          - >-
+            cluster_namespaces.stdout_lines |
+            difference(['default', 'kube-node-lease', 'kube-public', 'kube-system']) |
+            length == 0
+
+- name: Reset non-bootstrap Kubernetes nodes first
+  hosts: all:!control_plane[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Reset kubeadm state
+      ansible.builtin.command: kubeadm reset --force
+      when: not ansible_check_mode
+
+    - name: Remove kubeadm and CNI state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: [/etc/kubernetes, /var/lib/kubelet, /etc/cni/net.d]
+      when: not ansible_check_mode
+
+- name: Reset the bootstrap control plane last
+  hosts: control_plane[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Reset bootstrap kubeadm state
+      ansible.builtin.command: kubeadm reset --force
+      when: not ansible_check_mode
+
+    - name: Remove bootstrap kubeadm and CNI state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: [/etc/kubernetes, /var/lib/kubelet, /etc/cni/net.d]
+      when: not ansible_check_mode

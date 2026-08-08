@@ -116,6 +116,16 @@
     {{ [('containerd' if (container_runtime | default('crio')) == 'containerd' else 'crio'), 'kubelet'] }}
   when: not ansible_check_mode or kubernetes_repository_file.stat.exists
 
+- name: Pin the kubelet node address to the control fabric
+  ansible.builtin.copy:
+    dest: /etc/default/kubelet
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      KUBELET_EXTRA_ARGS=--node-ip={{ node_ip | default(ansible_host) }}
+  notify: Restart kubelet
+
 - name: Download pinned Helm archive
   ansible.builtin.get_url:
     url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"

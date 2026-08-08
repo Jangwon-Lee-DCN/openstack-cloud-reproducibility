@@ -1,5 +1,8 @@
 apiVersion: {{ kubeadm_api_version }}
 kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: {{ node_ip | default(ansible_host) }}
+  bindPort: 6443
 nodeRegistration:
   criSocket: {{ kubernetes_cri_socket | default('unix:///var/run/crio/crio.sock') }}
   name: {{ inventory_hostname }}

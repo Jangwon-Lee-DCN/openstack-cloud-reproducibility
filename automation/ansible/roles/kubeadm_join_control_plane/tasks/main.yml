@@ -24,6 +24,8 @@
   ansible.builtin.command: >-
     {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
     --control-plane
+    --apiserver-advertise-address {{ node_ip | default(ansible_host) }}
+    --node-name {{ inventory_hostname }}
     --certificate-key {{ hostvars[groups['control_plane'][0]].kubeadm_certificate_key }}
     --cri-socket {{ kubernetes_cri_socket | default('unix:///var/run/crio/crio.sock') }}
   args:
