@@ -1,4 +1,28 @@
 ---
+- name: Validate live Kubernetes host prerequisites
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read required live sysctls
+      ansible.builtin.command:
+        argv:
+          - sysctl
+          - -n
+          - net.ipv4.ip_forward
+          - net.bridge.bridge-nf-call-iptables
+          - net.bridge.bridge-nf-call-ip6tables
+          - net.ipv4.conf.all.rp_filter
+      register: kubernetes_live_sysctls
+      changed_when: false
+      check_mode: false
+
+    - name: Require the Phase 10 live sysctl contract
+      ansible.builtin.assert:
+        that:
+          - kubernetes_live_sysctls.stdout_lines == ['1', '1', '1', '0']
+        fail_msg: Rerun Phase 10 to reconcile the live Kubernetes sysctl contract.
+
 - name: Initialize the first Kubernetes control plane
   hosts: control_plane[0]
   become: true

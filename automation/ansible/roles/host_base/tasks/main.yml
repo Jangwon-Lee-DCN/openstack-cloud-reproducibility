@@ -62,6 +62,11 @@
       fs.inotify.max_user_watches = 1048576
   notify: Reload sysctl
 
+- name: Reconcile live Kubernetes and OpenStack sysctls
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+  when: not ansible_check_mode
+
 - name: Enable time synchronization
   ansible.builtin.systemd_service:
     name: systemd-timesyncd
