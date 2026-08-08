@@ -111,6 +111,12 @@
     dest: "/var/cache/helm-{{ helm_version }}-linux-amd64.tar.gz"
     mode: '0644'
 
+- name: Detect an existing Helm archive during dry-run
+  ansible.builtin.stat:
+    path: "/var/cache/helm-{{ helm_version }}-linux-amd64.tar.gz"
+  register: helm_archive_file
+  check_mode: false
+
 - name: Extract pinned Helm binary
   ansible.builtin.unarchive:
     src: "/var/cache/helm-{{ helm_version }}-linux-amd64.tar.gz"
@@ -119,3 +125,13 @@
     include: [linux-amd64/helm]
     extra_opts: [--strip-components=1]
     creates: /usr/local/bin/helm
+  when: not ansible_check_mode or helm_archive_file.stat.exists
+
+- name: Report deferred first-run Helm validation in dry-run
+  ansible.builtin.debug:
+    msg: >-
+      The pinned Helm archive is not cached yet. A real run will download and
+      install {{ helm_version }}; rerun with --check afterward to validate it.
+  when:
+    - ansible_check_mode
+    - not helm_archive_file.stat.exists
