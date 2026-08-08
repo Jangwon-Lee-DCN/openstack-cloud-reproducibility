@@ -11,8 +11,15 @@
         fail_msg: Pass -e confirm_no_workloads_and_reset_cluster=true only for a new empty cluster.
 
     - name: List non-system namespaces
-      ansible.builtin.command: >-
-        kubectl get namespace -o jsonpath={range .items[*]}{.metadata.name}{'\n'}{end}
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - /etc/kubernetes/admin.conf
+          - get
+          - namespace
+          - -o
+          - name
       register: cluster_namespaces
       changed_when: false
       check_mode: false
@@ -22,7 +29,7 @@
         that:
           - >-
             cluster_namespaces.stdout_lines |
-            difference(['default', 'kube-node-lease', 'kube-public', 'kube-system']) |
+            difference(['namespace/default', 'namespace/kube-node-lease', 'namespace/kube-public', 'namespace/kube-system']) |
             length == 0
 
 - name: Reset non-bootstrap Kubernetes nodes first
