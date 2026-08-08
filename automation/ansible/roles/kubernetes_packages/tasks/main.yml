@@ -17,6 +17,12 @@
     filename: kubernetes
     state: present
 
+- name: Detect an existing Kubernetes repository during dry-run
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/kubernetes.list
+  register: kubernetes_repository_file
+  check_mode: false
+
 - name: Download CRI-O repository key
   ansible.builtin.get_url:
     url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_minor }}/deb/Release.key"
@@ -52,6 +58,17 @@
     state: present
     update_cache: true
     allow_downgrade: false
+  when: not ansible_check_mode or kubernetes_repository_file.stat.exists
+
+- name: Report deferred first-run package validation in dry-run
+  ansible.builtin.debug:
+    msg: >-
+      The Kubernetes repository is not present yet. A real run will install the
+      pinned Kubernetes packages and {{ container_runtime | default('crio') }};
+      rerun with --check afterward to validate package idempotency.
+  when:
+    - ansible_check_mode
+    - not kubernetes_repository_file.stat.exists
 
 - name: Configure containerd with the systemd cgroup driver
   ansible.builtin.copy:
@@ -67,6 +84,7 @@
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
           SystemdCgroup = true
   when: container_runtime | default('crio') == 'containerd'
+    and (not ansible_check_mode or kubernetes_repository_file.stat.exists)
   notify: Restart containerd
 
 - name: Prevent implicit Kubernetes and runtime package upgrades
@@ -76,6 +94,7 @@
   loop: >-
     {{ ['kubelet', 'kubeadm', 'kubectl']
        + (['containerd'] if (container_runtime | default('crio')) == 'containerd' else ['cri-o']) }}
+  when: not ansible_check_mode or kubernetes_repository_file.stat.exists
 
 - name: Enable the selected runtime and kubelet
   ansible.builtin.systemd_service:
@@ -84,6 +103,7 @@
     state: started
   loop: >-
     {{ [('containerd' if (container_runtime | default('crio')) == 'containerd' else 'crio'), 'kubelet'] }}
+  when: not ansible_check_mode or kubernetes_repository_file.stat.exists
 
 - name: Download pinned Helm archive
   ansible.builtin.get_url:
