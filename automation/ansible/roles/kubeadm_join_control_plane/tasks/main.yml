@@ -4,6 +4,6 @@
     {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
     --control-plane
     --certificate-key {{ hostvars[groups['control_plane'][0]].kubeadm_certificate_key }}
-    --cri-socket unix:///var/run/crio/crio.sock
+    --cri-socket {{ kubernetes_cri_socket | default('unix:///var/run/crio/crio.sock') }}
   args:
     creates: /etc/kubernetes/admin.conf

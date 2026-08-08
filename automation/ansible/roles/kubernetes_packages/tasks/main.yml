@@ -22,36 +22,68 @@
     url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_minor }}/deb/Release.key"
     dest: /etc/apt/keyrings/cri-o.asc
     mode: '0644'
+  when: container_runtime | default('crio') == 'crio'
 
 - name: Configure CRI-O repository
   ansible.builtin.apt_repository:
     repo: "deb [signed-by=/etc/apt/keyrings/cri-o.asc] https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_minor }}/deb/ /"
     filename: cri-o
     state: present
+  when: container_runtime | default('crio') == 'crio'
 
-- name: Install Kubernetes and CRI-O packages
+- name: Require a supported container runtime
+  ansible.builtin.assert:
+    that: container_runtime | default('crio') in ['containerd', 'crio']
+
+- name: Remove CRI-O when containerd is selected
   ansible.builtin.apt:
-    name:
-      - cri-o
-      - "kubelet={{ kubernetes_deb_version }}"
-      - "kubeadm={{ kubernetes_deb_version }}"
-      - "kubectl={{ kubernetes_deb_version }}"
+    name: cri-o
+    state: absent
+  when: container_runtime | default('crio') == 'containerd'
+
+- name: Install Kubernetes packages and the selected runtime
+  ansible.builtin.apt:
+    name: >-
+      {{ [
+           'kubelet=' ~ kubernetes_deb_version,
+           'kubeadm=' ~ kubernetes_deb_version,
+           'kubectl=' ~ kubernetes_deb_version
+         ] + (['containerd'] if (container_runtime | default('crio')) == 'containerd' else ['cri-o']) }}
     state: present
     update_cache: true
     allow_downgrade: false
 
-- name: Prevent implicit Kubernetes package upgrades
+- name: Configure containerd with the systemd cgroup driver
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      version = 2
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+          SystemdCgroup = true
+  when: container_runtime | default('crio') == 'containerd'
+  notify: Restart containerd
+
+- name: Prevent implicit Kubernetes and runtime package upgrades
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
-  loop: [kubelet, kubeadm, kubectl, cri-o]
+  loop: >-
+    {{ ['kubelet', 'kubeadm', 'kubectl']
+       + (['containerd'] if (container_runtime | default('crio')) == 'containerd' else ['cri-o']) }}
 
-- name: Enable CRI-O and kubelet
+- name: Enable the selected runtime and kubelet
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     enabled: true
     state: started
-  loop: [crio, kubelet]
+  loop: >-
+    {{ [('containerd' if (container_runtime | default('crio')) == 'containerd' else 'crio'), 'kubelet'] }}
 
 - name: Download pinned Helm archive
   ansible.builtin.get_url:
