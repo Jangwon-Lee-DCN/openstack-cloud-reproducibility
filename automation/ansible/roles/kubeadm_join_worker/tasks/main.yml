@@ -3,10 +3,7 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     regexp: "\\s{{ kubernetes_api_fqdn | regex_escape }}(?:\\s|$)"
-    line: >-
-      {{ hostvars[groups['control_plane'][0]].node_ip |
-         default(hostvars[groups['control_plane'][0]].ansible_host) }}
-      {{ kubernetes_api_fqdn }}
+    line: "{{ hostvars[groups['control_plane'][0]].node_ip | default(hostvars[groups['control_plane'][0]].ansible_host) }} {{ kubernetes_api_fqdn }}"
 
 - name: Join Kubernetes worker node
   ansible.builtin.command: >-
