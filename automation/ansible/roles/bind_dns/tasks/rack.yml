@@ -90,6 +90,7 @@
   loop: "{{ dns_record_hosts }}"
   register: rack_dns_answer
   changed_when: false
+  check_mode: false
   until: hostvars[item].node_ip in rack_dns_answer.stdout_lines
   retries: 15
   delay: 2
