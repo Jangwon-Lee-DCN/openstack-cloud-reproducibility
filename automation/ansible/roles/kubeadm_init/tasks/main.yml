@@ -73,7 +73,10 @@
 
 - name: Publish ephemeral join data to the play
   ansible.builtin.set_fact:
-    kubeadm_join_command: "{{ worker_join.stdout }}"
+    kubeadm_join_command: >-
+      {{ worker_join.stdout | regex_replace(
+           '^kubeadm join [^ ]+',
+           'kubeadm join ' ~ (node_ip | default(ansible_host)) ~ ':6443') }}
     kubeadm_certificate_key: "{{ cert_upload.stdout_lines | last }}"
   when: not ansible_check_mode
   no_log: true
