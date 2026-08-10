@@ -7,6 +7,10 @@ images:
     manila_share: quay.io/airshipit/manila:2026.1-ubuntu_noble@sha256:5117d274abd30bfed90db2197373a0fc61a9f47bb5a1d79a0ee154d6eb0a7044
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 pod:
+  mounts:
+    manila_share:
+      # The PowerStore DHSS=False driver does not use an OVS service VM path.
+      host_openvswitch: false
   tolerations:
     manila:
       enabled: true

@@ -15,13 +15,13 @@ spec:
   targets:
     staticConfig:
       static:
-        - https://192.168.21.6/identity/v3
-        - https://192.168.21.6/compute
-        - https://192.168.21.6/network
-        - https://192.168.21.6/image
-        - https://192.168.21.6/volume
-        - https://192.168.21.6/orchestration
-        - https://192.168.21.6/
+        - https://10.67.10.6/identity/v3
+        - https://10.67.10.6/compute
+        - https://10.67.10.6/network
+        - https://10.67.10.6/image
+        - https://10.67.10.6/volume
+        - https://10.67.10.6/orchestration
+        - https://10.67.10.6/
       labels:
         scope: public
 ---
@@ -45,4 +45,3 @@ spec:
         - 192.168.21.200:22
       labels:
         scope: tenant-fip
-

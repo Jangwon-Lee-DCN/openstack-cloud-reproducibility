@@ -3,10 +3,13 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 namespace="${MAGNUM_NAMESPACE:-openstack}"
-repro_root="${REPRO_ROOT:-/home/ubuntu/openstack-cloud-reproducibility}"
+repro_root="${REPRO_ROOT:-$(cd "${root}/.." && pwd)}"
 chart="${MAGNUM_CHART:-${repro_root}/helm/packages/patched/magnum-2026.1.0.tgz}"
 site_values="${root}/values/site/magnum.yaml"
 secret_values="${root}/secrets/magnum.values.sops.yaml"
+runtime_values=$(mktemp /tmp/magnum-runtime-values.XXXXXX.yaml)
+trap 'shred -u "${runtime_values}"' EXIT
+"${root}/scripts/generate-database-admin-override.py" magnum "${runtime_values}"
 
 test -f "${chart}"
 sops filestatus "${secret_values}" | grep -q '"encrypted":true'
@@ -19,6 +22,7 @@ helm upgrade --install magnum "${chart}" \
   --create-namespace \
   -f "${site_values}" \
   -f <(sops -d "${secret_values}") \
+  -f "${runtime_values}" \
   --no-hooks \
   --timeout 15m
 
@@ -43,7 +47,9 @@ for item in "${hooks[@]}"; do
     --namespace "${namespace}" \
     -f "${site_values}" \
     -f <(sops -d "${secret_values}") \
+    -f "${runtime_values}" \
     --show-only "${template}" |
+    sed '/helm.sh\/hook:/d; /helm.sh\/hook-weight:/d' |
     kubectl -n "${namespace}" apply -f -
   kubectl -n "${namespace}" wait "job/${job}" \
     --for=condition=Complete --timeout=10m
@@ -53,6 +59,7 @@ helm upgrade magnum "${chart}" \
   --namespace "${namespace}" \
   -f "${site_values}" \
   -f <(sops -d "${secret_values}") \
+  -f "${runtime_values}" \
   --no-hooks \
   --wait \
   --timeout 15m

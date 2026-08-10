@@ -8,15 +8,15 @@ USER root
 # virtual environment.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3-pip ca-certificates curl \
-    && curl -fsSL -o /tmp/ovn_octavia_provider.whl \
+    && curl -fsSL -o /tmp/ovn_octavia_provider-10.0.0-py3-none-any.whl \
        https://tarballs.openstack.org/ovn-octavia-provider/ovn_octavia_provider-10.0.0-py3-none-any.whl \
-    && echo "9ee7826fb123882a6cc0de1c29d666c01b7efc195bbbfa587a056f55fdd40a3c  /tmp/ovn_octavia_provider.whl" | sha256sum -c - \
+    && echo "9ee7826fb123882a6cc0de1c29d666c01b7efc195bbbfa587a056f55fdd40a3c  /tmp/ovn_octavia_provider-10.0.0-py3-none-any.whl" | sha256sum -c - \
     && python3 -m pip install --break-system-packages --no-cache-dir \
        --constraint=https://releases.openstack.org/constraints/upper/2026.1 \
        --target=/var/lib/openstack/lib/python3.12/site-packages \
        redis==7.2.0 \
-       /tmp/ovn_octavia_provider.whl \
+       /tmp/ovn_octavia_provider-10.0.0-py3-none-any.whl \
     && /var/lib/openstack/bin/python3 -c "import ovn_octavia_provider, redis; from redis.sentinel import Sentinel; print(redis.__version__)" \
     && apt-get purge -y python3-pip \
     && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/* /tmp/ovn_octavia_provider.whl
+    && rm -rf /var/lib/apt/lists/* /tmp/ovn_octavia_provider-10.0.0-py3-none-any.whl

@@ -8,7 +8,7 @@ Gitea, or Argo CD.
 
 - Bitnami Valkey Helm chart: `6.2.4`
 - Valkey and Sentinel images are pinned by digest in `values/valkey.yaml`.
-- Persistent data uses three 2 GiB `rook-ceph-block` volumes.
+- Persistent data uses three 2 GiB `powerstore-rwo-single-path` volumes.
 - Authentication is stored only in
   `secrets/octavia-valkey-auth.secret.sops.yaml`.
 
@@ -25,7 +25,8 @@ scripts/install.sh
 ## HA boundary
 
 One primary and two replicas run with a Sentinel sidecar in every Pod. They are
-spread across the two current controllers as evenly as Kubernetes permits.
+spread across the PowerStore CSI-enabled compute nodes as evenly as Kubernetes
+permits.
 This supports Octavia worker process failure and many individual Pod failures.
 
 It cannot guarantee Sentinel majority after the loss of either physical node:
@@ -40,5 +41,5 @@ Valkey data endpoints use the generated credential. Sentinel discovery is
 cluster-internal and unauthenticated because Octavia 2026.1/Taskflow does not
 send the data-store credential when it discovers a Sentinel master. Do not
 print the Valkey credential, pass it on a command line outside the verification
-script, or commit a decrypted Secret. Ceph snapshots and backups containing
+script, or commit a decrypted Secret. PowerStore snapshots and backups containing
 Valkey AOF data must be protected as sensitive infrastructure data.

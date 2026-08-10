@@ -13,9 +13,12 @@ network:
 
 pod:
   tolerations:
-    - key: node-role.kubernetes.io/control-plane
-      operator: Exists
-      effect: NoSchedule
+    powerdns:
+      enabled: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
   affinity:
     anti:
       type:

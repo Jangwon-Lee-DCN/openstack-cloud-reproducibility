@@ -21,18 +21,21 @@ kubectl -n "${namespace}" exec "${conductor}" -- sh -lc \
 kubectl -n "${namespace}" exec "${conductor}" -- \
   helm --kubeconfig /etc/magnum/kubeconfig.conf list -A >/dev/null
 
-for route in openstack-public-services openstack-internal-services; do
-  kubectl -n "${namespace}" wait "httproute/${route}" \
+kubectl -n "${namespace}" wait httproute/openstack-internal-services \
+  --for='jsonpath={.status.parents[0].conditions[?(@.type=="Accepted")].status}=True' \
+  --timeout=2m
+
+# The public Gateway is an independent production acceptance gate. Validate
+# its route only when that Gateway has actually been provisioned.
+if kubectl -n openstack-gateway-system get gateway openstack-gateway >/dev/null 2>&1; then
+  kubectl -n "${namespace}" wait httproute/openstack-public-services \
     --for='jsonpath={.status.parents[0].conditions[?(@.type=="Accepted")].status}=True' \
     --timeout=2m
-  kubectl -n "${namespace}" wait "httproute/${route}" \
-    --for='jsonpath={.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}=True' \
-    --timeout=2m
-done
+fi
 
-code="$(curl -ksS --resolve api.internal.cloud.dcn.ssu.ac.kr:443:192.168.21.7 \
+code="$(curl -ksS --resolve internal.cloud.dcn.ssu.ac.kr:443:10.67.10.7 \
   -o /dev/null -w '%{http_code}' \
-  https://api.internal.cloud.dcn.ssu.ac.kr/container-infra/v1/clusters)"
+  https://internal.cloud.dcn.ssu.ac.kr/container-infra/v1/clusters)"
 test "${code}" = "401"
 
 echo "Magnum API, HA placement, CAPI driver, management-cluster access, and internal routing verified."

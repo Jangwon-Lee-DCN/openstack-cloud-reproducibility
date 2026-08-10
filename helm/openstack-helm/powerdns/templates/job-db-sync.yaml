@@ -35,6 +35,10 @@ spec:
       restartPolicy: OnFailure
       nodeSelector:
         {{ .Values.labels.job.node_selector_key }}: {{ .Values.labels.job.node_selector_value }}
+{{- if .Values.pod.tolerations.powerdns.enabled }}
+      tolerations:
+{{ toYaml .Values.pod.tolerations.powerdns.tolerations | indent 8 }}
+{{- end }}
       initContainers:
 {{ tuple $envAll "db_sync" list | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
       containers:

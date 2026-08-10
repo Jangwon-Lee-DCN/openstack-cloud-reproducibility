@@ -46,7 +46,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: api
-          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:799bacb764b4837250ae66b9e763831bfedc4b07e83812693e9042ac8260f1f6
+          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:9ff9c4e4369737aa630a004b8eac001a685826e001411ee28b64290cd7cb3ea3
           command: [uwsgi]
           args:
             - --http
@@ -133,7 +133,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: metricd
-          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:799bacb764b4837250ae66b9e763831bfedc4b07e83812693e9042ac8260f1f6
+          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:9ff9c4e4369737aa630a004b8eac001a685826e001411ee28b64290cd7cb3ea3
           command: [gnocchi-metricd]
           args: [--config-file, /etc/gnocchi/gnocchi.conf]
           volumeMounts:
@@ -182,7 +182,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: upgrade
-          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:799bacb764b4837250ae66b9e763831bfedc4b07e83812693e9042ac8260f1f6
+          image: registry.dcn.ssu.ac.kr/openstack/gnocchi@sha256:9ff9c4e4369737aa630a004b8eac001a685826e001411ee28b64290cd7cb3ea3
           command: [gnocchi-upgrade]
           args: [--config-file, /etc/gnocchi/gnocchi.conf]
           volumeMounts:
@@ -191,4 +191,3 @@ spec:
         - name: config
           secret:
             secretName: gnocchi-config
-

@@ -19,6 +19,17 @@ images:
     designate_sink: quay.io/airshipit/designate:2026.1-ubuntu_noble
     designate_service_cleaner: quay.io/airshipit/designate:2026.1-ubuntu_noble
 
+# One-shot control jobs do not need host networking or controller-local state.
+# Keep them on untainted compute nodes; the long-running control services use
+# the controller toleration below.
+labels:
+  job:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled
+  service_cleaner:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled
+
 pod:
   host_network:
     mdns: true

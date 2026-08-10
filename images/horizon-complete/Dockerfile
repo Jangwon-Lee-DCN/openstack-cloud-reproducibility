@@ -116,4 +116,5 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \
     && grep -q 'openstack_dashboard.platform_navigation' "$local_enabled/_9999_platform_navigation.py" \
-    && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py"
+    && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py" \
+    && chmod -R a+rX /var/lib/openstack/lib/python3.12/site-packages

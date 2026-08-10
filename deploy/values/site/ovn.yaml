@@ -1,5 +1,5 @@
-# Two-node PoC OVN topology. Three Raft members are used for each database;
-# preferred anti-affinity spreads them as far as the two-node topology permits.
+# Three-rack production OVN topology. Three Raft members are used for each
+# database and are spread across the available Compute nodes.
 volume:
   ovn_ovsdb_nb:
     enabled: true
@@ -11,8 +11,8 @@ volume:
     size: 5Gi
 network:
   interface:
-    tunnel: eno1
-    tunnel_network_cidr: 192.168.21.0/24
+    tunnel: dcn-geneve
+    tunnel_network_cidr: 10.64.0.0/14
 images:
   tags:
     vector: docker.io/timberio/vector@sha256:31c01788f10c47530a99a51bb22d37582d557e3b8edd02dc5bd62f58b2659e34
@@ -20,7 +20,7 @@ conf:
   ovn_encap_type: geneve
   ovn_bridge_mappings: external:br-ex
   auto_bridge_add:
-    br-ex: eno2
+    br-ex: dcn-provider
   # The upstream parser sidecar image currently lacks the WSGI entry file.
   # Preserve the Neutron log object ID in the raw acl_log message and ingest
   # directly into the single-tenant platform Loki instead.

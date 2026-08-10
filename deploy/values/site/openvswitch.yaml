@@ -13,4 +13,5 @@ conf:
     # OVN still drops to UID 42424 and needs the OpenFlow management sockets.
     extraCommand: >-
       sh -c 'while true; do find /run/openvswitch -maxdepth 1 -type s
-      -name "*.mgmt" -exec chown 42424:42424 {} +; sleep 2; done' &
+      -name "*.mgmt" -exec chown 42424:42424 {} +; sleep 2; done'
+      >/dev/null 2>&1 &

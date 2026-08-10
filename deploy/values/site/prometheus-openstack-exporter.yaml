@@ -1,0 +1,13 @@
+# The upstream chart does not expose pod tolerations. Run the stateless
+# exporter and its Keystone bootstrap job on non-tainted Compute workers.
+labels:
+  openstack_exporter:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled
+  job:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled
+
+pod:
+  replicas:
+    prometheus_openstack_exporter: 2

@@ -4,7 +4,7 @@ metadata:
   name: openstack-internal-gateway
 spec:
   blocks:
-    - cidr: 192.168.21.7/32
+    - cidr: 10.67.10.7/32
   serviceSelector:
     matchLabels:
       io.cilium.gateway/owning-gateway: openstack-internal-gateway

@@ -11,16 +11,25 @@ MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
+REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
+PYTHON_BINARY=${PYTHON_BINARY:-python3}
+if [[ "$PYTHON_BINARY" == python3 && -x "$REPO_ROOT/../../.venv/bin/python" ]]; then
+  PYTHON_BINARY="$REPO_ROOT/../../.venv/bin/python"
+fi
+# Space-separated source component names. Empty means the complete rebuild.
+BUILD_COMPONENTS=${BUILD_COMPONENTS:-}
 KANIKO_IMAGE=gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
 
 for command in kubectl sops git tar sha256sum go; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
-for repo in "$VPC_DASHBOARD_REPO" "$VPC_CONTROL_PLANE_REPO" "$MAGNUM_GITOPS_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO"; do
-  git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
-    echo "refusing to build from dirty source repository: $repo" >&2; exit 1;
-  }
-done
+if [[ -z "$BUILD_COMPONENTS" ]]; then
+  for repo in "$VPC_DASHBOARD_REPO" "$VPC_CONTROL_PLANE_REPO" "$MAGNUM_GITOPS_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO"; do
+    git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
+      echo "refusing to build from dirty source repository: $repo" >&2; exit 1;
+    }
+  done
+fi
 
 WORK_DIR=$(mktemp -d /tmp/dcn-image-rebuild.XXXXXX)
 cleanup() { rm -rf "$WORK_DIR"; }
@@ -28,10 +37,17 @@ trap cleanup EXIT
 mkdir -p "$(dirname "$RESULT_FILE")"
 : > "$RESULT_FILE"
 
-sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" | kubectl apply -f -
+if [[ "$REGISTRY_SECRET" == telemetry-harbor-push ]]; then
+  sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" | kubectl apply -f -
+fi
+
+selected() {
+  [[ -z "$BUILD_COMPONENTS" || " $BUILD_COMPONENTS " == *" $1 "* ]]
+}
 
 build_context() {
-  local name=$1 context=$2 image=$3 job="source-rebuild-${name}"
+  local name=$1 context=$2 image=$3 job
+  job="source-rebuild-${name}"
   local archive="$WORK_DIR/${name}.tar.gz" digest
   tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
   kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
@@ -76,7 +92,7 @@ spec:
         - {name: archive, configMap: {name: $job}}
         - {name: workspace, emptyDir: {}}
         - name: registry-auth
-          secret: {secretName: telemetry-harbor-push, items: [{key: .dockerconfigjson, path: config.json}]}
+          secret: {secretName: $REGISTRY_SECRET, items: [{key: .dockerconfigjson, path: config.json}]}
 EOF
   kubectl wait -n "$NAMESPACE" --for=condition=complete "job/$job" --timeout=30m
   digest=$(kubectl get pod -n "$NAMESPACE" -l "job-name=$job" -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.message}')
@@ -85,30 +101,78 @@ EOF
 }
 
 simple_context() {
-  local component=$1 image_name=${2:-$1} context="$WORK_DIR/$component"
+  local component=$1 image_name=${2:-$1} context
+  context="$WORK_DIR/$component"
   mkdir -p "$context"
   cp -a "$REPO_ROOT/images/$component/." "$context/"
   build_context "$component" "$context" "$REGISTRY/$image_name:source-$BUILD_ID"
 }
 
+build_horizon_complete() {
+  local repo horizon_context
+  for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO"; do
+    git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
+      echo "refusing to build from dirty source repository: $repo" >&2
+      exit 1
+    }
+  done
+  (cd "$VPC_DASHBOARD_REPO" && "$PYTHON_BINARY" -m build && make verify-wheel)
+  (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
+  (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
+  horizon_context="$WORK_DIR/horizon-complete"
+  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled"
+  cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
+  cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
+  cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
+  cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
+  cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
+  cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"
+  cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$horizon_context/octavia-workflow/"
+  cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
+  cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
+  cp -a "$REPO_ROOT/images/horizon-magnum-dashboard/overlay" "$horizon_context/magnum-ui/overlay"
+  build_context horizon-complete "$horizon_context" "$REGISTRY/horizon:source-$BUILD_ID"
+}
+
 # Images whose parents are all public and digest-pinned.
-for component in gnocchi ceilometer aodh keycloak; do simple_context "$component"; done
-simple_context keystone-oidc keystone
-simple_context neutron-fwaas neutron
-simple_context octavia-ovn octavia
+for component in gnocchi ceilometer aodh keycloak; do
+  selected "$component" && simple_context "$component"
+done
+selected keystone-oidc && simple_context keystone-oidc keystone
+selected neutron-fwaas && simple_context neutron-fwaas neutron
+selected octavia-ovn && simple_context octavia-ovn octavia
+selected horizon-complete && build_horizon_complete
+selected project-facade && simple_context project-facade
+
+# Magnum's GitOps-enabled image is layered on the locally rebuilt Magnum base.
+# Keep both components available to narrow rebuilds so a missing registry
+# digest does not force rebuilding every unrelated platform image.
+if selected magnum-capi || selected magnum-capi-gitops; then
+  git -C "$MAGNUM_GITOPS_REPO" diff --quiet &&
+    git -C "$MAGNUM_GITOPS_REPO" diff --cached --quiet || {
+      echo "refusing to build from dirty source repository: $MAGNUM_GITOPS_REPO" >&2
+      exit 1
+    }
+  simple_context magnum-capi magnum
+  magnum_ref=$(awk -F= '$1=="magnum_capi"{print $2}' "$RESULT_FILE")
+fi
+if selected magnum-capi-gitops; then
+  magnum_context="$WORK_DIR/magnum-capi-gitops"
+  mkdir -p "$magnum_context"
+  cp "$REPO_ROOT/images/magnum-capi-gitops/Dockerfile" "$magnum_context/Dockerfile"
+  sed -i "s#registry.dcn.ssu.ac.kr/openstack/magnum@sha256:[a-f0-9]*#$magnum_ref#" "$magnum_context/Dockerfile"
+  cp -a "$MAGNUM_GITOPS_REPO/magnum-driver" "$magnum_context/magnum-driver"
+  build_context magnum-capi-gitops "$magnum_context" "$REGISTRY/magnum-capi-gitops:source-$BUILD_ID"
+fi
+
+if [[ -n "$BUILD_COMPONENTS" ]]; then
+  echo "Selected source builds completed. Immutable references: $RESULT_FILE"
+  exit 0
+fi
 
 # Magnum base must precede the GitOps driver image. The generated result file
 # supplies its immutable digest to the second Dockerfile, removing any Harbor
 # bootstrap dependency.
-simple_context magnum-capi magnum
-magnum_ref=$(awk -F= '$1=="magnum_capi"{print $2}' "$RESULT_FILE")
-magnum_context="$WORK_DIR/magnum-capi-gitops"
-mkdir -p "$magnum_context"
-cp "$REPO_ROOT/images/magnum-capi-gitops/Dockerfile" "$magnum_context/Dockerfile"
-sed -i "s#registry.dcn.ssu.ac.kr/openstack/magnum@sha256:[a-f0-9]*#$magnum_ref#" "$magnum_context/Dockerfile"
-cp -a "$MAGNUM_GITOPS_REPO/magnum-driver" "$magnum_context/magnum-driver"
-build_context magnum-capi-gitops "$magnum_context" "$REGISTRY/magnum-capi-gitops:source-$BUILD_ID"
-
 writer_context="$WORK_DIR/magnum-capi-repository-writer"
 mkdir -p "$writer_context"
 cp "$REPO_ROOT/images/magnum-capi-gitops/repository-writer.Dockerfile" "$writer_context/Dockerfile"
@@ -131,27 +195,8 @@ for item in manager:vpc-control-plane:manager-runtime apiserver:vpc-facade:apise
 done
 
 # One upstream-rooted Horizon image replaces the historical private-image
-# layer chain. The wheel must be rebuilt from the locked dashboard checkout.
-(cd "$VPC_DASHBOARD_REPO" && python3 -m build && make verify-wheel)
-(cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
-(cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
-horizon_context="$WORK_DIR/horizon-complete"
-mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled"
-cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
-cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
-cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
-cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
-cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
-cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"
-cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$horizon_context/octavia-workflow/"
-cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
-cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
-cp -a "$REPO_ROOT/images/horizon-magnum-dashboard/overlay" "$horizon_context/magnum-ui/overlay"
-build_context horizon-complete "$horizon_context" "$REGISTRY/horizon:source-$BUILD_ID"
-
-# Build this last so concurrent application development cannot accidentally be
-# hidden by a successful infrastructure-only run.
-simple_context project-facade
+# layer chain. The wheel is rebuilt from the locked dashboard checkouts.
+build_horizon_complete
 
 # CAPO's source tree is larger than Kubernetes' ConfigMap limit. Its dedicated
 # Job fetches the exact (not merely tagged) upstream commit, applies the one

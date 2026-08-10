@@ -14,16 +14,21 @@ images:
     ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
-    octavia_db_sync: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
-    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:30a2d22ea9294ea6e6193c922af679929415953a7aa17f263c9669e7ca65ab4a
-    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:30a2d22ea9294ea6e6193c922af679929415953a7aa17f263c9669e7ca65ab4a
-    octavia_worker: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:3f052c46f46ec08d5a39c76719a2db70067637135fe695b5ca9c3f1536045a1f
+    octavia_db_sync: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:e517b7e52e1ce5e420ce28f03a3931c0a90995ae899e6a7853665aea68335a35
+    octavia_api: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:e517b7e52e1ce5e420ce28f03a3931c0a90995ae899e6a7853665aea68335a35
+    octavia_driver_agent: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:e517b7e52e1ce5e420ce28f03a3931c0a90995ae899e6a7853665aea68335a35
+    octavia_worker: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:e517b7e52e1ce5e420ce28f03a3931c0a90995ae899e6a7853665aea68335a35
     octavia_worker_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
-    octavia_housekeeping: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:4a861ce15ef154f1abc42ea3805cdef6552a048f4145bdfd533ebf563d7eec47
+    octavia_housekeeping: registry.dcn.ssu.ac.kr/openstack/octavia@sha256:e517b7e52e1ce5e420ce28f03a3931c0a90995ae899e6a7853665aea68335a35
     octavia_health_manager: quay.io/airshipit/octavia@sha256:f38440062afb29db0c8d805f024c3a18e127a119b05b249d26962bc4716d9332
     octavia_health_manager_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     openvswitch_vswitchd: quay.io/airshipit/openvswitch:latest-ubuntu_noble
   pull_policy: IfNotPresent
+
+labels:
+  job:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled
 
 conf:
   # Amphora inventory is read-only. OVN CRUD remains governed by defaults.
@@ -47,9 +52,6 @@ conf:
     cinder:
       endpoint_type: internalURL
       ca_certificates_file: /etc/ssl/certs/openstack-internal-ca.crt
-    ovn:
-      ovn_nb_connection: tcp:10.200.1.69:6641,tcp:10.200.1.175:6641,tcp:10.200.0.45:6641
-      ovn_sb_connection: tcp:10.200.1.251:6642,tcp:10.200.1.132:6642,tcp:10.200.0.200:6642
     service_auth:
       endpoint_type: internalURL
       valid_interfaces: internal
@@ -80,6 +82,15 @@ pod:
   image_pull_secrets:
     default:
       - name: telemetry-harbor-push
+  probes:
+    api:
+      octavia-api:
+        readiness:
+          params:
+            timeoutSeconds: 30
+        liveness:
+          params:
+            timeoutSeconds: 30
   tolerations:
     octavia_worker:
       - key: node-role.kubernetes.io/control-plane
@@ -127,7 +138,7 @@ pod:
           - name: octavia-driver-agents
             hostPath:
               path: /var/lib/octavia/run
-              type: Directory
+              type: DirectoryOrCreate
           - name: octavia-certs
             secret:
               secretName: octavia-certs
@@ -258,8 +269,10 @@ endpoints:
         public: 443
 
 manifests:
-  daemonset_health_manager: true
-  daemonset_worker: true
+  # Phase one is OVN-only. Amphora requires a separately provisioned
+  # management network, per-host ports and an amphora image.
+  daemonset_health_manager: false
+  daemonset_worker: false
   ingress_api: false
   job_image_repo_sync: false
   secret_credential_keys: false

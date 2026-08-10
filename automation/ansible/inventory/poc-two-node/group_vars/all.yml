@@ -27,7 +27,7 @@ management_prefix: 24
 keepalived_auth_pass: REPLACE_WITH_8_CHARS
 
 openstack_public_fqdn: cloud.dcn.ssu.ac.kr
-openstack_public_gateway_ip: 192.168.21.6
+openstack_public_gateway_ip: 10.67.10.6
 openstack_internal_fqdn: internal.cloud.dcn.ssu.ac.kr
 openstack_internal_gateway_ip: 192.168.21.7
 platform_gateway_fqdn: platform.dcn.ssu.ac.kr

@@ -41,9 +41,9 @@ spec:
         configmap-bin-hash: {{ tuple "configmap-bin.yaml" . | include "helm-toolkit.utils.hash" }}
     spec:
       serviceAccountName: {{ $serviceAccountName }}
-{{- with .Values.pod.tolerations }}
+{{- if .Values.pod.tolerations.powerdns.enabled }}
       tolerations:
-{{ toYaml . | indent 8 }}
+{{ toYaml .Values.pod.tolerations.powerdns.tolerations | indent 8 }}
 {{- end }}
       affinity:
 {{ tuple $envAll "powerdns" "server" | include "helm-toolkit.snippets.kubernetes_pod_anti_affinity" | indent 8 }}

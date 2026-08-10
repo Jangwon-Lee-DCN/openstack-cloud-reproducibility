@@ -37,7 +37,7 @@ conf:
     service_catalog:
       # IPA cannot reach the Kubernetes ClusterIP catalog endpoint. Advertise
       # the VM-routable internal Gateway callback URL instead.
-      endpoint_override: https://api.internal.cloud.dcn.ssu.ac.kr/baremetal
+      endpoint_override: https://internal.cloud.dcn.ssu.ac.kr/baremetal
 conductor:
   pxe:
     enabled: false
@@ -69,7 +69,9 @@ pod:
         min_available: 1
 network:
   pxe:
-    device: eno1
+    # Use the stable additive fabric interface shared by every conductor
+    # candidate; never bind provisioning services to the installer DHCP NIC.
+    device: dcn-control0
 endpoints:
   identity:
     auth:

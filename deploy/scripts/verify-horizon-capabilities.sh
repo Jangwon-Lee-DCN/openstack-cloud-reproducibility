@@ -79,5 +79,5 @@ PY
   '
 done
 
-curl -ksSf --resolve cloud.dcn.ssu.ac.kr:443:192.168.21.6 https://cloud.dcn.ssu.ac.kr/horizon/auth/login/ >/dev/null
+curl -ksSf --resolve cloud.dcn.ssu.ac.kr:443:10.67.10.6 https://cloud.dcn.ssu.ac.kr/horizon/auth/login/ >/dev/null
 echo "Horizon capability dashboard discovery and HA rollout passed."

@@ -1,11 +1,11 @@
 # Provider-side telemetry only. No software is injected into tenant guests.
 images:
   tags:
-    ceilometer_central: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
-    ceilometer_compute: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
-    ceilometer_db_sync: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
-    ceilometer_ipmi: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
-    ceilometer_notification: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:ac824b5af24904cb6d4ac26c3a8e53f5238bf2a048d73e7837093dbdb454f10e
+    ceilometer_central: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:93151d05c0255ce8b00ddb5e886f4b731ad05c912d96a7d5a797611acfe1e0fc
+    ceilometer_compute: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:93151d05c0255ce8b00ddb5e886f4b731ad05c912d96a7d5a797611acfe1e0fc
+    ceilometer_db_sync: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:93151d05c0255ce8b00ddb5e886f4b731ad05c912d96a7d5a797611acfe1e0fc
+    ceilometer_ipmi: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:93151d05c0255ce8b00ddb5e886f4b731ad05c912d96a7d5a797611acfe1e0fc
+    ceilometer_notification: registry.dcn.ssu.ac.kr/openstack/ceilometer@sha256:93151d05c0255ce8b00ddb5e886f4b731ad05c912d96a7d5a797611acfe1e0fc
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
   ceilometer:

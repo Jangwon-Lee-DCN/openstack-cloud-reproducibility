@@ -15,6 +15,10 @@ images:
     masakari_instance_monitor: quay.io/airshipit/masakari-monitors:2026.1-ubuntu_noble@sha256:35f8acdf24651b5270f586bd5bb06a6d92dd579d2d90d690dd56b47bce90a7de
     masakari_introspective_instance_monitor: quay.io/airshipit/masakari-monitors:2026.1-ubuntu_noble@sha256:35f8acdf24651b5270f586bd5bb06a6d92dd579d2d90d690dd56b47bce90a7de
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+labels:
+  job:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled
 pod:
   tolerations:
     masakari:

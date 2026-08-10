@@ -5,6 +5,7 @@ REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 BUILD_IMAGES=${BUILD_IMAGES:-0}
 VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
+START_AT=${START_AT:-mariadb}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
 for command in kubectl helm sops python3 sha256sum curl; do
@@ -87,6 +88,13 @@ install_release() {
     kubectl apply \
       -f "$REPO_ROOT/deploy/manifests/neutron-harbor-serviceaccounts.yaml"
   fi
+  if [[ "$1" == "prometheus-openstack-exporter" ]]; then
+    # This chart manages its bootstrap Job as a normal resource. Pod-template
+    # scheduling changes are immutable, so remove only the completed/pending
+    # bootstrap Job before the idempotent Helm upgrade recreates it.
+    kubectl delete job -n "$NAMESPACE" \
+      prometheus-openstack-exporter-ks-user --ignore-not-found --wait=true
+  fi
   local release=$1 package snapshot values_file secrets_file expected actual values
   package=$(release_field "$release" package)
   snapshot=$(release_field "$release" valuesSnapshot)
@@ -121,6 +129,18 @@ install_release() {
     "$REPO_ROOT/deploy/scripts/generate-powerstore-overrides.py" "$release" "$powerstore_values"
     value_args+=( -f "$powerstore_values" )
   fi
+  if [[ "$release" == "barbican" ]]; then
+    barbican_kek_values="$WORK_DIR/barbican.kek.yaml"
+    "$REPO_ROOT/deploy/scripts/generate-barbican-kek-override.py" "$barbican_kek_values"
+    value_args+=( -f "$barbican_kek_values" )
+  fi
+  case "$release" in
+    keystone|placement|glance|cinder|manila|barbican|heat|nova|masakari|neutron|octavia|magnum|designate|ceilometer|aodh)
+      database_values="$WORK_DIR/$release.database-admin.yaml"
+      "$REPO_ROOT/deploy/scripts/generate-database-admin-override.py" "$release" "$database_values"
+      value_args+=( -f "$database_values" )
+      ;;
+  esac
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
   wait_release "$release"
@@ -141,26 +161,33 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
   "$REPO_ROOT/deploy/scripts/build-images.sh"
 fi
 
-# Dependency order of the accepted PoC deployment.
+# Dependency order of the accepted deployment. START_AT allows an idempotent
+# resume after a corrected release without replaying already healthy layers.
+resume=0
 for release in   mariadb rabbitmq memcached   keystone placement   glance cinder manila barbican   openvswitch ovn neutron designate   libvirt nova masakari   heat octavia magnum horizon skyline ironic   prometheus-openstack-exporter; do
+  [[ "$release" == "$START_AT" ]] && resume=1
+  [[ "$resume" == "1" ]] || continue
   install_release "$release"
 done
+[[ "$resume" == "1" ]] || { echo "unknown START_AT release: $START_AT" >&2; exit 2; }
 
 # Gnocchi is intentionally manifest-managed because its upstream chart runtime
 # is obsolete. Its SOPS profile is environment-specific.
-for secret in telemetry-harbor-push.secret.sops.yaml               gnocchi-runtime.secret.sops.yaml               gnocchi-config.secret.sops.yaml; do
+for secret in telemetry-harbor-push.secret.sops.yaml gnocchi-runtime.secret.sops.yaml; do
   sops -d "$REPO_ROOT/deploy/secrets/$secret" | kubectl apply -f -
 done
 kubectl apply -f "$REPO_ROOT/deploy/manifests/gnocchi-bucket.yaml"
 kubectl wait -n "$NAMESPACE" --for=jsonpath='{.status.phase}'=Bound   objectbucketclaim/gnocchi-metrics --timeout=10m
-if kubectl get deployment -n rook-ceph rook-ceph-tools >/dev/null 2>&1; then
-  access_key=$(kubectl get secret -n "$NAMESPACE" gnocchi-metrics     -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
-  kubectl exec -n rook-ceph deployment/rook-ceph-tools --     radosgw-admin user modify --access-key="$access_key" --max-buckets=10 >/dev/null
-fi
+"$REPO_ROOT/deploy/scripts/reconcile-gnocchi-runtime.py"
+# The OBC provisioner owns the RGW identity. Do not mutate it with
+# radosgw-admin: recent Ceph account-backed users cannot be modified by access
+# key alone, and Gnocchi needs only the single bucket already created above.
 kubectl delete job -n "$NAMESPACE" gnocchi-keystone-bootstrap --ignore-not-found
 kubectl apply -f "$REPO_ROOT/deploy/manifests/gnocchi-keystone-bootstrap.yaml"
 kubectl wait -n "$NAMESPACE" --for=condition=complete   job/gnocchi-keystone-bootstrap --timeout=10m
+kubectl delete job -n "$NAMESPACE" gnocchi-upgrade --ignore-not-found --wait=true
 kubectl apply -f "$REPO_ROOT/deploy/manifests/gnocchi.yaml"
+kubectl wait -n "$NAMESPACE" --for=condition=complete job/gnocchi-upgrade --timeout=10m
 kubectl rollout status -n "$NAMESPACE" deployment/gnocchi-api --timeout=15m
 kubectl rollout status -n "$NAMESPACE" deployment/gnocchi-metricd --timeout=15m
 

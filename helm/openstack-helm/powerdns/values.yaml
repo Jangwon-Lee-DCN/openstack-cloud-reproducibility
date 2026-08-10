@@ -31,7 +31,10 @@ images:
       - image_repo_sync
 
 pod:
-  tolerations: []
+  tolerations:
+    powerdns:
+      enabled: false
+      tolerations: []
   affinity:
     anti:
       type:

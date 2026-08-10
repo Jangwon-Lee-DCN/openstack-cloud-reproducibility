@@ -12,9 +12,18 @@ pod:
         min_available: 1
 images:
   tags:
-    neutron_db_sync: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:511e99c211303233f5a4778956490d415451911b1bcf175a6343c0edc6cef16f
-    neutron_server: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:511e99c211303233f5a4778956490d415451911b1bcf175a6343c0edc6cef16f
+    neutron_db_sync: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
+    neutron_server: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
+dependencies:
+  static:
+    ovn_metadata:
+      # Nova is installed after Neutron. The agent retries Nova metadata at
+      # runtime, so requiring a ready nova-metadata endpoint here deadlocks
+      # the deterministic install order.
+      services:
+        - endpoint: internal
+          service: network
 conf:
   neutron:
     DEFAULT:

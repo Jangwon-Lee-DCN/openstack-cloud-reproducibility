@@ -30,7 +30,7 @@ metadata:
 spec:
   secretName: openstack-internal-tls
   dnsNames:
-    - api.internal.cloud.dcn.ssu.ac.kr
+    - internal.cloud.dcn.ssu.ac.kr
   issuerRef:
     name: openstack-internal-ca
     kind: Issuer

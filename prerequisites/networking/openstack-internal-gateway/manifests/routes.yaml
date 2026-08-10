@@ -9,7 +9,7 @@ spec:
       namespace: openstack-internal-gateway-system
       sectionName: https
   hostnames:
-    - api.internal.cloud.dcn.ssu.ac.kr
+    - internal.cloud.dcn.ssu.ac.kr
   rules:
     - matches: [{path: {type: PathPrefix, value: /identity}}]
       filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]

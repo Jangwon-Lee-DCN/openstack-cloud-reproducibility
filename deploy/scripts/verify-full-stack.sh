@@ -4,6 +4,20 @@ set -euo pipefail
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 
+public_status() {
+  local path=$1 code attempt
+  for attempt in $(seq 1 30); do
+    code=$(curl -ksS --connect-timeout 2 --max-time 10 \
+      -o /dev/null -w '%{http_code}' "https://cloud.dcn.ssu.ac.kr${path}" 2>/dev/null || true)
+    if [[ "$code" != "000" && -n "$code" ]]; then
+      printf '%s\n' "$code"
+      return 0
+    fi
+    sleep 1
+  done
+  printf '000\n'
+}
+
 "$REPO_ROOT/deploy/scripts/verify-image-rebuild-closure.py"
 
 python3 - "$REPO_ROOT/release-lock.yaml" <<'PYLOCK' | while read -r release expected; do
@@ -59,7 +73,7 @@ for workload in octavia-api octavia-driver-agent octavia-housekeeping; do
   }
 done
 
-[[ "$(curl -ksS -o /dev/null -w '%{http_code}' https://cloud.dcn.ssu.ac.kr/load-balancer/v2/lbaas/providers)" == "401" ]] || {
+[[ "$(public_status /load-balancer/v2/lbaas/providers)" == "401" ]] || {
   echo "public Octavia route did not enforce Keystone authentication" >&2; exit 1;
 }
 
@@ -106,7 +120,7 @@ done
 kubectl get pdb -n "$NAMESPACE" skyline >/dev/null
 [[ "$(kubectl get deployment -n "$NAMESPACE" barbican-api -o jsonpath='{.status.readyReplicas}')" == "2" ]]
 [[ "$(kubectl get pdb -n "$NAMESPACE" barbican-api -o jsonpath='{.spec.minAvailable}')" == "1" ]]
-[[ "$(curl -ksS -o /dev/null -w '%{http_code}' https://cloud.dcn.ssu.ac.kr/key-manager/v1/secrets)" == "401" ]] || {
+[[ "$(public_status /key-manager/v1/secrets)" == "401" ]] || {
   echo "public Barbican route did not enforce Keystone authentication" >&2; exit 1;
 }
 kubectl get httproute -n "$NAMESPACE" openstack-public-services \

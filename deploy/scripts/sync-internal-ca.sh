@@ -14,8 +14,13 @@ trap cleanup EXIT
 
 kubectl -n openstack-internal-gateway-system get secret openstack-internal-ca \
   -o jsonpath='{.data.ca\.crt}' | base64 -d >"${work_dir}/internal-ca.crt"
-kubectl -n openstack-gateway-system get secret openstack-public-ca \
-  -o jsonpath='{.data.ca\.crt}' | base64 -d >"${work_dir}/public-ca.crt"
+if kubectl -n openstack-gateway-system get secret openstack-public-ca \
+  >/dev/null 2>&1; then
+  kubectl -n openstack-gateway-system get secret openstack-public-ca \
+    -o jsonpath='{.data.ca\.crt}' | base64 -d >"${work_dir}/public-ca.crt"
+else
+  : >"${work_dir}/public-ca.crt"
+fi
 {
   cat "${work_dir}/internal-ca.crt"
   printf '\n'

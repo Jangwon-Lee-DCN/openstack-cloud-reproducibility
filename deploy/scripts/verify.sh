@@ -3,7 +3,7 @@ set -euo pipefail
 
 NAMESPACE=${NAMESPACE:-openstack}
 PUBLIC_HOST=${PUBLIC_HOST:-cloud.dcn.ssu.ac.kr}
-PUBLIC_GATEWAY_IP=${PUBLIC_GATEWAY_IP:-192.168.21.6}
+PUBLIC_GATEWAY_IP=${PUBLIC_GATEWAY_IP:-10.67.10.6}
 
 kubectl get deployments,daemonsets,poddisruptionbudgets -n "$NAMESPACE"   | grep -E 'ceilometer|gnocchi|aodh'
 kubectl get pods -n "$NAMESPACE" -o wide   | grep -E 'ceilometer|gnocchi|aodh'

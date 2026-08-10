@@ -125,6 +125,7 @@ pod:
         volumes:
     manila_share:
       init_container: null
+      host_openvswitch: true
       manila_share:
         volumeMounts:
         volumes:

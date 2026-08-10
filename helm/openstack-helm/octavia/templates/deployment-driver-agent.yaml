@@ -124,7 +124,7 @@ spec:
         - name: octavia-driver-agents
           hostPath:
             path: /var/lib/octavia/run
-            type: Directory
+            type: DirectoryOrCreate
         - name: octavia-bin
           configMap:
             name: octavia-bin

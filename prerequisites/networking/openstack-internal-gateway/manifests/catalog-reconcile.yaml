@@ -9,7 +9,7 @@ data:
     set -euo pipefail
 
     REGION=RegionOne-VM
-    BASE=https://api.internal.cloud.dcn.ssu.ac.kr
+    BASE=https://internal.cloud.dcn.ssu.ac.kr
 
     openstack region show "${REGION}" >/dev/null 2>&1 ||
       openstack region create --parent-region RegionOne \

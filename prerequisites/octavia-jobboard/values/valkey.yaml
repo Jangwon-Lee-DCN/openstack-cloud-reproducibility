@@ -25,11 +25,7 @@ commonConfiguration: |-
 
 primary:
   nodeSelector:
-    openstack-control-plane: enabled
-  tolerations:
-    - key: node-role.kubernetes.io/control-plane
-      operator: Exists
-      effect: NoSchedule
+    openstack-compute-node: enabled
   resources:
     requests:
       cpu: 100m
@@ -39,7 +35,7 @@ primary:
       memory: 512Mi
   persistence:
     enabled: true
-    storageClass: rook-ceph-block
+    storageClass: powerstore-rwo-single-path
     size: 2Gi
   persistentVolumeClaimRetentionPolicy:
     enabled: true
@@ -52,11 +48,7 @@ primary:
 replica:
   replicaCount: 3
   nodeSelector:
-    openstack-control-plane: enabled
-  tolerations:
-    - key: node-role.kubernetes.io/control-plane
-      operator: Exists
-      effect: NoSchedule
+    openstack-compute-node: enabled
   podAntiAffinityPreset: soft
   topologySpreadConstraints:
     - maxSkew: 1
@@ -74,7 +66,7 @@ replica:
       memory: 512Mi
   persistence:
     enabled: true
-    storageClass: rook-ceph-block
+    storageClass: powerstore-rwo-single-path
     size: 2Gi
   persistentVolumeClaimRetentionPolicy:
     enabled: true

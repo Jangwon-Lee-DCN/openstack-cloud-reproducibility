@@ -9,7 +9,7 @@ pod:
     api: 2
 images:
   tags:
-    keystone_api: registry.dcn.ssu.ac.kr/openstack/keystone@sha256:65ccaa7935753352ac329d325aa77edab9bc3bf42ad2b2f73fc884657c9eb656
+    keystone_api: registry.dcn.ssu.ac.kr/openstack/keystone@sha256:5c4a6ecb5ec01d6de6f273ad39a8330058e5df49660477fc9aedaf0e8fb5727e
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
   keystone:

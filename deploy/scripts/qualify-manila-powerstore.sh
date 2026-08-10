@@ -18,8 +18,22 @@ trap cleanup EXIT
 kubectl get deployment -n "$NAMESPACE" manila-share >/dev/null
 kubectl rollout status -n "$NAMESPACE" deployment/manila-share --timeout=10m
 kubectl delete pod -n "$NAMESPACE" powerstore-manila-client --ignore-not-found >/dev/null
-kubectl run powerstore-manila-client -n "$NAMESPACE" --restart=Never \
-  --image="$CLIENT_IMAGE" --env-from=secret/keystone-keystone-admin --command -- sleep 3600
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: powerstore-manila-client
+  namespace: $NAMESPACE
+spec:
+  restartPolicy: Never
+  containers:
+    - name: client
+      image: $CLIENT_IMAGE
+      command: [sleep, "3600"]
+      envFrom:
+        - secretRef:
+            name: keystone-keystone-admin
+EOF
 kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/powerstore-manila-client --timeout=5m
 
 osc() { kubectl exec -n "$NAMESPACE" powerstore-manila-client -- openstack "$@"; }

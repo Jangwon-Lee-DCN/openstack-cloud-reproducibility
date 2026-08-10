@@ -1,12 +1,12 @@
 # Provider-side alarming over Gnocchi metrics; no guest agent dependency.
 images:
   tags:
-    aodh_db_sync: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
-    aodh_api: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
-    aodh_evaluator: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
-    aodh_listener: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
-    aodh_notifier: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
-    aodh_alarms_cleaner: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:81a7b38c616695989eb9e44c99bd0e6832bf48916285b0abd131b4bbaad6d134
+    aodh_db_sync: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:947b136695b0fe0244d59425f41430057dd74f13e98c5f81558174a89fe2286a
+    aodh_api: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:947b136695b0fe0244d59425f41430057dd74f13e98c5f81558174a89fe2286a
+    aodh_evaluator: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:947b136695b0fe0244d59425f41430057dd74f13e98c5f81558174a89fe2286a
+    aodh_listener: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:947b136695b0fe0244d59425f41430057dd74f13e98c5f81558174a89fe2286a
+    aodh_notifier: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:947b136695b0fe0244d59425f41430057dd74f13e98c5f81558174a89fe2286a
+    aodh_alarms_cleaner: registry.dcn.ssu.ac.kr/openstack/aodh@sha256:947b136695b0fe0244d59425f41430057dd74f13e98c5f81558174a89fe2286a
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
   wsgi_aodh: |

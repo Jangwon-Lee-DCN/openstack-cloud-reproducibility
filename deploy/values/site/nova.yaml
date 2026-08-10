@@ -20,6 +20,8 @@ images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
+  ceph:
+    enabled: false
   # Read-only exporter access. No create, update, or delete rule is granted.
   policy:
     "os_compute_api:os-services:list": "role:admin or role:monitoring"

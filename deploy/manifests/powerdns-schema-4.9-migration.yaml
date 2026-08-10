@@ -12,6 +12,10 @@ spec:
         component: schema-migration
     spec:
       restartPolicy: OnFailure
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       nodeSelector:
         openstack-control-plane: enabled
       containers:
