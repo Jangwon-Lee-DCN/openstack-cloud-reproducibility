@@ -27,7 +27,7 @@ Install:
 The installer copies the existing Harbor pull secret into `capo-system`
 without exposing its value and pins:
 
-`registry.dcn.ssu.ac.kr/openstack/capo-controller@sha256:91bfcbad65adfacd832ec6935011eee76790ac71b27e9d333d125a7d519f4cf8`
+`registry.dcn.ssu.ac.kr/openstack/capo-controller@sha256:7145bc6f2476a547280130280a98a69289d882f81e2485e707d39fd0afe0f9db`
 
 `manifests/capo-image-build.yaml` records the reproducible build. It changes
 the unique-port lookup limit from one to two to avoid an incompatible Neutron

@@ -3,7 +3,7 @@ kind: Kustomization
 images:
   - name: registry.k8s.io/capi-openstack/capi-openstack-controller
     newName: registry.dcn.ssu.ac.kr/openstack/capo-controller
-    digest: sha256:91bfcbad65adfacd832ec6935011eee76790ac71b27e9d333d125a7d519f4cf8
+    digest: sha256:7145bc6f2476a547280130280a98a69289d882f81e2485e707d39fd0afe0f9db
 resources:
   - ../../vendor/capi-core-v1.13.4.yaml
   - ../../vendor/capi-bootstrap-kubeadm-v1.13.4.yaml
