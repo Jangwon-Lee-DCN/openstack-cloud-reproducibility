@@ -90,6 +90,9 @@
     content: |
       version = 2
 
+      [plugins."io.containerd.grpc.v1.cri".registry]
+        config_path = "/etc/containerd/certs.d"
+
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
         runtime_type = "io.containerd.runc.v2"
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
@@ -97,6 +100,33 @@
   when: container_runtime | default('crio') == 'containerd'
     and (not ansible_check_mode or kubernetes_repository_file.stat.exists)
   notify: Restart containerd
+
+- name: Create the scoped containerd registry trust directory
+  ansible.builtin.file:
+    path: "/etc/containerd/certs.d/{{ registry_fqdn }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - container_runtime | default('crio') == 'containerd'
+    - registry_temporary_skip_verify | default(false) | bool
+
+- name: Configure the temporary self-signed registry exception
+  ansible.builtin.copy:
+    dest: "/etc/containerd/certs.d/{{ registry_fqdn }}/hosts.toml"
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      server = "https://{{ registry_fqdn }}"
+
+      [host."https://{{ registry_fqdn }}"]
+        capabilities = ["pull", "resolve"]
+        skip_verify = true
+  when:
+    - container_runtime | default('crio') == 'containerd'
+    - registry_temporary_skip_verify | default(false) | bool
 
 - name: Prevent implicit Kubernetes and runtime package upgrades
   ansible.builtin.dpkg_selections:

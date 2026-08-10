@@ -52,6 +52,14 @@
           WantedBy=multi-user.target
       notify: Reload and apply resolver preference
 
+    - name: Reapply runtime per-link DNS preference on every phase run
+      ansible.builtin.systemd_service:
+        name: dcn-cloud-dns.service
+        daemon_reload: true
+        enabled: true
+        state: restarted
+      when: not ansible_check_mode
+
   handlers:
     - name: Restart systemd-resolved after global override removal
       ansible.builtin.systemd_service:

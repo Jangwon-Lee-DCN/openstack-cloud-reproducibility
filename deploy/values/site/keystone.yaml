@@ -2,6 +2,9 @@ pod:
   tolerations:
     keystone:
       enabled: true
+  image_pull_secrets:
+    keystone:
+      - name: telemetry-harbor-push
   replicas:
     api: 2
 images:
