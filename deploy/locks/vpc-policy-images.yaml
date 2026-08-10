@@ -1,0 +1,8 @@
+apiVersion: dcn.ssu.ac.kr/v1alpha1
+kind: VPCPolicyImageLock
+metadata:
+  name: production
+spec:
+  sourceRevision: 03689e8484d148ae69ea04e219601543b703a0e9
+  controllerImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-controller-be0d2ed7d203@sha256:6f702b68887ca4bfaa180d1b9a3933baf8d304d5c4f9dfcd03f04f8314658205
+  facadeImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-facade-be0d2ed7d203@sha256:5a585061058bcc375e8eab2906a975d4f8f44a5f85dbd46aa4ab27f4c0e7e68c

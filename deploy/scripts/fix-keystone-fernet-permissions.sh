@@ -42,8 +42,10 @@ DEPLOYMENT=keystone-api
 
 existing=$(kubectl -n "${NAMESPACE}" get deployment "${DEPLOYMENT}" \
   -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="fernet-perms-init")].name}' 2>/dev/null || true)
-if [[ -n "${existing}" ]]; then
-  echo "fernet-perms-init already present on ${DEPLOYMENT} -- nothing to do."
+current_secret=$(kubectl -n "${NAMESPACE}" get deployment "${DEPLOYMENT}" \
+  -o jsonpath='{.spec.template.spec.volumes[?(@.name=="keystone-fernet-keys")].secret.secretName}' 2>/dev/null || true)
+if [[ -n "${existing}" && -z "${current_secret}" ]]; then
+  echo "Fernet emptyDir, init container, and sync sidecar already present on ${DEPLOYMENT}."
   exit 0
 fi
 
@@ -66,6 +68,9 @@ idx = ${fernet_volume_index}
 patch = [
   {'op': 'replace', 'path': f'/spec/template/spec/volumes/{idx}',
    'value': {'name': 'keystone-fernet-keys', 'emptyDir': {}}},
+]
+if not '${existing}':
+  patch += [
   {'op': 'add', 'path': '/spec/template/spec/volumes/-',
    'value': {'name': 'keystone-fernet-keys-raw', 'secret': {'secretName': 'keystone-fernet-keys'}}},
   {'op': 'add', 'path': '/spec/template/spec/initContainers/-',
@@ -105,8 +110,8 @@ patch = [
        {'name': 'keystone-fernet-keys-raw', 'mountPath': '/secret-src', 'readOnly': True},
        {'name': 'keystone-fernet-keys', 'mountPath': '/etc/keystone/fernet-keys'},
      ],
-   }},
-]
+  }},
+  ]
 print(json.dumps(patch))
 ")
 

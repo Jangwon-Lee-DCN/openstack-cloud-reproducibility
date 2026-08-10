@@ -12,11 +12,11 @@ set -euo pipefail
 #
 # Expected result matrix (see the README section above for why -- e.g.
 # load balancer listing only needs project membership, not
-# load-balancer_admin, per Octavia's actual default policy; "monitoring"
-# has no effect on identity:list_users since Keystone's policy.yaml has no
-# site override and falls back to the admin-only built-in default):
+# load-balancer_admin, per Octavia's actual default policy. The site's
+# explicit Keystone policy grants identity inventory reads to `monitoring`,
+# so operators intentionally pass the known-user visibility check):
 #   openstack-admins:    network_list OK, loadbalancer_list OK, user_list OK
-#   openstack-operators: network_list OK, loadbalancer_list OK, user_list DENIED
+#   openstack-operators: network_list OK, loadbalancer_list OK, user_show OK
 #   openstack-members:   network_list OK, loadbalancer_list OK, user_list DENIED
 #   openstack-readers:   network_list OK, loadbalancer_list OK, user_list DENIED
 #
@@ -46,11 +46,26 @@ spec:
         - secretRef:
             name: keystone-keystone-admin
 EOF
-trap 'kubectl -n "${NAMESPACE}" delete pod "${POD}" --ignore-not-found --wait=false; rm -f /tmp/iam-persona-verify-pod.$$.yaml' EXIT
+BINDING_WAS_PRESENT=1
+PROJECT_NAMESPACE=
+cleanup() {
+  kubectl -n "${NAMESPACE}" delete pod "${POD}" --ignore-not-found --wait=false >/dev/null
+  rm -f /tmp/iam-persona-verify-pod.$$.yaml
+  if [[ "$BINDING_WAS_PRESENT" == 0 && "$PROJECT_NAMESPACE" == vpc-* ]]; then
+    kubectl -n "$PROJECT_NAMESPACE" delete secret openstack-credentials --ignore-not-found >/dev/null
+  fi
+}
+trap cleanup EXIT
 
 kubectl -n "${NAMESPACE}" delete pod "${POD}" --ignore-not-found --wait=true
 kubectl apply -f "/tmp/iam-persona-verify-pod.$$.yaml"
 kubectl -n "${NAMESPACE}" wait --for=condition=Ready "pod/${POD}" --timeout=60s
+project_id=$(kubectl -n "${NAMESPACE}" exec "${POD}" -- \
+  openstack project show --domain "$DOMAIN" "$PROJECT" -f value -c id)
+PROJECT_NAMESPACE="vpc-${project_id}"
+if ! kubectl -n "$PROJECT_NAMESPACE" get secret openstack-credentials >/dev/null 2>&1; then
+  BINDING_WAS_PRESENT=0
+fi
 
 cat > /tmp/iam-persona-verify-script.$$.sh <<'INNER'
 #!/bin/sh
@@ -86,7 +101,9 @@ check_persona() {
     --os-project-domain-name "$DOMAIN" --os-auth-type password \
     token issue -f value -c id)
 
-  for check in "network list:net:$expect_net" "loadbalancer list:lb:$expect_lb" "user list:users:$expect_users"; do
+  # Query a known administrator rather than merely executing `user list`:
+  # Keystone may legally return a filtered/self-only list with exit status 0.
+  for check in "network list:net:$expect_net" "loadbalancer list:lb:$expect_lb" "user show --domain $OS_USER_DOMAIN_NAME $OS_USERNAME:users:$expect_users"; do
     cmd="${check%%:*}"; rest="${check#*:}"; label="${rest%%:*}"; expect="${rest#*:}"
     if env -u OS_USERNAME -u OS_PASSWORD -u OS_USER_DOMAIN_NAME -u OS_PROJECT_NAME -u OS_PROJECT_DOMAIN_NAME \
       openstack --os-token "$token" --os-auth-type token --os-auth-url "$OS_AUTH_URL" \
@@ -118,7 +135,17 @@ check_persona() {
     code=$(curl -ksS --connect-timeout 5 --max-time 15 -o /tmp/vpc_verify_out.$$ -w '%{http_code}' -X POST \
       -H "X-Auth-Token: $token" -H 'Content-Type: application/json' \
       -d '{}' "https://cloud.dcn.ssu.ac.kr/vpc-api${path}")
-    if [ "$code" = 403 ]; then actual=DENIED; else actual=OK; fi
+    if [ "$code" = 403 ]; then
+      actual=DENIED
+    elif [ "$code" = 000 ] || [ "$code" = 401 ] || [ "$code" -ge 500 ]; then
+      echo "FAIL: $label facade authentication/availability failure (HTTP $code)"
+      cat /tmp/vpc_verify_out.$$ 2>/dev/null || true
+      fail=1
+      rm -f /tmp/vpc_verify_out.$$
+      continue
+    else
+      actual=OK
+    fi
     if [ "$actual" = "$expect" ]; then
       echo "PASS: $label -> $actual (HTTP $code)"
     else
@@ -135,7 +162,7 @@ check_persona() {
 }
 
 check_persona openstack-admins             OK OK OK     OK OK     OK
-check_persona openstack-operators          OK OK DENIED OK DENIED DENIED
+check_persona openstack-operators          OK OK OK     OK DENIED DENIED
 check_persona openstack-members            OK OK DENIED OK DENIED DENIED
 check_persona openstack-readers            OK OK DENIED DENIED DENIED DENIED
 check_persona openstack-network-operators  OK OK DENIED OK OK     DENIED

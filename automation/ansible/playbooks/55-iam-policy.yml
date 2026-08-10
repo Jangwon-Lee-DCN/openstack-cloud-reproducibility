@@ -1,0 +1,46 @@
+---
+- name: Reconcile production federated IAM and policy plane
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
+    SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
+    DCN_SERVICES_REPO: "{{ services_repo_path }}"
+    VPC_CONTROL_PLANE_REPO: "{{ lookup('env', 'VPC_CONTROL_PLANE_REPO') }}"
+  tasks:
+    - name: Require the production IAM feature gate
+      ansible.builtin.assert:
+        that: enable_federated_iam | bool
+        fail_msg: Production IAM requires enable_federated_iam=true.
+
+    - name: Install or reconcile Keycloak
+      ansible.builtin.command: >-
+        {{ services_repo_path }}/deployment/prerequisites/identity/keycloak/scripts/install.sh
+      changed_when: true
+
+    - name: Reconcile the Keystone OIDC client secret
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/reconcile-keystone-oidc.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      changed_when: true
+
+    - name: Reconcile federated personas and scoped assignments
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/reconcile-iam-dcn.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      changed_when: true
+
+    - name: Install the VPC and OPA policy plane
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-vpc-policy-plane.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      changed_when: true
+
+    - name: Verify federated IAM persona boundaries
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-iam-dcn-personas.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      changed_when: false
+
+    - name: Verify OPA policy decisions
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-vpc-policy-plane.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      changed_when: false

@@ -93,9 +93,48 @@ os_token_and_project_id
 test -n "${KC_TOKEN}"
 test -n "${OS_TOKEN}"
 
-echo "== resolving Keystone domain/project ids =="
-DOMAIN_ID=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/domains?name=${DOMAIN}" | jq -r '.domains[0].id')
-PROJECT_ID=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/projects?name=${PROJECT}&domain_id=${DOMAIN_ID}" | jq -r '.projects[0].id')
+echo "== ensuring Keycloak realm and Keystone OIDC client =="
+if ! curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+  "http://${KEYCLOAK_SVC}/admin/realms/${REALM}" >/dev/null; then
+  curl -sf -X POST -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+    -d "{\"realm\":\"${REALM}\",\"enabled\":true}" \
+    "http://${KEYCLOAK_SVC}/admin/realms" >/dev/null
+fi
+OIDC_CLIENT_SECRET=$(kubectl -n keycloak get secret keycloak-credentials \
+  -o jsonpath='{.data.oidc-client-secret}' | base64 -d)
+client_payload=$(jq -nc --arg secret "$OIDC_CLIENT_SECRET" '{
+  clientId:"keystone", name:"Keystone", enabled:true,
+  protocol:"openid-connect", publicClient:false, secret:$secret,
+  standardFlowEnabled:true, directAccessGrantsEnabled:false,
+  redirectUris:["https://cloud.dcn.ssu.ac.kr/identity/v3/OS-FEDERATION/oidc-callback"],
+  webOrigins:["https://cloud.dcn.ssu.ac.kr"]
+}')
+existing_client=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+  "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/clients?clientId=${KEYSTONE_CLIENT_ID}" | jq -r '.[0].id // empty')
+if [[ -z "$existing_client" ]]; then
+  curl -sf -X POST -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+    -d "$client_payload" "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/clients" >/dev/null
+else
+  curl -sf -X PUT -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+    -d "$client_payload" "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/clients/${existing_client}" >/dev/null
+fi
+unset OIDC_CLIENT_SECRET client_payload
+
+echo "== ensuring Keystone domain and administrative project =="
+DOMAIN_ID=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/domains?name=${DOMAIN}" | jq -r '.domains[0].id // empty')
+if [[ -z "$DOMAIN_ID" ]]; then
+  DOMAIN_ID=$(curl -sf -X POST -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
+    -d "{\"domain\":{\"name\":\"${DOMAIN}\",\"enabled\":true,\"description\":\"Federated DCN identity domain\"}}" \
+    "${OS_AUTH_URL}/domains" | jq -r '.domain.id')
+  echo "created Keystone domain ${DOMAIN}"
+fi
+PROJECT_ID=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/projects?name=${PROJECT}&domain_id=${DOMAIN_ID}" | jq -r '.projects[0].id // empty')
+if [[ -z "$PROJECT_ID" ]]; then
+  PROJECT_ID=$(curl -sf -X POST -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
+    -d "{\"project\":{\"name\":\"${PROJECT}\",\"domain_id\":\"${DOMAIN_ID}\",\"enabled\":true,\"description\":\"Federated DCN administrative project\"}}" \
+    "${OS_AUTH_URL}/projects" | jq -r '.project.id')
+  echo "created Keystone project ${DOMAIN}/${PROJECT}"
+fi
 test -n "${DOMAIN_ID}" && test "${DOMAIN_ID}" != null
 test -n "${PROJECT_ID}" && test "${PROJECT_ID}" != null
 
@@ -128,7 +167,8 @@ else
   echo "groups mapper already present (${existing_mapper})"
 fi
 
-# Custom roles this design needs that don't ship with OpenStack by default.
+# Required persona roles. Some service charts create their own roles, but the
+# IAM phase owns the final contract and therefore fills in any missing marker.
 # These are markers consulted by VPC-facade OPA policy (Path B), not
 # Keystone policy.yaml overrides -- see "Coordinated implementation
 # direction for the VPC platform" in the IAM hardening doc for what each
@@ -136,7 +176,7 @@ fi
 # for security-operator). Ensuring they exist here only makes them
 # assignable; it grants no OpenStack-service-level capability by itself.
 echo "== ensuring custom roles exist =="
-for role_name in network-operator security-operator project-creator; do
+for role_name in admin member reader load-balancer_admin monitoring network-operator security-operator project-creator; do
   existing=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/roles?name=${role_name}" | jq -r '.roles[0].id // empty')
   if [[ -z "${existing}" ]]; then
     curl -sf -X POST -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
@@ -271,9 +311,30 @@ MAPPING_RULES=$(cat <<EOF
 ]
 EOF
 )
-curl -sf -X PATCH -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
+mapping_method=PUT
+curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/OS-FEDERATION/mappings/keycloak-dcn" >/dev/null 2>&1 && mapping_method=PATCH
+curl -sf -X "$mapping_method" -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
   -d "{\"mapping\": {\"rules\": ${MAPPING_RULES}}}" \
   "${OS_AUTH_URL}/OS-FEDERATION/mappings/keycloak-dcn" >/dev/null
+echo "federation mapping object reconciled"
+idp_url="${OS_AUTH_URL}/OS-FEDERATION/identity_providers/keycloak-dcn"
+if idp_json=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "$idp_url" 2>/dev/null); then
+  test "$(printf '%s' "$idp_json" | jq -r '.identity_provider.domain_id')" = "$DOMAIN_ID"
+  curl -sf -X PATCH -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
+    -d '{"identity_provider":{"remote_ids":["https://auth.cloud.dcn.ssu.ac.kr/realms/dcn"]}}' \
+    "$idp_url" >/dev/null
+else
+  curl -sf -X PUT -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
+    -d '{"identity_provider":{"remote_ids":["https://auth.cloud.dcn.ssu.ac.kr/realms/dcn"],"domain_id":"'"${DOMAIN_ID}"'"}}' \
+    "$idp_url" >/dev/null
+fi
+echo "federation identity provider reconciled"
+protocol_method=PUT
+curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/OS-FEDERATION/identity_providers/keycloak-dcn/protocols/openid" >/dev/null 2>&1 && protocol_method=PATCH
+curl -sf -X "$protocol_method" -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
+  -d '{"protocol":{"mapping_id":"keycloak-dcn"}}' \
+  "${OS_AUTH_URL}/OS-FEDERATION/identity_providers/keycloak-dcn/protocols/openid" >/dev/null
+echo "federation protocol reconciled"
 echo "keycloak-dcn mapping reconciled to the eight-persona design"
 
 # Optional: let staff sign in with their own dcn.ssu.ac.kr company Google

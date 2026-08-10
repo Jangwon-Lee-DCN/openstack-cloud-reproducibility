@@ -134,6 +134,11 @@ install_release() {
     "$REPO_ROOT/deploy/scripts/generate-barbican-kek-override.py" "$barbican_kek_values"
     value_args+=( -f "$barbican_kek_values" )
   fi
+  if [[ "$release" == "keystone" ]]; then
+    oidc_values="$WORK_DIR/keystone.oidc.yaml"
+    "$REPO_ROOT/deploy/scripts/generate-keycloak-oidc-override.py" "$values" "$oidc_values"
+    value_args+=( -f "$oidc_values" )
+  fi
   case "$release" in
     keystone|placement|glance|cinder|manila|barbican|heat|nova|masakari|neutron|octavia|magnum|designate|ceilometer|aodh)
       database_values="$WORK_DIR/$release.database-admin.yaml"

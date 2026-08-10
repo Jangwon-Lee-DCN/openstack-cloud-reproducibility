@@ -86,7 +86,9 @@ spec:
             - --skip-tls-verify
             - --snapshot-mode=redo
           volumeMounts:
-            - {name: workspace, mountPath: /workspace, readOnly: true}
+            # Kaniko may chown copied source paths while evaluating COPY . .;
+            # its extracted context therefore must remain writable.
+            - {name: workspace, mountPath: /workspace}
             - {name: registry-auth, mountPath: /kaniko/.docker, readOnly: true}
       volumes:
         - {name: archive, configMap: {name: $job}}
@@ -94,7 +96,16 @@ spec:
         - name: registry-auth
           secret: {secretName: $REGISTRY_SECRET, items: [{key: .dockerconfigjson, path: config.json}]}
 EOF
-  kubectl wait -n "$NAMESPACE" --for=condition=complete "job/$job" --timeout=30m
+  deadline=$((SECONDS + 1800))
+  until [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.succeeded}' 2>/dev/null) == 1 ]]; do
+    [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.failed}' 2>/dev/null) != 1 ]] || {
+      kubectl logs -n "$NAMESPACE" "job/$job" --tail=200 >&2 || true
+      echo "$job failed" >&2
+      exit 1
+    }
+    (( SECONDS < deadline )) || { echo "$job timed out" >&2; exit 1; }
+    sleep 5
+  done
   digest=$(kubectl get pod -n "$NAMESPACE" -l "job-name=$job" -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.message}')
   [[ "$digest" == sha256:* ]] || { echo "$name did not emit a digest: $digest" >&2; exit 1; }
   printf '%s=%s@%s\n' "${name//-/_}" "$image" "$digest" | tee -a "$RESULT_FILE"
@@ -143,6 +154,19 @@ selected neutron-fwaas && simple_context neutron-fwaas neutron
 selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
 selected project-facade && simple_context project-facade
+
+build_vpc_git_component() {
+  local name=$1 dockerfile=$2 tag=$3 context
+  context="$WORK_DIR/$name-source"
+  mkdir -p "$context"
+  git -C "$VPC_CONTROL_PLANE_REPO" archive HEAD | tar -x -C "$context"
+  if [[ "$dockerfile" != Dockerfile ]]; then
+    cp "$context/$dockerfile" "$context/Dockerfile"
+  fi
+  build_context "$name" "$context" "$REGISTRY/project-facade:$tag-$BUILD_ID"
+}
+selected vpc-control-plane && build_vpc_git_component vpc-control-plane Dockerfile vpc-controller
+selected vpc-facade && build_vpc_git_component vpc-facade Dockerfile.apiserver vpc-facade
 
 # Magnum's GitOps-enabled image is layered on the locally rebuilt Magnum base.
 # Keep both components available to narrow rebuilds so a missing registry
