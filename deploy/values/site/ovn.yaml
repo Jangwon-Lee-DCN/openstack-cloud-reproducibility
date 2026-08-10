@@ -3,11 +3,11 @@
 volume:
   ovn_ovsdb_nb:
     enabled: true
-    class_name: rook-ceph-block
+    class_name: dcn-local-rwo
     size: 5Gi
   ovn_ovsdb_sb:
     enabled: true
-    class_name: rook-ceph-block
+    class_name: dcn-local-rwo
     size: 5Gi
 network:
   interface:

@@ -7,7 +7,7 @@ BUILD_IMAGES=${BUILD_IMAGES:-0}
 VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
-for command in kubectl helm sops python3 sha256sum; do
+for command in kubectl helm sops python3 sha256sum curl; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
 
@@ -81,11 +81,6 @@ install_release() {
     "$REPO_ROOT/deploy/scripts/install-magnum.sh"
     return
   fi
-  if [[ "$1" == "manila" ]]; then
-    kubectl apply -f "$REPO_ROOT/deploy/manifests/manila-cephfilesystem.yaml"
-    kubectl wait -n rook-ceph --for=jsonpath='{.status.phase}'=Ready \
-      cephfilesystem/manila-cephfs --timeout=15m
-  fi
   if [[ "$1" == "neutron" ]]; then
     sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" \
       | kubectl apply -f -
@@ -116,6 +111,16 @@ install_release() {
     sops -d "$REPO_ROOT/$secrets_file" > "$values"
     value_args+=( -f "$REPO_ROOT/$values_file" -f "$values" )
   fi
+  # An unencrypted site file is always the final non-secret override. This
+  # lets production replace old PoC storage choices retained in SOPS locks.
+  if [[ -f "$REPO_ROOT/deploy/values/site/$release.yaml" && "$values_file" != "deploy/values/site/$release.yaml" ]]; then
+    value_args+=( -f "$REPO_ROOT/deploy/values/site/$release.yaml" )
+  fi
+  if [[ "$release" == "cinder" || "$release" == "manila" ]]; then
+    powerstore_values="$WORK_DIR/$release.powerstore.yaml"
+    "$REPO_ROOT/deploy/scripts/generate-powerstore-overrides.py" "$release" "$powerstore_values"
+    value_args+=( -f "$powerstore_values" )
+  fi
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
   wait_release "$release"
@@ -130,12 +135,14 @@ trap cleanup EXIT
 
 validate_admin_passwords
 
+"$REPO_ROOT/deploy/scripts/install-local-path-storage.sh"
+
 if [[ "$BUILD_IMAGES" == "1" ]]; then
   "$REPO_ROOT/deploy/scripts/build-images.sh"
 fi
 
 # Dependency order of the accepted PoC deployment.
-for release in   ceph-adapter-rook   mariadb rabbitmq memcached   keystone placement   glance cinder manila barbican   openvswitch ovn neutron designate   libvirt nova masakari   heat octavia magnum horizon skyline ironic   prometheus-openstack-exporter; do
+for release in   mariadb rabbitmq memcached   keystone placement   glance cinder manila barbican   openvswitch ovn neutron designate   libvirt nova masakari   heat octavia magnum horizon skyline ironic   prometheus-openstack-exporter; do
   install_release "$release"
 done
 

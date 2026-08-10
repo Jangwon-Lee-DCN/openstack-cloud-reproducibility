@@ -1,5 +1,5 @@
 # HA Nova control services with a single PoC compute daemon on controller-0.
-# Ephemeral instance disks use the dedicated nova.vms RBD pool.
+# Ephemeral instance disks remain local qcow2; Ceph is object-only.
 pod:
   tolerations:
     nova:
@@ -19,9 +19,6 @@ pod:
 images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
-rbd_pool:
-  app_name: rbd
-  replication: 1
 conf:
   # Read-only exporter access. No create, update, or delete rule is granted.
   policy:
@@ -37,11 +34,7 @@ conf:
       enforce_new_defaults: true
       enforce_scope: false
     libvirt:
-      images_type: rbd
-      images_rbd_pool: nova.vms
-      images_rbd_ceph_conf: /etc/ceph/ceph.conf
-      rbd_user: cinder
-      rbd_secret_uuid: 457eb676-33da-42ec-9a8c-9293d545c337
+      images_type: qcow2
 endpoints:
   identity:
     auth:

@@ -1,5 +1,6 @@
-# HA Glance API backed by the dedicated Rook-Ceph RBD image pool.
-storage: rbd
+# PowerStore-backed image PVC. The CSI node plugin is intentionally limited to
+# compute nodes, so the initial RWO deployment is a single API replica.
+storage: pvc
 conf:
   # A single uWSGI worker is occupied for the full duration of a multi-GB image
   # download. Kubernetes health checks then time out and kill that worker,
@@ -8,20 +9,12 @@ conf:
   glance_api_uwsgi:
     uwsgi:
       processes: 4
-  software:
-    rbd:
-      rbd_store_pool_app_name: rbd
-  glance:
-    glance_store:
-      rbd_store_replication: 1
-    rbd:
-      rbd_store_replication: 1
 pod:
   tolerations:
     glance:
       enabled: true
   replicas:
-    api: 2
+    api: 1
   lifecycle:
     disruption_budget:
       api:
@@ -49,3 +42,12 @@ endpoints:
 manifests:
   ingress_api: false
   service_ingress_api: false
+volume:
+  class_name: powerstore-rwo-single-path
+  size: 100Gi
+  accessModes:
+    - ReadWriteOnce
+labels:
+  api:
+    node_selector_key: openstack-compute-node
+    node_selector_value: enabled

@@ -23,13 +23,6 @@ spec:
     package: helm/packages/upstream/ceilometer-2026.1.0.tgz
     sha256: af7d7c710347ff2389b057dc18c9b504043e6c8a65d1d9114deff3bf0aff86f0
     valuesSnapshot: deploy/releases/ceilometer.values.sops.yaml
-  - name: ceph-adapter-rook
-    chart: ceph-adapter-rook
-    chartVersion: 2026.1.0
-    appVersion: v20.2.1
-    package: helm/packages/upstream/ceph-adapter-rook-2026.1.0.tgz
-    sha256: b6338645fa713f43eee2e37a5c191bc0eff490f6ab9542d6c1ec88f9a63564c9
-    valuesSnapshot: deploy/releases/ceph-adapter-rook.values.sops.yaml
   - name: cinder
     chart: cinder
     chartVersion: 2026.1.0

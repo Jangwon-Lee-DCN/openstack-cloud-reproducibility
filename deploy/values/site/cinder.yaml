@@ -5,11 +5,6 @@ labels:
   volume:
     node_selector_key: openstack-cinder-volume
     node_selector_value: enabled
-  backup:
-    # Backup is a control service; only cinder-volume is tied to the physical
-    # storage node. Run backup consumers on both controllers.
-    node_selector_key: openstack-control-plane
-    node_selector_value: enabled
 pod:
   security_context:
     cinder_backup:
@@ -31,7 +26,7 @@ pod:
     api: 2
     scheduler: 2
     volume: 1
-    backup: 2
+    backup: 0
   lifecycle:
     disruption_budget:
       api:
@@ -61,20 +56,23 @@ conf:
     "volume_extension:quotas:show": "role:admin or role:monitoring or (role:reader and project_id:%(project_id)s)"
     "volume:get_all": "role:admin or role:monitoring or (role:reader and project_id:%(project_id)s)"
     "volume:get_all_snapshots": "role:admin or role:monitoring or (role:reader and project_id:%(project_id)s)"
-  ceph:
-    pools:
-      backup:
-        app_name: rbd
-        replication: 1
-      cinder.volumes:
-        app_name: rbd
-        replication: 1
   cinder:
     DEFAULT:
-      backup_driver: cinder.backup.drivers.ceph.CephBackupDriver
-      # Keep one service process per Pod. Two anti-affined Pods provide HA;
-      # Cinder 28's multi-process backup callback path is not used here.
-      backup_workers: 1
+      # The pinned chart ships a map key named rbd1 that Helm cannot delete by
+      # overlay. Repurpose that key; the advertised backend remains POWERSTORE.
+      enabled_backends: rbd1
+  backends:
+    rbd1:
+      volume_driver: cinder.volume.drivers.dell_emc.powerstore.driver.PowerStoreDriver
+      volume_backend_name: POWERSTORE
+      storage_protocol: iSCSI
+      rbd_pool: ""
+      rbd_ceph_conf: ""
+      rbd_user: ""
+      rbd_secret_uuid: ""
+      rbd_flatten_volume_from_snapshot: false
+      report_discard_supported: true
+      image_volume_cache_enabled: false
 endpoints:
   identity:
     auth:
@@ -95,3 +93,7 @@ endpoints:
 manifests:
   ingress_api: false
   service_ingress_api: false
+  deployment_backup: false
+  job_backup_storage_init: false
+  job_storage_init: false
+  pvc_backup: false

@@ -6,6 +6,5 @@ pod:
     server: 3
 volume:
   enabled: true
-  class_name: rook-ceph-block
+  class_name: dcn-local-rwo
   size: 5Gi
-

@@ -24,7 +24,9 @@ pod:
     api: 2
     data: 2
     scheduler: 2
-    share: 2
+    # Start one unsupported PowerStoreOS 2.1 qualification worker. It is kept
+    # only after the complete lifecycle acceptance test passes.
+    share: 1
   lifecycle:
     disruption_budget:
       api:
@@ -36,20 +38,18 @@ pod:
 conf:
   manila:
     DEFAULT:
-      enabled_share_backends: cephfs
-      enabled_share_protocols: CEPHFS
-      default_share_type: cephfs
-      cephfs_auth_id: manila
+      enabled_share_backends: powerstore
+      enabled_share_protocols: NFS
+      default_share_type: powerstore-nfs
       admin_only_metadata: __mount_options
-    cephfs:
+    powerstore:
       driver_handles_share_servers: false
-      share_backend_name: CEPHFS
-      share_driver: manila.share.drivers.cephfs.driver.CephFSDriver
-      cephfs_protocol_helper_type: CEPHFS
-      cephfs_conf_path: /etc/ceph/ceph.conf
-      cephfs_auth_id: manila
-      cephfs_cluster_name: ceph
-      cephfs_filesystem_name: manila-cephfs
+      share_backend_name: POWERSTORE
+      share_driver: manila.share.drivers.dell_emc.driver.EMCShareDriver
+      emc_share_backend: powerstore
+      dell_nas_backend_host: 192.168.40.124
+      dell_nas_server: platform-nfs
+      dell_ssl_cert_verify: false
       reserved_share_percentage: 10
   # The 2026.1 image sample config no longer supplies
   # DEFAULT.osapi_share_workers, while this chart derives the uWSGI process
@@ -80,9 +80,7 @@ endpoints:
       api:
         public: 443
 manifests:
-  # The upstream bootstrap downloads a generic-driver service image. The
-  # CephFS native backend does not use service VMs; share types are reconciled
-  # by the site verification script instead.
+  # DHSS=False does not use generic-driver service VMs.
   job_bootstrap: false
   ingress_api: false
   service_ingress_api: false
