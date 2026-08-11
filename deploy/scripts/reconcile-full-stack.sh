@@ -59,9 +59,22 @@ PYLOCK
 
 wait_release() {
   local release=$1 obj
-  if kubectl get jobs -n "$NAMESPACE" -l "release_group=$release" -o name | grep -q .; then
-    kubectl wait -n "$NAMESPACE" --for=condition=complete       job -l "release_group=$release" --timeout=15m
-  fi
+  # Helm hook Jobs are unowned. Exclude CronJob-owned execution history:
+  # a retained failed audit/cleaner run must not block a later healthy Helm
+  # reconciliation for the entire release_group.
+  while read -r obj; do
+    [[ -n "$obj" ]] || continue
+    kubectl wait -n "$NAMESPACE" --for=condition=complete "$obj" --timeout=15m
+  done < <(
+    kubectl get jobs -n "$NAMESPACE" -l "release_group=$release" -o json \
+      | python3 -c '
+import json, sys
+for item in json.load(sys.stdin).get("items", []):
+    owners = item.get("metadata", {}).get("ownerReferences", []) or []
+    if not any(owner.get("kind") == "CronJob" for owner in owners):
+        print("job/" + item["metadata"]["name"])
+'
+  )
   for kind in deployment statefulset daemonset; do
     while read -r obj; do
       [[ -n "$obj" ]] || continue
@@ -149,6 +162,12 @@ install_release() {
   esac
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
+  # Helm renders the Fernet repository as a read-only Secret volume. Restore
+  # the permission-safe emptyDir + sync sidecar before waiting for Keystone's
+  # rollout, otherwise its init container cannot chmod the Secret mount.
+  if [[ "$release" == "keystone" ]]; then
+    "$REPO_ROOT/deploy/scripts/fix-keystone-fernet-permissions.sh"
+  fi
   wait_release "$release"
 }
 
