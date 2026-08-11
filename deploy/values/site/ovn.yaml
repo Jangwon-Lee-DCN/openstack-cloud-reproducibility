@@ -18,7 +18,11 @@ images:
     vector: docker.io/timberio/vector@sha256:31c01788f10c47530a99a51bb22d37582d557e3b8edd02dc5bd62f58b2659e34
 conf:
   ovn_encap_type: geneve
+  # Each rack owns a separate VLAN 140 broadcast domain. Derive both the
+  # physnet mapping and OVN gateway AZ from the node's topology label.
   ovn_bridge_mappings: external:br-ex
+  ovn_availability_zone_label: topology\.kubernetes\.io/zone
+  ovn_bridge_mapping_zone_prefix: external-
   auto_bridge_add:
     br-ex: dcn-provider
   # The upstream parser sidecar image currently lacks the WSGI entry file.

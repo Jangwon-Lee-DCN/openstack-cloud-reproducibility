@@ -104,11 +104,11 @@ for item in \
 done
 
 for workload in \
-  deployment/octavia-api \
   deployment/octavia-driver-agent \
   deployment/octavia-housekeeping \
   daemonset/octavia-health-manager-default \
-  daemonset/octavia-worker-default; do
+  daemonset/octavia-worker-default \
+  deployment/octavia-api; do
   kubectl -n openstack get "${workload}" >/dev/null 2>&1 || continue
   kubectl -n openstack rollout restart "${workload}"
   kubectl -n openstack rollout status "${workload}" --timeout=10m

@@ -29,6 +29,12 @@ labels:
   job:
     node_selector_key: openstack-compute-node
     node_selector_value: enabled
+  # The API and provider agent exchange status through a node-local Unix
+  # socket. Run one provider agent on every OpenStack control-plane node so
+  # either API replica always has a local socket after rescheduling.
+  driver_agent:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
 
 conf:
   # Amphora inventory is read-only. OVN CRUD remains governed by defaults.
@@ -82,6 +88,16 @@ pod:
   image_pull_secrets:
     default:
       - name: telemetry-harbor-push
+  security_context:
+    octavia_driver_agent:
+      container:
+        octavia_driver_agent:
+          capabilities:
+            add:
+              - SYS_NICE
+          # The provider-agent Unix sockets live in a root-owned hostPath
+          # shared with the API pod on each control-plane node.
+          runAsUser: 0
   probes:
     api:
       octavia-api:
@@ -243,7 +259,7 @@ pod:
             timeoutSeconds: 10
   replicas:
     api: 2
-    driver_agent: 2
+    driver_agent: 6
     housekeeping: 2
   lifecycle:
     disruption_budget:

@@ -40,14 +40,16 @@ conf:
         mechanism_drivers: ovn
         extension_drivers: port_security
       ml2_type_flat:
-        flat_networks: external
+        flat_networks: external-rack-1,external-rack-2,external-rack-3
       ml2_type_geneve:
         vni_ranges: 1:65536
         max_header_size: 38
       ovn:
         ovn_l3_scheduler: leastloaded
         neutron_sync_mode: repair
-        enable_distributed_floating_ip: true
+        # Rack-local VLAN 140 domains are not stretched. Keep north-south
+        # translation on the router's AZ-constrained gateway chassis.
+        enable_distributed_floating_ip: false
         dns_servers: 192.168.21.10,8.8.8.8,1.1.1.1
       network_log:
         rate_limit: 150

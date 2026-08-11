@@ -76,6 +76,10 @@ network:
 conf:
   ovn_cms_options: "availability-zones=nova"
   ovn_cms_options_gw_enabled: "enable-chassis-as-gw,availability-zones=nova"
+  # When set, the controller init derives the OVN availability zone and an
+  # optional rack-local bridge mapping from this Kubernetes node label.
+  ovn_availability_zone_label: ""
+  ovn_bridge_mapping_zone_prefix: ""
   ovn_encap_type: geneve
   ovn_bridge: br-int
   ovn_bridge_mappings: external:br-ex

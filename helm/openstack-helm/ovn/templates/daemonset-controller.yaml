@@ -73,6 +73,9 @@ spec:
             - -c
             - |
               kubectl get node ${NODENAME} -o jsonpath='{.metadata.labels.{{ .Values.labels.ovn_controller_gw.node_selector_key }}}' > /tmp/gw-enabled/gw-enabled
+{{- if .Values.conf.ovn_availability_zone_label }}
+              kubectl get node ${NODENAME} -o jsonpath='{.metadata.labels.{{ .Values.conf.ovn_availability_zone_label }}}' > /tmp/gw-enabled/availability-zone
+{{- end }}
           env:
             - name: NODENAME
               valueFrom:

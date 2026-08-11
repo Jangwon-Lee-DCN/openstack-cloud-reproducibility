@@ -6,6 +6,7 @@ NAMESPACE=${NAMESPACE:-openstack}
 BUILD_IMAGES=${BUILD_IMAGES:-0}
 VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
 START_AT=${START_AT:-mariadb}
+ONLY_RELEASE=${ONLY_RELEASE:-}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
 for command in kubectl helm sops python3 sha256sum curl; do
@@ -164,6 +165,11 @@ validate_admin_passwords
 
 if [[ "$BUILD_IMAGES" == "1" ]]; then
   "$REPO_ROOT/deploy/scripts/build-images.sh"
+fi
+
+if [[ -n "$ONLY_RELEASE" ]]; then
+  install_release "$ONLY_RELEASE"
+  exit 0
 fi
 
 # Dependency order of the accepted deployment. START_AT allows an idempotent
