@@ -27,6 +27,11 @@ dependencies:
 conf:
   neutron:
     DEFAULT:
+      # Do not force the legacy "nova" network AZ. OVN gateway chassis are
+      # rack-scoped (rack-1/2/3), while generic tenant networks such as those
+      # created by CAPO must remain usable across racks unless the caller
+      # explicitly supplies an availability-zone hint.
+      default_availability_zones: ""
       global_physnet_mtu: 1500
       router_distributed: true
       service_plugins: ovn-router,firewall_v2,log
