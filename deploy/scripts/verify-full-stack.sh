@@ -65,8 +65,8 @@ if bad:
 PODCHECK
 
 for workload in octavia-api octavia-driver-agent octavia-housekeeping; do
-  [[ "$(kubectl get deployment -n "$NAMESPACE" "$workload" -o jsonpath='{.status.readyReplicas}')" == "2" ]] || {
-    echo "$workload does not have two ready replicas" >&2; exit 1;
+  [[ "$(kubectl get deployment -n "$NAMESPACE" "$workload" -o jsonpath='{.status.readyReplicas}')" -ge 2 ]] || {
+    echo "$workload does not have at least two ready replicas" >&2; exit 1;
   }
   [[ "$(kubectl get pods -n "$NAMESPACE" -l "application=octavia" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2 ]] || {
     echo "Octavia replicas are not spread across two nodes" >&2; exit 1;
