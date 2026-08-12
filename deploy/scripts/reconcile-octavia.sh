@@ -43,6 +43,20 @@ sops -d "${SNAPSHOT}" >"${secret_values}"
 "${ROOT_DIR}/deploy/scripts/generate-database-admin-override.py" \
   octavia "${runtime_values}"
 
+python3 - "${runtime_values}" "${OCTAVIA_DRIVER_AGENT_REPLICAS:-6}" <<'PY'
+import pathlib
+import sys
+import yaml
+
+path = pathlib.Path(sys.argv[1])
+replicas = int(sys.argv[2])
+if replicas < 3:
+    raise SystemExit("OCTAVIA_DRIVER_AGENT_REPLICAS must be at least 3")
+values = yaml.safe_load(path.read_text()) or {}
+values.setdefault("pod", {}).setdefault("replicas", {})["driver_agent"] = replicas
+path.write_text(yaml.safe_dump(values, sort_keys=False))
+PY
+
 python3 - "${secret_values}" "${nb_remotes}" "${sb_remotes}" <<'PY'
 import pathlib
 import sys
