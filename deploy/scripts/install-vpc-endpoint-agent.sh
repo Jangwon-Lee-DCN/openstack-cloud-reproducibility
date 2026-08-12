@@ -32,8 +32,16 @@ if values:
  try: decoded=base64.b64decode(values[0], validate=True)
  except Exception as exc: raise SystemExit("existing endpoint-policy HMAC secret is not valid base64") from exc
  if len(decoded) < 32: raise SystemExit("existing endpoint-policy HMAC secret is shorter than 32 bytes")
- key=values[0]
-else: key=base64.b64encode(secrets.token_bytes(48)).decode()
+ # Kubernetes Secret.data is one base64 layer. Environment variables must
+ # decode to UTF-8 text, not arbitrary key bytes. Migrate the earlier raw-byte
+ # representation losslessly by using its base64 text as the HMAC key.
+ try:
+  text=decoded.decode("utf-8")
+  if not text.isprintable(): raise UnicodeDecodeError("utf-8", decoded, 0, len(decoded), "non-printable key")
+ except UnicodeDecodeError:
+  text=base64.urlsafe_b64encode(decoded).decode()
+ key=base64.b64encode(text.encode()).decode()
+else: key=base64.b64encode(secrets.token_urlsafe(48).encode()).decode()
 print(key,end="")
 ' | python3 -c 'import json,sys; key=sys.stdin.read().strip(); items=[{"apiVersion":"v1","kind":"Secret","metadata":{"name":"vpc-endpoint-policy-hmac","namespace":ns},"type":"Opaque","data":{"hmac-secret":key}} for ns in ("openstack","vpc-control-plane-system")]; print(json.dumps({"apiVersion":"v1","kind":"List","items":items}))' | kubectl apply -f -
 
