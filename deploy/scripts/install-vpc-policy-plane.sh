@@ -8,6 +8,10 @@ IMAGE_LOCK="$REPO_ROOT/deploy/locks/vpc-policy-images.yaml"
 
 test -f "$VPC_REPO/config/production/kustomization.yaml"
 test -f "$IMAGE_LOCK"
+git -C "$VPC_REPO" diff --quiet && git -C "$VPC_REPO" diff --cached --quiet || {
+  echo "refusing CRD/controller rollout from dirty VPC source; commit and lock the exact revision first" >&2
+  exit 1
+}
 locked_revision=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["spec"]["sourceRevision"])' "$IMAGE_LOCK")
 test "$(git -C "$VPC_REPO" rev-parse HEAD)" = "$locked_revision" || {
   echo "VPC source revision does not match the production image lock" >&2
@@ -20,11 +24,34 @@ test "$(git -C "$VPC_REPO" rev-parse HEAD)" = "$locked_revision" || {
 kubectl -n openstack get secret keystone-keystone-admin -o json |
   python3 -c 'import base64,json,sys,yaml; s=json.load(sys.stdin)["data"]; g=lambda k:base64.b64decode(s[k]).decode(); cloud={"clouds":{"openstack":{"auth":{"auth_url":g("OS_AUTH_URL"),"username":g("OS_USERNAME"),"password":g("OS_PASSWORD"),"project_name":g("OS_PROJECT_NAME"),"user_domain_name":g("OS_USER_DOMAIN_NAME"),"project_domain_name":g("OS_PROJECT_DOMAIN_NAME")},"region_name":g("OS_REGION_NAME"),"interface":g("OS_INTERFACE"),"identity_api_version":3,"verify":False}}}; raw=yaml.safe_dump(cloud,sort_keys=False).encode(); out={"apiVersion":"v1","kind":"Secret","metadata":{"name":"vpc-facade-service-credentials","namespace":"openstack"},"type":"Opaque","data":{"clouds.yaml":base64.b64encode(raw).decode()}}; print(json.dumps(out))' |
   kubectl apply -f -
+# Neutron service credentials are used solely for the privileged
+# binding:host_id transition of interface endpoint ports. Tenant credentials
+# continue to own port/IP/security-group lifecycle.
+kubectl -n openstack get secret neutron-keystone-user -o json |
+  python3 -c 'import base64,json,sys,yaml; s=json.load(sys.stdin)["data"]; g=lambda k:base64.b64decode(s[k]).decode(); cloud={"clouds":{"openstack":{"auth":{"auth_url":g("OS_AUTH_URL"),"username":g("OS_USERNAME"),"password":g("OS_PASSWORD"),"project_name":g("OS_PROJECT_NAME"),"user_domain_name":g("OS_USER_DOMAIN_NAME"),"project_domain_name":g("OS_PROJECT_DOMAIN_NAME")},"region_name":g("OS_REGION_NAME"),"interface":g("OS_INTERFACE"),"identity_api_version":3,"verify":False}}}; raw=yaml.safe_dump(cloud,sort_keys=False).encode(); out={"apiVersion":"v1","kind":"Secret","metadata":{"name":"vpc-endpoint-binding-credentials","namespace":"openstack"},"type":"Opaque","data":{"clouds.yaml":base64.b64encode(raw).decode()}}; print(json.dumps(out))' |
+  kubectl apply -f -
 render_production() {
   kubectl kustomize "$VPC_REPO/config/production" |
     "$REPO_ROOT/deploy/scripts/render-vpc-policy-plane.py" "$IMAGE_LOCK"
 }
-render_production | kubectl apply -f -
+# Validate the complete locked stream before applying any VPC control-plane
+# object. This catches a missing CRD or controller/facade image mismatch before
+# the rollout begins.
+rendered=$(mktemp)
+trap 'rm -f "$rendered"' EXIT
+render_production > "$rendered"
+python3 - "$rendered" "$IMAGE_LOCK" <<'PY'
+import sys, yaml
+documents=[item for item in yaml.safe_load_all(open(sys.argv[1], encoding="utf-8")) if item]
+lock=yaml.safe_load(open(sys.argv[2], encoding="utf-8"))["spec"]
+crds={item.get("metadata",{}).get("name") for item in documents if item.get("kind")=="CustomResourceDefinition"}
+required={"connectivityprobes.vpc.dcn.ssu.ac.kr","vpcendpoints.vpc.dcn.ssu.ac.kr","flowlogconfigs.vpc.dcn.ssu.ac.kr"}
+if not required <= crds: raise SystemExit(f"production render lacks CRDs: {sorted(required-crds)}")
+images={item["metadata"]["name"]:item["spec"]["template"]["spec"]["containers"][0]["image"] for item in documents if item.get("kind")=="Deployment" and item["metadata"]["name"] in ("vpc-control-plane-controller-manager","vpc-facade")}
+expected={"vpc-control-plane-controller-manager":lock["controllerImage"],"vpc-facade":lock["facadeImage"]}
+if images != expected: raise SystemExit(f"rendered locked images differ: {images!r} != {expected!r}")
+PY
+kubectl apply -f "$rendered"
 
 # Derive a namespace-local pull secret from Harbor's reproducibly installed
 # administrator Secret without writing or printing the credential.
@@ -34,7 +61,7 @@ kubectl -n harbor get secret harbor-admin-password -o json |
 
 # The first apply creates the namespace; repeat so Deployments can consume the
 # pull Secret immediately and so this remains safe after a clean rebuild.
-render_production | kubectl apply -f -
+kubectl apply -f "$rendered"
 kubectl apply -k "$VPC_REPO/config/gateway"
 if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
   kubectl apply -k "$VPC_REPO/config/monitoring"

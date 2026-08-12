@@ -1,0 +1,12 @@
+conf:
+  # Both keys are set because the chart supports legacy and OVN metadata
+  # agents. This site runs the OVN agent; keeping them identical prevents a
+  # backend change from bypassing the attestor.
+  metadata_agent:
+    DEFAULT:
+      nova_metadata_host: vpc-metadata-attestor.openstack.svc.cluster.local
+      nova_metadata_port: 8775
+  ovn_metadata_agent:
+    DEFAULT:
+      nova_metadata_host: vpc-metadata-attestor.openstack.svc.cluster.local
+      nova_metadata_port: 8775

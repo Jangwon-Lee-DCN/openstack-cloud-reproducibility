@@ -157,6 +157,10 @@ selected project-facade && simple_context project-facade
 
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context
+  git -C "$VPC_CONTROL_PLANE_REPO" diff --quiet && git -C "$VPC_CONTROL_PLANE_REPO" diff --cached --quiet || {
+    echo "refusing to build $name from dirty VPC source; git archive HEAD would omit working-tree changes: $VPC_CONTROL_PLANE_REPO" >&2
+    exit 1
+  }
   context="$WORK_DIR/$name-source"
   mkdir -p "$context"
   git -C "$VPC_CONTROL_PLANE_REPO" archive HEAD | tar -x -C "$context"
@@ -165,21 +169,39 @@ build_vpc_git_component() {
   fi
   build_context "$name" "$context" "$REGISTRY/project-facade:$tag-$BUILD_ID"
 }
-selected vpc-control-plane && build_vpc_git_component vpc-control-plane Dockerfile vpc-controller
-selected vpc-facade && build_vpc_git_component vpc-facade Dockerfile.apiserver vpc-facade
+if [[ -n "$BUILD_COMPONENTS" ]]; then
+  selected vpc-control-plane && build_vpc_git_component vpc-control-plane Dockerfile vpc-controller
+  selected vpc-facade && build_vpc_git_component vpc-facade Dockerfile.apiserver vpc-facade
+  selected vpc-metadata-attestor && build_vpc_git_component vpc-metadata-attestor Dockerfile.metadata-attestor vpc-metadata-attestor
+  selected vpc-endpoint-agent && build_vpc_git_component vpc-endpoint-agent Dockerfile.endpoint-agent vpc-endpoint-agent
+fi
 
 # Magnum's GitOps-enabled image is layered on the locally rebuilt Magnum base.
 # Keep both components available to narrow rebuilds so a missing registry
 # digest does not force rebuilding every unrelated platform image.
-if selected magnum-capi || selected magnum-capi-gitops; then
+if selected magnum-capi || selected magnum-capi-gitops || selected magnum-capi-repository-writer; then
   git -C "$MAGNUM_GITOPS_REPO" diff --quiet &&
     git -C "$MAGNUM_GITOPS_REPO" diff --cached --quiet || {
       echo "refusing to build from dirty source repository: $MAGNUM_GITOPS_REPO" >&2
       exit 1
     }
+fi
+if selected magnum-capi || selected magnum-capi-gitops; then
   simple_context magnum-capi magnum
   magnum_ref=$(awk -F= '$1=="magnum_capi"{print $2}' "$RESULT_FILE")
 fi
+
+build_magnum_repository_writer() {
+  local writer_context="$WORK_DIR/magnum-capi-repository-writer"
+  mkdir -p "$writer_context"
+  cp "$REPO_ROOT/images/magnum-capi-gitops/repository-writer.Dockerfile" "$writer_context/Dockerfile"
+  cp -a "$MAGNUM_GITOPS_REPO/magnum-driver" "$writer_context/magnum-driver"
+  cp -a "$MAGNUM_GITOPS_REPO/repository-writer" "$writer_context/repository-writer"
+  mkdir -p "$writer_context/vendor/capi-helm-charts"
+  cp -a "$MAGNUM_GITOPS_REPO/vendor/capi-helm-charts/openstack-cluster" "$writer_context/vendor/capi-helm-charts/openstack-cluster"
+  build_context magnum-capi-repository-writer "$writer_context" "$REGISTRY/magnum-capi-repository-writer:source-$BUILD_ID"
+}
+selected magnum-capi-repository-writer && build_magnum_repository_writer
 if selected magnum-capi-gitops; then
   magnum_context="$WORK_DIR/magnum-capi-gitops"
   mkdir -p "$magnum_context"
@@ -194,23 +216,13 @@ if [[ -n "$BUILD_COMPONENTS" ]]; then
   exit 0
 fi
 
-# Magnum base must precede the GitOps driver image. The generated result file
-# supplies its immutable digest to the second Dockerfile, removing any Harbor
-# bootstrap dependency.
-writer_context="$WORK_DIR/magnum-capi-repository-writer"
-mkdir -p "$writer_context"
-cp "$REPO_ROOT/images/magnum-capi-gitops/repository-writer.Dockerfile" "$writer_context/Dockerfile"
-cp -a "$MAGNUM_GITOPS_REPO/magnum-driver" "$writer_context/magnum-driver"
-cp -a "$MAGNUM_GITOPS_REPO/repository-writer" "$writer_context/repository-writer"
-mkdir -p "$writer_context/vendor/capi-helm-charts"
-cp -a "$MAGNUM_GITOPS_REPO/vendor/capi-helm-charts/openstack-cluster" "$writer_context/vendor/capi-helm-charts/openstack-cluster"
-build_context magnum-capi-repository-writer "$writer_context" "$REGISTRY/magnum-capi-repository-writer:source-$BUILD_ID"
-
 # Build the VPC binaries from the locked Git checkout, then package only the
 # binaries in digest-pinned runtime images.
 (cd "$VPC_CONTROL_PLANE_REPO" && CGO_ENABLED=0 GOOS=linux go build -trimpath -o "$WORK_DIR/manager" ./cmd/main.go)
 (cd "$VPC_CONTROL_PLANE_REPO" && CGO_ENABLED=0 GOOS=linux go build -trimpath -o "$WORK_DIR/apiserver" ./cmd/apiserver)
-for item in manager:vpc-control-plane:manager-runtime apiserver:vpc-facade:apiserver-runtime; do
+(cd "$VPC_CONTROL_PLANE_REPO" && CGO_ENABLED=0 GOOS=linux go build -trimpath -o "$WORK_DIR/metadata-attestor" ./cmd/metadata-attestor)
+(cd "$VPC_CONTROL_PLANE_REPO" && CGO_ENABLED=0 GOOS=linux go build -trimpath -o "$WORK_DIR/endpoint-agent" ./cmd/endpoint-agent)
+for item in manager:vpc-control-plane:manager-runtime apiserver:vpc-facade:apiserver-runtime metadata-attestor:vpc-metadata-attestor:metadata-attestor-runtime endpoint-agent:vpc-endpoint-agent:endpoint-agent-runtime; do
   IFS=: read -r binary image runtime <<<"$item"
   context="$WORK_DIR/$image"; mkdir -p "$context/dist"
   cp "$WORK_DIR/$binary" "$context/dist/$binary"

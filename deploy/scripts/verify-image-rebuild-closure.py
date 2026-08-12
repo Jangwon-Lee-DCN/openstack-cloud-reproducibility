@@ -10,12 +10,21 @@ required = {
     "aodh", "ceilometer", "gnocchi", "keystone-oidc", "keycloak",
     "neutron-fwaas", "octavia-ovn", "magnum-capi",
     "magnum-capi-gitops", "magnum-capi-repository-writer",
-    "vpc-control-plane", "vpc-facade", "horizon-complete",
+    "vpc-control-plane", "vpc-facade", "vpc-metadata-attestor", "vpc-endpoint-agent", "horizon-complete",
     "project-facade", "capo-controller",
 }
 missing = sorted(name for name in required if name not in build)
 if missing:
     raise SystemExit("build-images.sh lacks source builders: " + ", ".join(missing))
+
+early_exit = build.index('  echo "Selected source builds completed.')
+writer_call = build.index("selected magnum-capi-repository-writer && build_magnum_repository_writer")
+if writer_call > early_exit:
+    raise SystemExit("selective rebuild exits before building the Magnum repository writer")
+vpc_selective_guard = build.index('if [[ -n "$BUILD_COMPONENTS" ]]; then', build.index("build_vpc_git_component()"))
+first_vpc_build = build.index("selected vpc-control-plane && build_vpc_git_component")
+if not vpc_selective_guard < first_vpc_build < early_exit:
+    raise SystemExit("VPC Git-context builders are not confined to selective rebuild mode")
 
 bootstrap_dockerfiles = [
     root / "images/horizon-complete/Dockerfile",

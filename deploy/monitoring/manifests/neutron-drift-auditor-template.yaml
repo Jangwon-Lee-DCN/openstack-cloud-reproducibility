@@ -7,7 +7,7 @@ kind: Role
 metadata: {name: vpc-neutron-drift-auditor, namespace: __PROJECT_NAMESPACE__}
 rules:
 - apiGroups: [vpc.dcn.ssu.ac.kr]
-  resources: [securitygroups, elasticips, natgateways]
+  resources: [securitygroups, elasticips, natgateways, internetgateways, loadbalancers, vpcendpoints, privatednszones, flowlogconfigs, networkinterfaces]
   verbs: [get, list]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -32,7 +32,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: audit
-            image: quay.io/airshipit/openstack-client:2025.1-ubuntu_noble
+            image: quay.io/airshipit/openstack-client@sha256:91fc5934a802c62827c9fec208027c79e66226fd9b86cab20a5d933ed2879b62
             command: [python3, /opt/audit/audit.py]
             env:
             - {name: PROJECT_NAMESPACE, value: __PROJECT_NAMESPACE__}

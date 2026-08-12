@@ -14,8 +14,8 @@ namespace=$1
 resource=$2
 name=$3
 case "$resource" in
-  securitygroup|elasticip|natgateway) ;;
-  *) echo "resource must be securitygroup, elasticip, or natgateway" >&2; exit 2 ;;
+  securitygroup|elasticip|natgateway|internetgateway|loadbalancer|vpcendpoint|privatednszone|flowlogconfig|networkinterface) ;;
+  *) echo "unsupported resource; use a VPC controller-owned singular resource name" >&2; exit 2 ;;
 esac
 
 kubectl -n "$namespace" annotate "$resource" "$name" \

@@ -11,6 +11,23 @@ for deployment in vpc-control-plane-controller-manager vpc-facade opa-pilot; do
   test "$(kubectl -n "$NAMESPACE" get deployment "$deployment" -o jsonpath='{.status.readyReplicas}')" = 2
   test "$(kubectl -n "$NAMESPACE" get pods -l "${selectors[$deployment]}" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2
 done
+for crd in connectivityprobes.vpc.dcn.ssu.ac.kr vpcendpoints.vpc.dcn.ssu.ac.kr flowlogconfigs.vpc.dcn.ssu.ac.kr; do
+  kubectl get crd "$crd" >/dev/null
+done
+for deployment in vpc-control-plane-controller-manager vpc-facade; do
+  image=$(kubectl -n "$NAMESPACE" get deployment "$deployment" -o jsonpath='{.spec.template.spec.containers[0].image}')
+  [[ "$image" == *@sha256:* ]] || { echo "$deployment image is not digest-pinned" >&2; exit 1; }
+done
+manager_args=$(kubectl -n "$NAMESPACE" get deployment vpc-control-plane-controller-manager -o jsonpath='{.spec.template.spec.containers[0].args}')
+facade_args=$(kubectl -n "$NAMESPACE" get deployment vpc-facade -o jsonpath='{.spec.template.spec.containers[0].args}')
+expected_endpoint_cidrs=${VPC_ENDPOINT_SERVICE_CIDRS:-192.168.21.0/24}
+[[ "$manager_args" == *"--vpc-endpoint-service-cidrs=${expected_endpoint_cidrs}"* ]]
+[[ "$facade_args" == *"--vpc-endpoint-service-cidrs=${expected_endpoint_cidrs}"* ]]
+[[ "$facade_args" == *"--availability-zones=rack-1,rack-2,rack-3"* ]]
+kubectl -n openstack get secret vpc-facade-service-credentials >/dev/null
+kubectl -n openstack get secret vpc-endpoint-binding-credentials >/dev/null
+kubectl auth can-i --as=system:serviceaccount:vpc-control-plane-system:vpc-facade get secret/vpc-facade-service-credentials -n openstack | grep -qx yes
+kubectl auth can-i --as=system:serviceaccount:vpc-control-plane-system:vpc-control-plane-controller-manager get secret/vpc-endpoint-binding-credentials -n openstack | grep -qx yes
 test "$(kubectl -n "$NAMESPACE" get configmap opa-vpc-policy-v4 -o jsonpath='{.metadata.labels.app\.kubernetes\.io/version}')" = vpc-authz-v4
 test "$(kubectl -n "$NAMESPACE" get configmap vpc-facade-opa-enforcement -o jsonpath='{.data.classes}')" = read,project-write,network-sharing,security-policy
 
