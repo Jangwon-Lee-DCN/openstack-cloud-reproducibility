@@ -99,10 +99,34 @@ source = source.replace(
     "                    cluster.cluster_template.master_lb_enabled\n"
     "                ),\n",
 )
+source = source.replace(
+    '        true_conditions = {\n'
+    '            cond["type"]\n'
+    '            for cond in capi_cluster.get("status", {}).get("conditions", [])\n'
+    '            if cond["status"] == "True"\n'
+    '        }\n',
+    '        status = capi_cluster.get("status", {})\n'
+    '        conditions = list(status.get("conditions", []))\n'
+    '        # Cluster API v1.11 exposes the legacy Ready and\n'
+    '        # ControlPlaneReady conditions under status.deprecated.v1beta1.\n'
+    '        # Retain compatibility until magnum-capi-helm consumes the new\n'
+    '        # Available/ControlPlaneAvailable condition contract.\n'
+    '        conditions.extend(\n'
+    '            status.get("deprecated", {}).get("v1beta1", {}).get(\n'
+    '                "conditions", []\n'
+    '            )\n'
+    '        )\n'
+    '        true_conditions = {\n'
+    '            cond["type"] for cond in conditions\n'
+    '            if cond["status"] == "True"\n'
+    '        }\n',
+)
 if "cluster.cluster_template.master_lb_enabled" not in source:
     raise SystemExit("master_lb_enabled patch did not apply")
 if '"infrastructureCloudName": "openstack-capo"' not in source:
     raise SystemExit("infrastructure cloud-name patch did not apply")
+if 'status.get("deprecated", {}).get("v1beta1", {})' not in source:
+    raise SystemExit("Cluster API v1beta1 compatibility patch did not apply")
 driver.write_text(source)
 
 wsgi = Path("/var/lib/openstack/bin/magnum-api-wsgi")
