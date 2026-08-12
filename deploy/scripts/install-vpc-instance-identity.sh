@@ -18,7 +18,9 @@ test -f "$VPC_REPO/config/production/metadata-attestor.yaml"
 git -C "$VPC_REPO" diff --quiet && git -C "$VPC_REPO" diff --cached --quiet || { echo "refusing identity cutover from dirty VPC source" >&2; exit 1; }
 locked_revision=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["spec"]["sourceRevision"])' "$IMAGE_LOCK")
 locked_image=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["spec"].get("metadataAttestorImage", ""))' "$IMAGE_LOCK")
-[[ $(git -C "$VPC_REPO" rev-parse HEAD) == "$locked_revision" && "$ATTESTOR_IMAGE" == "$locked_image" ]] || { echo "metadata attestor image/source does not match the production VPC image lock" >&2; exit 1; }
+git -C "$VPC_REPO" merge-base --is-ancestor "$locked_revision" HEAD &&
+  git -C "$VPC_REPO" diff --quiet "$locked_revision" HEAD -- . ':(exclude)config/production/kustomization.yaml' &&
+  [[ "$ATTESTOR_IMAGE" == "$locked_image" ]] || { echo "metadata attestor image/source does not match the production VPC image lock" >&2; exit 1; }
 kubectl create namespace vpc-control-plane-system --dry-run=client -o yaml | kubectl apply -f -
 
 # Reuse an existing VPC identity key on rerun, otherwise generate it. Extract
