@@ -27,7 +27,7 @@ COPY --from=helm /usr/bin/helm /usr/local/bin/helm
 COPY --from=tools /out/kpt /out/porchctl /usr/local/bin/
 WORKDIR /app
 COPY magnum-driver/ /app/magnum-driver/
-COPY repository-writer/server.py /app/repository-writer/server.py
+COPY --chmod=0644 repository-writer/server.py /app/repository-writer/server.py
 COPY vendor/capi-helm-charts/openstack-cluster/ /app/vendor/capi-helm-charts/openstack-cluster/
 USER 65532:65532
 EXPOSE 8080
