@@ -3,6 +3,8 @@ set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT="$(cd "${ROOT}/../../.." && pwd)"
+readonly TEMPO_VALUES_FILE="${TEMPO_VALUES_FILE:-${ROOT}/values/tempo-distributed.yaml}"
+readonly PUSHGATEWAY_STORAGE_CLASS="${PUSHGATEWAY_STORAGE_CLASS:-rook-ceph-block}"
 
 for command_name in kubectl helm sops jq curl; do
   command -v "${command_name}" >/dev/null
@@ -72,7 +74,7 @@ helm upgrade --install prometheus-pushgateway \
   -n monitoring \
   --set serviceMonitor.enabled=true \
   --set persistentVolume.enabled=true \
-  --set persistentVolume.storageClass=rook-ceph-block \
+  --set persistentVolume.storageClass="${PUSHGATEWAY_STORAGE_CLASS}" \
   --set persistentVolume.size=2Gi \
   --set nodeSelector.openstack-control-plane=enabled \
   --set 'tolerations[0].key=node-role.kubernetes.io/control-plane' \
@@ -99,7 +101,7 @@ for _ in $(seq 1 60); do
 done
 
 helm upgrade --install tempo grafana/tempo-distributed --version 1.61.3 \
-  -n monitoring -f "${ROOT}/values/tempo-distributed.yaml" \
+  -n monitoring -f "${TEMPO_VALUES_FILE}" \
   --wait --timeout 20m
 
 helm upgrade --install opentelemetry-collector \
