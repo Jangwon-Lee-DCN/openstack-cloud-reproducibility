@@ -19,6 +19,12 @@ configured=$(kubectl -n openstack get secret neutron-ovn-metadata-agent-default 
 [[ "$configured" == vpc-metadata-attestor.openstack.svc.cluster.local ]] || { echo "OVN metadata agent is not using the attestor" >&2; exit 1; }
 
 kubectl -n openstack get networkpolicy vpc-metadata-attestor-ingress >/dev/null
+# A normal readiness probe cannot detect policy rejection of hostNetwork
+# clients. Prove the exact metadata-agent-to-attestor path on every node.
+for pod in $(kubectl -n openstack get pod -l application=neutron,component=ovn-metadata-agent -o name); do
+  kubectl -n openstack exec "$pod" -c neutron-ovn-metadata-agent -- python3 -c \
+    'import socket; s=socket.create_connection(("vpc-metadata-attestor.openstack.svc.cluster.local",8775),5); s.close()'
+done
 kubectl -n vpc-control-plane-system get networkpolicy vpc-facade-default-deny >/dev/null
 automount=$(kubectl -n openstack get deployment "$deployment" -o jsonpath='{.spec.template.spec.automountServiceAccountToken}')
 [[ "$automount" == false ]] || { echo "$deployment must not mount a Kubernetes API token" >&2; exit 1; }
