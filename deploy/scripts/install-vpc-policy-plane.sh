@@ -46,7 +46,12 @@ import sys, yaml
 documents=[item for item in yaml.safe_load_all(open(sys.argv[1], encoding="utf-8")) if item]
 lock=yaml.safe_load(open(sys.argv[2], encoding="utf-8"))["spec"]
 crds={item.get("metadata",{}).get("name") for item in documents if item.get("kind")=="CustomResourceDefinition"}
-required={"connectivityprobes.vpc.dcn.ssu.ac.kr","vpcendpoints.vpc.dcn.ssu.ac.kr","flowlogconfigs.vpc.dcn.ssu.ac.kr"}
+required={
+  "connectivityprobes.vpc.dcn.ssu.ac.kr", "vpcendpoints.vpc.dcn.ssu.ac.kr",
+  "vpcendpointservices.vpc.dcn.ssu.ac.kr", "flowlogconfigs.vpc.dcn.ssu.ac.kr",
+  "ipampools.vpc.dcn.ssu.ac.kr", "ipamallocations.vpc.dcn.ssu.ac.kr",
+  "routeservers.vpc.dcn.ssu.ac.kr", "trafficmirrorsessions.vpc.dcn.ssu.ac.kr",
+}
 if not required <= crds: raise SystemExit(f"production render lacks CRDs: {sorted(required-crds)}")
 images={item["metadata"]["name"]:item["spec"]["template"]["spec"]["containers"][0]["image"] for item in documents if item.get("kind")=="Deployment" and item["metadata"]["name"] in ("vpc-control-plane-controller-manager","vpc-facade")}
 expected={"vpc-control-plane-controller-manager":lock["controllerImage"],"vpc-facade":lock["facadeImage"]}
