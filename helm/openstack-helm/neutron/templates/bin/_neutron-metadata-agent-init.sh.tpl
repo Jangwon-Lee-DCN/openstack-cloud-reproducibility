@@ -16,7 +16,12 @@ limitations under the License.
 
 set -ex
 
+# The UNIX socket is created through a host-privileged helper and can therefore
+# carry the host's neutron UID rather than the container image UID.  Keep the
+# parent searchable so the unprivileged OVN metadata agent and HAProxy can both
+# connect after a restart or a new network is provisioned.
 chown ${NEUTRON_USER_UID} /var/lib/neutron/openstack-helm
+chmod 0755 /var/lib/neutron/openstack-helm
 {{- if (has "ovn" .Values.network.backend) }}
 chown ${NEUTRON_USER_UID} /run/openvswitch/db.sock
 {{- end }}

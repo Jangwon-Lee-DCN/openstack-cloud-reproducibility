@@ -34,6 +34,10 @@ conf:
       default_availability_zones: ""
       global_physnet_mtu: 1500
       router_distributed: true
+      # Host-side privsep creates this socket with the host neutron UID, while
+      # the container uses the image UID. Permit the OVN metadata proxy to
+      # connect across that intentional UID boundary.
+      metadata_proxy_socket_mode: all
       service_plugins: ovn-router,firewall_v2,log
     service_providers:
       service_provider: FIREWALL_V2:fwaas_db:neutron_fwaas.services.firewall.service_drivers.ovn.firewall_l3_driver.OVNFwaasDriver:default
