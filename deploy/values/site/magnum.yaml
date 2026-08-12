@@ -3,14 +3,14 @@ images:
   tags:
     bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
-    magnum_db_sync: registry.dcn.ssu.ac.kr/openstack/magnum@sha256:b592f160832a173743d2acb6d2b4e5896a8775aef271c81e50cfcd23cb70c8c3
+    magnum_db_sync: registry.dcn.ssu.ac.kr/openstack/magnum:source-04a74060e973@sha256:1d95033814dc30a28b7dcf7fa2aff715b990588aa9504fb1b588061e977dc096
     db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
     ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
-    magnum_api: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops@sha256:31185d4d099904374f65ed51c6562e37f07de85002a7961c86cefe9d64d74d11
-    magnum_conductor: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops@sha256:31185d4d099904374f65ed51c6562e37f07de85002a7961c86cefe9d64d74d11
+    magnum_api: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops:source-04a74060e973@sha256:2e08daaa44bf6ee79a8bc9edefd72f62d90cff3a9bf8194d3502aaa1c0fd5b29
+    magnum_conductor: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops:source-04a74060e973@sha256:2e08daaa44bf6ee79a8bc9edefd72f62d90cff3a9bf8194d3502aaa1c0fd5b29
     dep_check: quay.io/airshipit/kubernetes-entrypoint:latest-ubuntu_noble
 
 labels:
