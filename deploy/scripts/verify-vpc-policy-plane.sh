@@ -11,7 +11,15 @@ for deployment in vpc-control-plane-controller-manager vpc-facade opa-pilot; do
   test "$(kubectl -n "$NAMESPACE" get deployment "$deployment" -o jsonpath='{.status.readyReplicas}')" = 2
   test "$(kubectl -n "$NAMESPACE" get pods -l "${selectors[$deployment]}" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2
 done
-for crd in connectivityprobes.vpc.dcn.ssu.ac.kr vpcendpoints.vpc.dcn.ssu.ac.kr flowlogconfigs.vpc.dcn.ssu.ac.kr; do
+for crd in \
+  connectivityprobes.vpc.dcn.ssu.ac.kr \
+  vpcendpoints.vpc.dcn.ssu.ac.kr \
+  vpcendpointservices.vpc.dcn.ssu.ac.kr \
+  flowlogconfigs.vpc.dcn.ssu.ac.kr \
+  ipampools.vpc.dcn.ssu.ac.kr \
+  ipamallocations.vpc.dcn.ssu.ac.kr \
+  routeservers.vpc.dcn.ssu.ac.kr \
+  trafficmirrorsessions.vpc.dcn.ssu.ac.kr; do
   kubectl get crd "$crd" >/dev/null
 done
 for deployment in vpc-control-plane-controller-manager vpc-facade; do
@@ -29,7 +37,7 @@ kubectl -n openstack get secret vpc-endpoint-binding-credentials >/dev/null
 kubectl auth can-i --as=system:serviceaccount:vpc-control-plane-system:vpc-facade get secret/vpc-facade-service-credentials -n openstack | grep -qx yes
 kubectl auth can-i --as=system:serviceaccount:vpc-control-plane-system:vpc-control-plane-controller-manager get secret/vpc-endpoint-binding-credentials -n openstack | grep -qx yes
 test "$(kubectl -n "$NAMESPACE" get configmap opa-vpc-policy-v4 -o jsonpath='{.metadata.labels.app\.kubernetes\.io/version}')" = vpc-authz-v4
-test "$(kubectl -n "$NAMESPACE" get configmap vpc-facade-opa-enforcement -o jsonpath='{.data.classes}')" = read,project-write,network-sharing,security-policy
+test "$(kubectl -n "$NAMESPACE" get configmap vpc-facade-opa-enforcement -o jsonpath='{.data.classes}')" = read,project-write,network-sharing,security-policy,cross-domain-peering
 
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
 kubectl -n "$NAMESPACE" port-forward service/opa-pilot "$port:8181" >/dev/null 2>&1 &
