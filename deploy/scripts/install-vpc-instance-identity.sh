@@ -45,11 +45,11 @@ python3 - "$VPC_REPO/config/production/metadata-attestor.yaml" "$ATTESTOR_IMAGE"
 import sys, yaml
 docs=list(yaml.safe_load_all(open(sys.argv[1])))
 for doc in docs:
-    if doc and doc.get("kind") == "Deployment":
+    if doc and doc.get("kind") == "DaemonSet":
         doc["spec"]["template"]["spec"]["containers"][0]["image"] = sys.argv[2]
 yaml.safe_dump_all(docs, sys.stdout, sort_keys=False)
 PY
-kubectl -n openstack rollout status deployment/vpc-metadata-attestor --timeout=5m
+kubectl -n openstack rollout status daemonset/vpc-metadata-attestor --timeout=10m
 
 # Cut over only after both proxy replicas are Ready. --reuse-values preserves
 # the current SOPS-derived release values; the same override is conditionally

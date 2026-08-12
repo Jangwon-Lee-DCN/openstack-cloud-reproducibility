@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-deployment=vpc-metadata-attestor
-desired=$(kubectl -n openstack get deployment "$deployment" -o jsonpath='{.spec.replicas}')
-ready=$(kubectl -n openstack get deployment "$deployment" -o jsonpath='{.status.readyReplicas}')
-[[ "$desired" -ge 2 && "$ready" == "$desired" ]] || { echo "$deployment is not fully ready" >&2; exit 1; }
-image=$(kubectl -n openstack get deployment "$deployment" -o jsonpath='{.spec.template.spec.containers[0].image}')
-[[ "$image" == *@sha256:* ]] || { echo "$deployment image is not digest-pinned" >&2; exit 1; }
+daemonset=vpc-metadata-attestor
+desired=$(kubectl -n openstack get daemonset "$daemonset" -o jsonpath='{.status.desiredNumberScheduled}')
+ready=$(kubectl -n openstack get daemonset "$daemonset" -o jsonpath='{.status.numberReady}')
+[[ "$desired" -ge 6 && "$ready" == "$desired" ]] || { echo "$daemonset is not fully ready" >&2; exit 1; }
+image=$(kubectl -n openstack get daemonset "$daemonset" -o jsonpath='{.spec.template.spec.containers[0].image}')
+[[ "$image" == *@sha256:* ]] || { echo "$daemonset image is not digest-pinned" >&2; exit 1; }
 
 attestor_key=$(kubectl -n openstack get secret vpc-metadata-attestor-secrets -o jsonpath='{.data.vpc-instance-identity-hmac-secret}')
 facade_key=$(kubectl -n vpc-control-plane-system get secret vpc-instance-identity -o jsonpath='{.data.hmac-secret}')
@@ -26,6 +26,6 @@ for pod in $(kubectl -n openstack get pod -l application=neutron,component=ovn-m
     'import socket; s=socket.create_connection(("vpc-metadata-attestor.openstack.svc.cluster.local",8775),5); s.close()'
 done
 kubectl -n vpc-control-plane-system get networkpolicy vpc-facade-default-deny >/dev/null
-automount=$(kubectl -n openstack get deployment "$deployment" -o jsonpath='{.spec.template.spec.automountServiceAccountToken}')
-[[ "$automount" == false ]] || { echo "$deployment must not mount a Kubernetes API token" >&2; exit 1; }
+automount=$(kubectl -n openstack get daemonset "$daemonset" -o jsonpath='{.spec.template.spec.automountServiceAccountToken}')
+[[ "$automount" == false ]] || { echo "$daemonset must not mount a Kubernetes API token" >&2; exit 1; }
 echo "vpc-instance-identity-verification-ok ready=${ready}/${desired} image=${image}"
