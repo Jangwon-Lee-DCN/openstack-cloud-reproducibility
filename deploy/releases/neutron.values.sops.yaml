@@ -27,6 +27,12 @@ conf:
             network_log:
                 rate_limit: ENC[AES256_GCM,data:nFzT,iv:WRv9Qrv/ySwCpCyyiiN0e9kb8/4O7ZhIp2XrA7L+c7Y=,tag:FBTnP+ATOl4AZTNVgEH6Tg==,type:float]
                 burst_limit: ENC[AES256_GCM,data:ou8=,iv:sSKFmKNpHQMK2Pgeo/yN6JOmcH9cwkpmDQ5BW5ksxQo=,tag:Ea1YuClDhqRM06nptgSNnw==,type:float]
+    metadata_agent:
+        DEFAULT:
+            metadata_proxy_shared_secret: ENC[AES256_GCM,data:lKUO2vUIPKIiiqjeAyYED2uArbs2aqfzIaYrk5OV46awAxv1sdmJXL0xkFu9nzJj+bQdmTc23wnbEjghFqjFrQ==,iv:YueBOXReDJcK1ejNYPVNzSoDGwBrw0b2JCuL2IGqmRg=,tag:GfTADnngVktp8O0LOEjr0Q==,type:str]
+    ovn_metadata_agent:
+        DEFAULT:
+            metadata_proxy_shared_secret: ENC[AES256_GCM,data:Uvcfd3Vou/V74WOalkf6pHecGekV3gvJVS7XWxBAM9PyNjrhQ+MrZsijk8BviCmqE+NqdyFQxsKAriAhNNqtoA==,iv:Dv2ax6w+n/zgWUBvdI6R8MTgBuGqeZdnNkUOhMw1Ahs=,tag:sdR99cxE0bMbT0L0hmxbMw==,type:str]
 endpoints:
     identity:
         auth:
@@ -124,7 +130,7 @@ sops:
             BCWTToSC6ecLUPsq8bCaYfLtShlQ9gW+4cJjyHImnteuN9H+vBwz8A==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-30T17:10:15Z"
-    mac: ENC[AES256_GCM,data:+E5sAdiLDlSh11duJY1mpyJZdg3v4825FvfganCdJyKKCoKRAx//zdcIDCMo3GOe+WXbEDui8ctXQXKkveIxhdPMe+KlD1bv3zyi9O/UG8fsL4qwhzJi4crkQEjmfEbaRFdaXe7tjUpxGKPIcPuHJ/FplBJd8NW7tr/2Gqrky3w=,iv:f0Hjn7MESwTuIcVNcfnK0L+TwgyOuclw9BkE4HOyRK4=,tag:ntTBF39SiSdEb9IWCSERtA==,type:str]
+    lastmodified: "2026-08-12T10:52:44Z"
+    mac: ENC[AES256_GCM,data:lXSoY8sd2k94VXQcwAISPC9cge6HTeYgWsG2PVTExl3NGna2o6B+mDggI9UBRpG4940FRZfmZQLbi8V/hRjv5QdFFwenUsacNobCtlnOJd8dpsl+8PFlPjqNPp0HlnM5JeefDp9OWTropaUkmEM5Vd7sCK/58viEh9ZkNfFGvcY=,iv:AQJMYfp0zXXlBt9KrmiVsjqAGotwku+MVt5idmmhSs8=,tag:H7KINQAJv+dDdaY+0jKsRg==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

@@ -9,6 +9,8 @@ conf:
             images_type: ENC[AES256_GCM,data:jIfQ,iv:OLuht1b5tDjj+JE7GRJMMK/zrF9FL/pPxkLBPo7sT/U=,tag:ZftmaEqJCm3XIuLdGE3PEA==,type:str]
             rbd_secret_uuid: ENC[AES256_GCM,data:gXVbD20D9bxctrROi3oDhsRh+1fJlydexSqF0HWGoiebzGJH,iv:gOLiVWkZWf/HEdpI25Kny/qhpSJMIg6mAQJ6E9VnhIw=,tag:qkKGxWh45O+sds9PjfaJzg==,type:str]
             rbd_user: ENC[AES256_GCM,data:Cgs+/Nox,iv:6hyCFJRx/49tPH9aOGUQ9zHOXspUgE+sLNb3nV3YsSM=,tag:EP3pv/LmDr3qxHhs7ip7Bg==,type:str]
+        neutron:
+            metadata_proxy_shared_secret: ENC[AES256_GCM,data:sDH5mnDellnEpxamrBBluKZzH96b/UOx8nZLH+1Rz7pMB9++S5/IgMFDzD/7fxfXX7u12ZBCZ2Rcn1676wREcQ==,iv:JyPqDerqcQtV24sdn1surEGtWiRbqXeIF+14kfmh8js=,tag:FAfpHmUEGMWi7FcSBzdTTQ==,type:str]
 endpoints:
     compute:
         host_fqdn_override:
@@ -146,7 +148,7 @@ sops:
             YMWFKLpRZjfnasXeNTHpgttkP+CWs7hEv/8zdfmrBEI5XXSf4qhhUg==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-26T10:29:38Z"
-    mac: ENC[AES256_GCM,data:k4JWRwaCjJ1puD+wxRgHg3CSzX9u6gTrsyw+/uAzfFdazGeyuXsn0lf5k/TY6CCAd1HAQqjsYEJXiwd+fK2QEClSlna1Tb1qPMEWjczLbpJOkP/vZ/qOf3BUhpW5tacCYTSbZgeRtTyycs9GXyIe8ynmb00xJWfvCptlCbURqmo=,iv:O604+dTkCVGY8HFzL0xdJaMqbnUQHcEV17xRZ0LUY9A=,tag:RGRx70/rNvbxjU6oA8A5fQ==,type:str]
+    lastmodified: "2026-08-12T10:52:44Z"
+    mac: ENC[AES256_GCM,data:80KqY/1PVXm/22beUcUm4d8s3hLp0lVaFPcCxDVnYqtJMedPhBSD4JCnXFdKGZCia9vXAWukX47hSEYSJYjDNL7T4XgJzNcPThLgsQHZZK9uGo3AfLPQym3/hNstiFZLEthkFhmKbwMJlFHZXuMtPY4T9p2H9qKMTtzWY80kPRY=,iv:PeaQnBZyOunrMDYDrqt5hJnlEuPZz5/8HMsa357XrQU=,tag:vEHVOWtaM6AEzYA0LW+5DQ==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3
