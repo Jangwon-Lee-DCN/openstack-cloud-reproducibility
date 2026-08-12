@@ -29,6 +29,7 @@ WORKDIR /app
 COPY magnum-driver/ /app/magnum-driver/
 COPY --chmod=0644 repository-writer/server.py /app/repository-writer/server.py
 COPY vendor/capi-helm-charts/openstack-cluster/ /app/vendor/capi-helm-charts/openstack-cluster/
+RUN chmod -R a+rX /app
 USER 65532:65532
 EXPOSE 8080
 ENTRYPOINT ["python3", "/app/repository-writer/server.py"]
