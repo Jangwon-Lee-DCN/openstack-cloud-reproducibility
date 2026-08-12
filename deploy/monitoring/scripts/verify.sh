@@ -30,7 +30,7 @@ for query in \
   'vpc_reconcile_duration_seconds_count or vector(0)' \
   'vpc_network_interface_attachment_operation_seconds_count or vector(0)' \
   'vpc_network_interface_orphans or vector(0)' \
-  'openstack_synthetic_success'; do
+  'openstack_synthetic_success or vector(0)'; do
   result="$(curl --fail --silent --get \
     --data-urlencode "query=${query}" \
     "http://${prometheus_ip}:9090/api/v1/query")"

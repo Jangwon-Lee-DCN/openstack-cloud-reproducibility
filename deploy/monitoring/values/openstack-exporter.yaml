@@ -1,6 +1,12 @@
 images:
   tags:
     prometheus_openstack_exporter: ghcr.io/openstack-exporter/openstack-exporter:1.7.0
+labels:
+  # The chart does not expose Job tolerations; run the short-lived Keystone
+  # bootstrap on any Linux node instead of the tainted control-plane nodes.
+  job:
+    node_selector_key: kubernetes.io/os
+    node_selector_value: linux
 pod:
   replicas:
     prometheus_openstack_exporter: 2

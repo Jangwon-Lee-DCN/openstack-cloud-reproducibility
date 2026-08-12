@@ -2,9 +2,10 @@
 set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly REPO_ROOT="$(cd "${ROOT}/../../.." && pwd)"
+readonly REPO_ROOT="$(cd "${ROOT}/../.." && pwd)"
 readonly TEMPO_VALUES_FILE="${TEMPO_VALUES_FILE:-${ROOT}/values/tempo-distributed.yaml}"
 readonly PUSHGATEWAY_STORAGE_CLASS="${PUSHGATEWAY_STORAGE_CLASS:-rook-ceph-block}"
+readonly PUSHGATEWAY_NODE_SELECTOR="${PUSHGATEWAY_NODE_SELECTOR-openstack-control-plane=enabled}"
 
 for command_name in kubectl helm sops jq curl; do
   command -v "${command_name}" >/dev/null
@@ -34,6 +35,11 @@ admin_password="$(kubectl -n openstack get secret keystone-keystone-admin \
 exporter_password="$(kubectl -n openstack get secret \
   prometheus-openstack-exporter-keystone-user \
   -o jsonpath='{.data.OS_PASSWORD}' | base64 -d)"
+
+# The chart renders its Keystone bootstrap as an immutable Job. Remove only
+# the completed release-owned Job before an idempotent Helm reconciliation.
+kubectl -n openstack delete job prometheus-openstack-exporter-ks-user \
+  --ignore-not-found --wait=true
 
 helm upgrade --install prometheus-openstack-exporter \
   "${REPO_ROOT}/helm/packages/upstream/prometheus-openstack-exporter-2026.1.0.tgz" \
@@ -69,6 +75,10 @@ helm upgrade --install prometheus-mysql-exporter \
   -n monitoring -f "${ROOT}/values/mysql-exporter.yaml" \
   --wait --timeout 10m
 
+pushgateway_scheduling=()
+if [[ -n "${PUSHGATEWAY_NODE_SELECTOR}" ]]; then
+  pushgateway_scheduling+=(--set-string "nodeSelector.${PUSHGATEWAY_NODE_SELECTOR%%=*}=${PUSHGATEWAY_NODE_SELECTOR#*=}")
+fi
 helm upgrade --install prometheus-pushgateway \
   prometheus-community/prometheus-pushgateway --version 3.7.0 \
   -n monitoring \
@@ -76,7 +86,7 @@ helm upgrade --install prometheus-pushgateway \
   --set persistentVolume.enabled=true \
   --set persistentVolume.storageClass="${PUSHGATEWAY_STORAGE_CLASS}" \
   --set persistentVolume.size=2Gi \
-  --set nodeSelector.openstack-control-plane=enabled \
+  "${pushgateway_scheduling[@]}" \
   --set 'tolerations[0].key=node-role.kubernetes.io/control-plane' \
   --set 'tolerations[0].operator=Exists' \
   --set 'tolerations[0].effect=NoSchedule' \
@@ -104,6 +114,8 @@ helm upgrade --install tempo grafana/tempo-distributed --version 1.61.3 \
   -n monitoring -f "${TEMPO_VALUES_FILE}" \
   --wait --timeout 20m
 
+helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update
+helm repo update open-telemetry
 helm upgrade --install opentelemetry-collector \
   open-telemetry/opentelemetry-collector --version 0.165.0 \
   -n monitoring -f "${ROOT}/values/otel-collector.yaml" \
