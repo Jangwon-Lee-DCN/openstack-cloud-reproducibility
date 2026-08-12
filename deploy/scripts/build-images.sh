@@ -38,7 +38,13 @@ mkdir -p "$(dirname "$RESULT_FILE")"
 : > "$RESULT_FILE"
 
 if [[ "$REGISTRY_SECRET" == telemetry-harbor-push ]]; then
-  sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" | kubectl apply -f -
+  # Harbor is itself installed by the platform. Derive the build credential
+  # from its live admin Secret so a rotated password cannot leave a stale
+  # encrypted dockerconfig blocking a reproducible rebuild. No credential is
+  # written to disk or printed.
+  kubectl -n harbor get secret harbor-admin-password -o json |
+    "$PYTHON_BINARY" -c 'import base64,json,sys; s=json.load(sys.stdin); p=base64.b64decode(s["data"]["HARBOR_ADMIN_PASSWORD"]).decode(); cfg={"auths":{"registry.dcn.ssu.ac.kr":{"username":"admin","password":p,"auth":base64.b64encode(("admin:"+p).encode()).decode()}}}; out={"apiVersion":"v1","kind":"Secret","metadata":{"name":sys.argv[1],"namespace":sys.argv[2]},"type":"kubernetes.io/dockerconfigjson","data":{".dockerconfigjson":base64.b64encode(json.dumps(cfg,separators=(",", ":")).encode()).decode()}}; print(json.dumps(out))' "$REGISTRY_SECRET" "$NAMESPACE" |
+    kubectl apply -f - >/dev/null
 fi
 
 selected() {
