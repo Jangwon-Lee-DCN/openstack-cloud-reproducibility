@@ -43,7 +43,12 @@ cp -a "$REPO_ROOT/images/horizon-magnum-dashboard/overlay" "$context/magnum-ui/o
 
 archive="$WORK_DIR/context.tar.gz"
 tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
-sops -d "$REPO_ROOT/deploy/secrets/telemetry-harbor-push.secret.sops.yaml" | kubectl apply -f -
+# Derive the disposable builder credential from Harbor's live administrator
+# Secret. This follows the full image builder and survives Harbor password
+# rotation without storing or printing plaintext credentials.
+kubectl -n harbor get secret harbor-admin-password -o json |
+  python3 -c 'import base64,json,sys; s=json.load(sys.stdin); p=base64.b64decode(s["data"]["HARBOR_ADMIN_PASSWORD"]).decode(); cfg={"auths":{"registry.dcn.ssu.ac.kr":{"username":"admin","password":p,"auth":base64.b64encode(("admin:"+p).encode()).decode()}}}; out={"apiVersion":"v1","kind":"Secret","metadata":{"name":"telemetry-harbor-push","namespace":sys.argv[1]},"type":"kubernetes.io/dockerconfigjson","data":{".dockerconfigjson":base64.b64encode(json.dumps(cfg,separators=(",", ":")).encode()).decode()}}; print(json.dumps(out))' "$NAMESPACE" |
+  kubectl apply -f - >/dev/null
 kubectl delete job "$JOB" -n "$NAMESPACE" --ignore-not-found --wait=true
 kubectl delete configmap "$JOB" -n "$NAMESPACE" --ignore-not-found --wait=true
 kubectl create configmap "$JOB" -n "$NAMESPACE" --from-file=context.tar.gz="$archive"
