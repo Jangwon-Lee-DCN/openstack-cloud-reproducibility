@@ -110,6 +110,15 @@ function start () {
 }
 
 function stop () {
+  # Keep serving while Kubernetes removes this Pod from Service/Gateway
+  # endpoints.  Without this drain, ClientIP-affine clients can be sent to an
+  # Apache process that has already stopped.
+  sleep {{ .Values.conf.software.apache2.shutdown_drain_seconds | default 10 }}
+  # The lifecycle hook runs in a new shell, unlike start(), so Apache's runtime
+  # variables must be loaded again before apachectl can locate its pid file.
+  if [ -f /etc/apache2/envvars ]; then
+    source /etc/apache2/envvars
+  fi
   {{ .Values.conf.software.apache2.binary }} -k graceful-stop
 }
 

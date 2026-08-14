@@ -71,6 +71,7 @@ conf:
     apache2:
       binary: apache2
       start_parameters: -DFOREGROUND
+      shutdown_drain_seconds: 10
       site_dir: /etc/apache2/sites-available
       conf_dir: /etc/apache2/conf-available
       mods_dir: /etc/apache2/mods-available

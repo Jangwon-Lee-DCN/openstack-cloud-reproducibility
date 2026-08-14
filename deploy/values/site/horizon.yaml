@@ -38,6 +38,11 @@ pod:
     disruption_budget:
       horizon:
         min_available: 2
+    # Allow endpoint withdrawal plus Apache's graceful worker shutdown to
+    # finish before kubelet sends SIGKILL during a rollout.
+    termination_grace_period:
+      horizon:
+        timeout: 60
   resources:
     enabled: true
     server:
