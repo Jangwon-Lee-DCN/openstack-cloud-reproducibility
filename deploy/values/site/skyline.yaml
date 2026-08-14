@@ -21,7 +21,7 @@ conf:
       debug: false
     openstack:
       interface_type: internal
-      default_region: RegionOne
+      default_region: seoul-ssu-1
       extension_mapping:
         load-balancer: octavia
       service_mapping:
@@ -31,10 +31,10 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
       skyline:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
   skyline:
     host_fqdn_override:

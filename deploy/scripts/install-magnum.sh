@@ -21,7 +21,7 @@ helm upgrade --install magnum "${chart}" \
   --namespace "${namespace}" \
   --create-namespace \
   -f "${site_values}" \
-  -f <(sops -d "${secret_values}") \
+  -f <(sops -d "${secret_values}" | "${root}/scripts/render-region-values.py") \
   -f "${runtime_values}" \
   --no-hooks \
   --timeout 15m
@@ -46,7 +46,7 @@ for item in "${hooks[@]}"; do
   helm template magnum "${chart}" \
     --namespace "${namespace}" \
     -f "${site_values}" \
-    -f <(sops -d "${secret_values}") \
+    -f <(sops -d "${secret_values}" | "${root}/scripts/render-region-values.py") \
     -f "${runtime_values}" \
     --show-only "${template}" |
     sed '/helm.sh\/hook:/d; /helm.sh\/hook-weight:/d' |
@@ -58,7 +58,7 @@ done
 helm upgrade magnum "${chart}" \
   --namespace "${namespace}" \
   -f "${site_values}" \
-  -f <(sops -d "${secret_values}") \
+  -f <(sops -d "${secret_values}" | "${root}/scripts/render-region-values.py") \
   -f "${runtime_values}" \
   --no-hooks \
   --wait \

@@ -28,6 +28,7 @@ helm upgrade kube-prometheus-stack \
 sops --decrypt "${ROOT}/secrets/mariadb-exporter.secret.sops.yaml" |
   kubectl apply -f -
 sops --decrypt "${ROOT}/secrets/openstack-exporter.secret.sops.yaml" |
+  "${REPO_ROOT}/deploy/scripts/render-region-values.py" |
   kubectl apply -f -
 
 admin_password="$(kubectl -n openstack get secret keystone-keystone-admin \

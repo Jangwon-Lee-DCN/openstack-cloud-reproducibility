@@ -122,7 +122,8 @@ install_release() {
   local -a value_args=()
   if [[ -n "$snapshot" ]]; then
     values="$WORK_DIR/$release.yaml"
-    sops -d "$REPO_ROOT/$snapshot" > "$values"
+    sops -d "$REPO_ROOT/$snapshot" |
+      "$REPO_ROOT/deploy/scripts/render-region-values.py" >"$values"
     value_args+=( -f "$values" )
   else
     [[ -n "$values_file" && -n "$secrets_file" ]] || {
@@ -130,7 +131,8 @@ install_release() {
       exit 1
     }
     values="$WORK_DIR/$release.secrets.yaml"
-    sops -d "$REPO_ROOT/$secrets_file" > "$values"
+    sops -d "$REPO_ROOT/$secrets_file" |
+      "$REPO_ROOT/deploy/scripts/render-region-values.py" >"$values"
     value_args+=( -f "$REPO_ROOT/$values_file" -f "$values" )
   fi
   # An unencrypted site file is always the final non-secret override. This
@@ -246,6 +248,11 @@ kubectl apply -f "$REPO_ROOT/deploy/manifests/project-facade.yaml"
 kubectl apply -f "$REPO_ROOT/deploy/manifests/project-facade-routes.yaml"
 kubectl -n openstack rollout status deployment/project-facade --timeout=5m
 "$REPO_ROOT/deploy/scripts/reconcile-project-facade-keystone.sh"
+
+# OpenStack-Helm charts may recreate endpoints while releases converge. Make
+# the single production region authoritative only after every service has
+# registered its catalog entries, then retire the historical endpoint sets.
+"$REPO_ROOT/deploy/scripts/reconcile-keystone-region.sh"
 
 "$REPO_ROOT/deploy/scripts/verify-barbican.sh"
 if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then

@@ -51,7 +51,7 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
   instance_ha:
     host_fqdn_override:

@@ -8,39 +8,11 @@ data:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    REGION=RegionOne-VM
-    BASE=https://internal.cloud.dcn.ssu.ac.kr
-
+    REGION=seoul-ssu-1
     openstack region show "${REGION}" >/dev/null 2>&1 ||
-      openstack region create --parent-region RegionOne \
-        --description "VM-routable OpenStack API endpoints" "${REGION}"
-
-    ensure_endpoint() {
-      service_type="$1"
-      url="$2"
-      service_id="$(openstack service show "${service_type}" -f value -c id)"
-      test -n "${service_id}"
-      endpoint_id="$(openstack endpoint list --service "${service_id}" \
-        --interface internal --region "${REGION}" -f value -c ID | head -n1)"
-      if test -n "${endpoint_id}"; then
-        openstack endpoint set --url "${url}" "${endpoint_id}"
-      else
-        openstack endpoint create --region "${REGION}" \
-          "${service_id}" internal "${url}"
-      fi
-    }
-
-    ensure_endpoint identity "${BASE}/identity/v3"
-    ensure_endpoint compute "${BASE}/compute/v2.1"
-    ensure_endpoint network "${BASE}/network"
-    ensure_endpoint image "${BASE}/image"
-    ensure_endpoint volumev3 "${BASE}/volume/v3/%(project_id)s"
-    ensure_endpoint orchestration "${BASE}/orchestration/v1/%(project_id)s"
-    ensure_endpoint load-balancer "${BASE}/load-balancer"
-    ensure_endpoint key-manager "${BASE}/key-manager"
-    ensure_endpoint container-infra "${BASE}/container-infra/v1"
-
-    echo "RegionOne-VM internal endpoint reconciliation completed."
+      openstack region create \
+        --description "Seoul SSU production region" "${REGION}"
+    echo "${REGION} region prerequisite reconciliation completed."
 ---
 apiVersion: batch/v1
 kind: Job

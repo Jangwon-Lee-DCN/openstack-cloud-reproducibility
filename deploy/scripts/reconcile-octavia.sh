@@ -39,7 +39,8 @@ secret_values=$(mktemp /tmp/octavia-values.XXXXXX.yaml)
 runtime_values=$(mktemp /tmp/octavia-runtime-values.XXXXXX.yaml)
 trap 'shred -u "${secret_values}" "${runtime_values}"' EXIT
 chmod 0600 "${secret_values}"
-sops -d "${SNAPSHOT}" >"${secret_values}"
+sops -d "${SNAPSHOT}" |
+  "${ROOT_DIR}/deploy/scripts/render-region-values.py" >"${secret_values}"
 "${ROOT_DIR}/deploy/scripts/generate-database-admin-override.py" \
   octavia "${runtime_values}"
 

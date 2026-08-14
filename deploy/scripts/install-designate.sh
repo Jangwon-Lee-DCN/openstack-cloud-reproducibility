@@ -24,7 +24,7 @@ helm upgrade --install powerdns \
   --namespace openstack \
   --timeout 15m \
   -f "$ROOT/releases/powerdns.site.yaml" \
-  -f <(sops -d "$ROOT/secrets/powerdns.values.sops.yaml") \
+  -f <(sops -d "$ROOT/secrets/powerdns.values.sops.yaml" | "$ROOT/scripts/render-region-values.py") \
   -f "$RUNTIME_VALUES"
 
 kubectl delete job powerdns-schema-4-9 --namespace openstack \
@@ -43,7 +43,7 @@ helm upgrade --install designate \
   --timeout 20m \
   --wait \
   -f "$ROOT/releases/designate.site.yaml" \
-  -f <(sops -d "$ROOT/secrets/designate.values.sops.yaml") \
+  -f <(sops -d "$ROOT/secrets/designate.values.sops.yaml" | "$ROOT/scripts/render-region-values.py") \
   -f "$RUNTIME_VALUES"
 
 # Reconcile the database-backed pool definition on upgrades as well as fresh

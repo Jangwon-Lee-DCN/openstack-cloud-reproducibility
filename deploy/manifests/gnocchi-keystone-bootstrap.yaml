@@ -66,11 +66,11 @@ spec:
                 fi
                 endpoint_id="$(
                   openstack endpoint list --service "${metric_service_id}" \
-                    --region RegionOne --interface "${interface}" \
+                    --region seoul-ssu-1 --interface "${interface}" \
                     -f value -c ID | head -n 1
                 )"
                 if [ -z "${endpoint_id}" ]; then
-                  openstack endpoint create --region RegionOne \
+                  openstack endpoint create --region seoul-ssu-1 \
                     "${metric_service_id}" "${interface}" "${url}" >/dev/null
                 else
                   openstack endpoint set --url "${url}" "${endpoint_id}"
@@ -84,4 +84,3 @@ spec:
           resources:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {memory: 512Mi}
-

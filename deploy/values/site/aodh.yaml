@@ -26,13 +26,13 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
         user_domain_name: Default
         project_domain_name: Default
       aodh:
         role: admin
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         username: aodh
         project_name: service
         user_domain_name: Default

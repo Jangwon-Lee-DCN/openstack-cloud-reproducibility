@@ -82,7 +82,7 @@ assert project_views.IndexView.table_classes[0]._meta.name == "tenants"
 # URL to origin-root /v3 and previously broke every Nova-backed owner panel.
 class IdentityProbeUser:
     service_catalog = []
-    services_region = "RegionOne-VM"
+    services_region = "seoul-ssu-1"
 class IdentityProbeRequest:
     user = IdentityProbeUser()
 assert api_base.url_for(IdentityProbeRequest(), "identity") == settings.OPENSTACK_KEYSTONE_URL

@@ -58,7 +58,7 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         username: admin
         project_name: admin
         user_domain_name: default
@@ -67,7 +67,7 @@ endpoints:
         # openstack-exporter 1.7.0 authenticates with a project-scoped token.
         # This dedicated role is granted only explicit read-only policy rules.
         role: monitoring
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         username: prometheus-openstack-exporter
         project_name: service
         user_domain_name: default

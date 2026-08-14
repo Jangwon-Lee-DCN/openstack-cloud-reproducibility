@@ -24,11 +24,13 @@ Install and verify:
 ./scripts/reconcile-catalog.sh
 ```
 
-The catalog reconciler creates a child region named `RegionOne-VM`. Existing
-`RegionOne/internal` ClusterIP endpoints remain unchanged so OpenStack service
-Pods are not forced to trust the temporary VM-facing CA. Magnum-generated
-workload credentials must select `RegionOne-VM` and include
-`openstack-internal-ca`.
+The catalog reconciler creates the single production region `seoul-ssu-1`.
+Phase 50 subsequently runs `deploy/scripts/reconcile-keystone-region.sh`,
+which consolidates public, admin, and cluster-local internal endpoints and
+disables every endpoint in the historical `RegionOne` and `RegionOne-VM`
+regions. Magnum-generated workload credentials select the new region and the
+public interface; Keystone cannot safely expose both cluster-local and
+VM-routed URLs as the same service's `internal` endpoint in one region.
 
 After DNS is configured, publish the service-catalog `internal` URLs using the
 paths documented in `docs/endpoints.md`.
