@@ -83,7 +83,7 @@ pages=(
   "object-storage|project/cloud_s3/|4.0"
   "vpc-list|project/vpcs/|7.0"
   "vpc-topology|project/vpc_topology/|5.0"
-  "vpc-launch|project/network_interfaces/instances/launch/|7.0"
+  "instance-launch|project/instances/launch-instance/|7.0"
 )
 
 failed=0

@@ -74,6 +74,7 @@ for name in (
     "horizon:admin:project_operations:index",
     "horizon:project:shares:index",
     "horizon:masakaridashboard:segments:index",
+    "horizon:project:instances:launch_instance",
 ):
     assert reverse(name).startswith("/horizon/")
 project = Horizon.get_dashboard("project")
@@ -98,12 +99,15 @@ assert str(identity.get_panel("projects").name) == "Projects & Members"
 assert str(identity.get_panel("users").name) == "User Accounts"
 from openstack_dashboard.dashboards.identity.projects import tabs as project_tabs
 from openstack_dashboard.dashboards.identity.projects import views as project_views
+from openstack_dashboard.dashboards.project.instances import tables as instance_tables
 from openstack_dashboard.api import base as api_base
 assert [tab.slug for tab in project_tabs.ProjectDetailTabs.tabs] == [
     "overview", "members", "groups", "quota_usage", "credentials", "health", "audit",
 ]
 assert len(project_views.IndexView.table_classes) == 1
 assert project_views.IndexView.table_classes[0]._meta.name == "tenants"
+assert instance_tables.LaunchLinkNG.url == "horizon:project:instances:launch_instance"
+assert "ajax-modal" in instance_tables.LaunchLinkNG.classes
 # Horizon must never feed the VM-facing, path-prefixed Identity catalog URL
 # back into generic keystoneauth token re-scoping. That client normalizes the
 # URL to origin-root /v3 and previously broke every Nova-backed owner panel.
