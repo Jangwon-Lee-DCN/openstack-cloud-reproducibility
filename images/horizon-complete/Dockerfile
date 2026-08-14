@@ -20,7 +20,7 @@ COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
 COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/platform_navigation.py
 COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
-COPY enabled/_0001_production_region.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_0001_production_region.py
+COPY settings/0001_production_region.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py
 COPY region_selector.html /var/lib/openstack/lib/python3.12/site-packages/horizon/templates/horizon/common/_region_selector.html
 
 RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
@@ -115,7 +115,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
     && test -f "$local_enabled/_1930_project_s3.py" \
     && test -f "$local_enabled/_9999_platform_navigation.py" \
-    && test -f "$local_enabled/_0001_production_region.py" \
+    && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py \
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \

@@ -147,12 +147,12 @@ build_horizon_complete() {
   (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   horizon_context="$WORK_DIR/horizon-complete"
-  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled"
+  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings"
   cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
   cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
   cp "$REPO_ROOT/images/horizon-complete/region_selector.html" "$horizon_context/region_selector.html"
   cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
-  cp "$REPO_ROOT/images/horizon-complete/enabled/_0001_production_region.py" "$horizon_context/enabled/_0001_production_region.py"
+  cp "$REPO_ROOT/images/horizon-complete/settings/0001_production_region.py" "$horizon_context/settings/0001_production_region.py"
   cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
   cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
   cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"

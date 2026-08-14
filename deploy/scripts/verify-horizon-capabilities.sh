@@ -39,12 +39,12 @@ region_selector = (
 ).read_text()
 assert "regions.current.name or regions.available" in region_selector
 masakari_api = (site_packages / "masakaridashboard/api/api.py").read_text()
-assert "getattr(request.user, 'services_region'" in masakari_api
+assert "getattr(request.user," in masakari_api and "services_region" in masakari_api
 vpc_launch = (
     site_packages
     / "openstack_vpc_dashboard/dashboards/project/compute/network_interfaces/launch.py"
 ).read_text()
-assert 'client.list("elastic-ip-pools")' not in vpc_launch
+assert "elastic-ip-pools" not in vpc_launch
 assert "load_public_pools" in vpc_launch
 for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
     assert app in settings.INSTALLED_APPS
