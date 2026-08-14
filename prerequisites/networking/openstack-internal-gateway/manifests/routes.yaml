@@ -11,6 +11,24 @@ spec:
   hostnames:
     - internal.cloud.dcn.ssu.ac.kr
   rules:
+    # python-novaclient still constructs a generic keystoneauth Token plugin
+    # when Horizon supplies both auth_token and endpoint_override.  Generic
+    # discovery deliberately normalizes a versioned, path-prefixed auth URL
+    # such as /identity/v3 to the origin-root /v3/auth/tokens.  Keep the
+    # documented /identity endpoint, but also expose Keystone's native root
+    # version path so project-token re-scoping works for Horizon and other
+    # legacy/generic clients.  Without this alias direct service requests
+    # work, while Nova list/create screens fail with a misleading 404 that
+    # Horizon presents as an authorization error.
+    - matches: [{path: {type: PathPrefix, value: /v3}}]
+      backendRefs: [{name: keystone-api, port: 5000}]
+    # python-novaclient's version discovery passes its absolute endpoint back
+    # through keystoneauth's Adapter. With a /compute prefix the Adapter
+    # normalizes that probe to origin-root /v2.1, even though ordinary
+    # /servers and /limits calls retain /compute/v2.1. Serve the native Nova
+    # path so microversion discovery cannot fail before instance operations.
+    - matches: [{path: {type: PathPrefix, value: /v2.1}}]
+      backendRefs: [{name: nova-api, port: 8774}]
     - matches: [{path: {type: PathPrefix, value: /identity}}]
       filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]
       backendRefs: [{name: keystone-api, port: 5000}]

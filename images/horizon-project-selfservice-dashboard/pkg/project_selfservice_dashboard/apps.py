@@ -6,6 +6,38 @@ class ProjectSelfserviceDashboardConfig(AppConfig):
     verbose_name = "Project Self-Service"
 
     def ready(self):
+        # Horizon's Nova, Cinder, Neutron and Placement adapters pass the
+        # catalog identity URL to keystoneauth's generic Token plugin when
+        # re-scoping an existing user token.  Generic discovery normalizes a
+        # path-prefixed URL such as RegionOne-VM's /identity/v3 to origin-root
+        # /v3/auth/tokens.  Before the Gateway gained that compatibility path,
+        # federated project owners therefore saw misleading authorization
+        # errors backed by a 404.  More importantly, Horizon is already inside
+        # the cluster and should not depend on the VM-facing Gateway or its DNS
+        # for authentication.  Resolve only Identity to the canonical
+        # in-cluster setting; all actual service endpoints remain selected from
+        # the user's catalog/region.  AppConfig.ready() is intentionally used
+        # instead of local_settings.py: importing openstack_dashboard.api while
+        # Django settings are still loading raises AppRegistryNotReady.
+        from django.conf import settings
+        from openstack_dashboard.api import base as os_api_base
+
+        if not getattr(os_api_base, "_dcn_identity_url_override_installed", False):
+            catalog_url_for = os_api_base.url_for
+
+            def dcn_url_for(request, service_type, endpoint_type=None, region=None):
+                if service_type == "identity":
+                    return settings.OPENSTACK_KEYSTONE_URL
+                return catalog_url_for(
+                    request,
+                    service_type,
+                    endpoint_type=endpoint_type,
+                    region=region,
+                )
+
+            os_api_base.url_for = dcn_url_for
+            os_api_base._dcn_identity_url_override_installed = True
+
         # Replaces openstack_dashboard.api.keystone.is_domain_admin
         # everywhere, by overwriting the attribute on the already-imported
         # keystone module object. See facade.is_domain_admin for the full

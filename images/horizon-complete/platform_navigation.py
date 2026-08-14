@@ -101,6 +101,7 @@ _order_panels(
     "vpc",
     (
         "vpc_topology",
+        "network_operations",
         "vpcs",
         "vpc_subnets",
         "vpc_route_tables",

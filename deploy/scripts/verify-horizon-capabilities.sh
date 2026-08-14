@@ -4,8 +4,8 @@ set -euo pipefail
 NAMESPACE=${NAMESPACE:-openstack}
 selector='application=horizon,component=server'
 
-test "$(kubectl -n "$NAMESPACE" get deployment horizon -o jsonpath='{.status.readyReplicas}')" = 2
-test "$(kubectl -n "$NAMESPACE" get pods -l "$selector" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2
+test "$(kubectl -n "$NAMESPACE" get deployment horizon -o jsonpath='{.status.readyReplicas}')" -ge 3
+test "$(kubectl -n "$NAMESPACE" get pods -l "$selector" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 3
 
 for pod in $(kubectl -n "$NAMESPACE" get pods -l "$selector" -o name); do
   kubectl -n "$NAMESPACE" exec "$pod" -- sh -c '
@@ -60,6 +60,8 @@ assert project.get_panel_group("share").panels == [
 assert project.get_panel_group("observability").panels == [
     "cloud_metrics", "cloud_alarms",
 ]
+assert "network_operations" in project.get_panel_group("vpc").panels
+assert reverse("horizon:project:network_operations:index").startswith("/horizon/")
 assert str(project.get_panel_group("observability").name) == "Monitoring & Alarms"
 assert str(project.get_panel("cloud_metrics").name) == "Metric Coverage"
 assert str(project.get_panel("cloud_s3").name) == "S3 Access & Credentials"
@@ -69,11 +71,21 @@ assert str(identity.get_panel("projects").name) == "Projects & Members"
 assert str(identity.get_panel("users").name) == "User Accounts"
 from openstack_dashboard.dashboards.identity.projects import tabs as project_tabs
 from openstack_dashboard.dashboards.identity.projects import views as project_views
+from openstack_dashboard.api import base as api_base
 assert [tab.slug for tab in project_tabs.ProjectDetailTabs.tabs] == [
     "overview", "members", "groups", "quota_usage", "credentials", "health", "audit",
 ]
 assert len(project_views.IndexView.table_classes) == 1
 assert project_views.IndexView.table_classes[0]._meta.name == "tenants"
+# Horizon must never feed the VM-facing, path-prefixed Identity catalog URL
+# back into generic keystoneauth token re-scoping. That client normalizes the
+# URL to origin-root /v3 and previously broke every Nova-backed owner panel.
+class IdentityProbeUser:
+    service_catalog = []
+    services_region = "RegionOne-VM"
+class IdentityProbeRequest:
+    user = IdentityProbeUser()
+assert api_base.url_for(IdentityProbeRequest(), "identity") == settings.OPENSTACK_KEYSTONE_URL
 assert ("instance-ha", "context_is_admin") in Horizon.get_dashboard("masakaridashboard").policy_rules
 PY
   '

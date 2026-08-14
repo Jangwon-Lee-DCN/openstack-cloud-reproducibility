@@ -32,3 +32,10 @@ workload credentials must select `RegionOne-VM` and include
 
 After DNS is configured, publish the service-catalog `internal` URLs using the
 paths documented in `docs/endpoints.md`.
+
+The route set intentionally includes both the canonical `/identity/v3` path
+and Keystone's native `/v3` path. Do not remove the latter: Horizon's Nova
+client and other generic `keystoneauth` consumers use it when re-scoping a
+token even though the service catalog advertises the former.
+Nova's native `/v2.1` path is retained for the same reason during microversion
+discovery; the canonical catalog endpoint remains `/compute/v2.1`.
