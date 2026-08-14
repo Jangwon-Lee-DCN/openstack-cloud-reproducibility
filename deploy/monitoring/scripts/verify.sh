@@ -4,6 +4,10 @@ set -euo pipefail
 python3 "$(dirname "$0")/test-dashboard-json.py"
 
 kubectl -n openstack get deployment prometheus-openstack-exporter
+[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.replicas}')" == "1" ]]
+[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OS_POLLING_INTERVAL")].value}')" == "300" ]]
+[[ "$(kubectl -n monitoring get servicemonitor openstack-exporter -o jsonpath='{.spec.endpoints[0].interval}')" == "300s" ]]
+printf 'PASS OpenStack exporter collection is rate-limited away from interactive Keystone traffic\n'
 kubectl -n monitoring get deployment \
   prometheus-blackbox-exporter prometheus-mysql-exporter \
   opentelemetry-collector

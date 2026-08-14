@@ -10,4 +10,4 @@ labels:
 
 pod:
   replicas:
-    prometheus_openstack_exporter: 2
+    prometheus_openstack_exporter: 1

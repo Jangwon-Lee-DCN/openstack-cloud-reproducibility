@@ -9,7 +9,10 @@ labels:
     node_selector_value: linux
 pod:
   replicas:
-    prometheus_openstack_exporter: 2
+    # The exporter authenticates once per OpenStack collector when its cache
+    # expires. Multiple replicas synchronize those expensive password checks
+    # and can starve interactive Keystone/Horizon requests.
+    prometheus_openstack_exporter: 1
   affinity:
     anti:
       type:
@@ -18,7 +21,7 @@ pod:
         default: kubernetes.io/hostname
 conf:
   prometheus_openstack_exporter:
-    OS_POLLING_INTERVAL: 60
+    OS_POLLING_INTERVAL: 300
     TIMEOUT_SECONDS: 30
     OS_RETRIES: 2
     # PoC public Gateway uses a cert-manager self-signed certificate.

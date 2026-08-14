@@ -33,7 +33,10 @@ spec:
       component: metrics
   endpoints:
     - port: http
-      interval: 60s
+      # A full exporter collection performs multiple OpenStack API lookups.
+      # Five-minute inventory freshness is sufficient for capacity alerts and
+      # prevents its Keystone authentication burst from delaying users.
+      interval: 300s
       scrapeTimeout: 30s
 ---
 apiVersion: rbac.authorization.k8s.io/v1
