@@ -321,11 +321,11 @@ idp_url="${OS_AUTH_URL}/OS-FEDERATION/identity_providers/keycloak-dcn"
 if idp_json=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "$idp_url" 2>/dev/null); then
   test "$(printf '%s' "$idp_json" | jq -r '.identity_provider.domain_id')" = "$DOMAIN_ID"
   curl -sf -X PATCH -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
-    -d '{"identity_provider":{"remote_ids":["https://auth.cloud.dcn.ssu.ac.kr/realms/dcn"]}}' \
+    -d '{"identity_provider":{"enabled":true,"remote_ids":["https://auth.cloud.dcn.ssu.ac.kr/realms/dcn"]}}' \
     "$idp_url" >/dev/null
 else
   curl -sf -X PUT -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
-    -d '{"identity_provider":{"remote_ids":["https://auth.cloud.dcn.ssu.ac.kr/realms/dcn"],"domain_id":"'"${DOMAIN_ID}"'"}}' \
+    -d '{"identity_provider":{"enabled":true,"remote_ids":["https://auth.cloud.dcn.ssu.ac.kr/realms/dcn"],"domain_id":"'"${DOMAIN_ID}"'"}}' \
     "$idp_url" >/dev/null
 fi
 echo "federation identity provider reconciled"
