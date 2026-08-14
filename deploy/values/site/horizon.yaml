@@ -138,6 +138,11 @@ conf:
         # touching any of these four settings; each one only exercises
         # one of the two paths, and both must be checked independently.
         raw:
+          # Keep the only production region visible in the header and make
+          # plugin SDK clients resolve the consolidated service catalog rather
+          # than falling back to the historical RegionOne name.
+          AVAILABLE_REGIONS: "[('https://cloud.dcn.ssu.ac.kr/identity/v3', 'seoul-ssu-1')]"
+          DEFAULT_SERVICE_REGIONS: "{'*': 'seoul-ssu-1'}"
           FORCE_SCRIPT_NAME: /horizon
           WEBROOT: /horizon/
           # Horizon replicas share the Django cache. Caching this fragment

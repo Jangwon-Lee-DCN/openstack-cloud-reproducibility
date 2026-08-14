@@ -49,7 +49,7 @@ for path in bootstrap_dockerfiles:
                 errors.append(f"{path.relative_to(root)} has mutable parent {parent}")
 
 horizon = (root / "images/horizon-complete/Dockerfile").read_text()
-for token in ("octavia_dashboard", "designatedashboard", "openstack_vpc_dashboard", "project_selfservice_dashboard", "magnum_ui", "magnumclient"):
+for token in ("octavia_dashboard", "designatedashboard", "openstack_vpc_dashboard", "project_selfservice_dashboard", "magnum_ui", "magnumclient", "region_selector.html", "services_region"):
     if token not in horizon:
         errors.append(f"complete Horizon image lacks {token}")
 

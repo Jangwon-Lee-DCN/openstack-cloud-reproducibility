@@ -26,8 +26,26 @@ from django.conf import settings
 from django.template.loader import get_template
 from django.urls import reverse
 from horizon import Horizon
+from pathlib import Path
 
 assert settings.OPENSTACK_CINDER_FEATURES["enable_backup"] is True
+assert settings.AVAILABLE_REGIONS == [
+    ("https://cloud.dcn.ssu.ac.kr/identity/v3", "seoul-ssu-1")
+]
+assert settings.DEFAULT_SERVICE_REGIONS["*"] == "seoul-ssu-1"
+site_packages = Path("/var/lib/openstack/lib/python3.12/site-packages")
+region_selector = (
+    site_packages / "horizon/templates/horizon/common/_region_selector.html"
+).read_text()
+assert "regions.current.name or regions.available" in region_selector
+masakari_api = (site_packages / "masakaridashboard/api/api.py").read_text()
+assert "getattr(request.user, 'services_region'" in masakari_api
+vpc_launch = (
+    site_packages
+    / "openstack_vpc_dashboard/dashboards/project/compute/network_interfaces/launch.py"
+).read_text()
+assert 'client.list("elastic-ip-pools")' not in vpc_launch
+assert "load_public_pools" in vpc_launch
 for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
     assert app in settings.INSTALLED_APPS
 for template in (
