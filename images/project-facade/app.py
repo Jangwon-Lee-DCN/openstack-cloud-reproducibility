@@ -556,7 +556,7 @@ def create_project():
     body = request.get_json(silent=True) or {}
     name = (body.get("name") or "").strip()
     description = (body.get("description") or "").strip()
-    tags = sorted({str(tag).strip() for tag in body.get("tags", []) if str(tag).strip()})
+    requested_tags = {str(tag).strip() for tag in body.get("tags", []) if str(tag).strip()}
     initial_members = sorted({str(name).strip() for name in body.get("initial_members", []) if str(name).strip()})
     domain_name = body.get("domain") or OS_DOMAIN_NAME
 
@@ -564,6 +564,13 @@ def create_project():
         return jsonify(error="'name' is required"), 400
     if len(name) > 64:
         return jsonify(error="'name' must be at most 64 characters"), 400
+
+    # Authentication is authoritative even when callers bypass Horizon:
+    # a project creator cannot claim a different governance owner.
+    tags = sorted(
+        {tag for tag in requested_tags if not tag.lower().startswith("owner=")}
+        | {f"owner={user_name}"}
+    )
 
     if domain_name != OS_DOMAIN_NAME:
         return jsonify(error=f"this service does not administer domain '{domain_name}'"), 403
@@ -1136,7 +1143,14 @@ def set_project_tags(project_id):
         return err
 
     body = request.get_json(silent=True) or {}
-    tags = sorted({(t or "").strip() for t in (body.get("tags") or [])} - {""})
+    requested_tags = {(t or "").strip() for t in (body.get("tags") or [])} - {""}
+    current_owner = {
+        tag for tag in _project_tags(project_id) if tag.lower().startswith("owner=")
+    }
+    tags = sorted(
+        {tag for tag in requested_tags if not tag.lower().startswith("owner=")}
+        | current_owner
+    )
     invalid = [t for t in tags if "," in t or "/" in t]
     if invalid:
         return jsonify(error=f"invalid tag(s) {invalid}: tags cannot contain ',' or '/'"), 400

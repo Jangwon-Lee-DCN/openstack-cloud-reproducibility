@@ -498,6 +498,7 @@ class ManageProjectTagsView(horizon_forms.ModalFormView):
                 structured[key] = value
             else:
                 extra.append(tag)
+        structured.pop("owner", None)
         return {"project_id": project_id, "extra_tags": ", ".join(extra), **structured}
 
 

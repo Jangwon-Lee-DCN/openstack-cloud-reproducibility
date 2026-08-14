@@ -8,6 +8,13 @@ from horizon import messages
 from project_selfservice_dashboard import facade
 
 
+def _request_owner(request):
+    """Return the authenticated creator identity used for governance tags."""
+    return str(
+        getattr(request.user, "username", "") or getattr(request.user, "id", "")
+    ).strip()
+
+
 class CreateProjectForm(horizon_forms.SelfHandlingForm):
     name = forms.CharField(label=_("Project Name"), max_length=64)
     description = forms.CharField(
@@ -15,7 +22,6 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
-    owner = forms.CharField(label=_("Owner"), help_text=_("Team or accountable person."))
     environment = forms.ChoiceField(
         label=_("Environment"),
         choices=(("production", _("Production")), ("staging", _("Staging")), ("development", _("Development")), ("test", _("Test"))),
@@ -34,7 +40,7 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
             project = facade.create_project(
                 request, data["name"], data.get("description", ""),
                 tags=[
-                    f"owner={data['owner']}", f"environment={data['environment']}",
+                    f"owner={_request_owner(request)}", f"environment={data['environment']}",
                     *([f"cost_center={data['cost_center']}"] if data.get("cost_center") else []),
                     *([f"purpose={data['purpose']}"] if data.get("purpose") else []),
                 ],
@@ -460,7 +466,6 @@ class ManageProjectTagsForm(horizon_forms.SelfHandlingForm):
     `required_tag` checks against."""
 
     project_id = forms.CharField(widget=forms.HiddenInput)
-    owner = forms.CharField(label=_("Owner"), required=False)
     environment = forms.ChoiceField(
         label=_("Environment"), required=False,
         choices=(("", _("Not set")), ("production", _("Production")), ("staging", _("Staging")), ("development", _("Development")), ("test", _("Test"))),
@@ -475,7 +480,13 @@ class ManageProjectTagsForm(horizon_forms.SelfHandlingForm):
 
     def handle(self, request, data):
         tags = [t.strip() for t in data.get("extra_tags", "").split(",") if t.strip()]
-        for key in ("owner", "environment", "cost_center", "purpose"):
+        try:
+            current = facade.list_project_tags(request, data["project_id"])
+        except facade.FacadeError as exc:
+            self.api_error(str(exc))
+            return False
+        tags.extend(tag for tag in current if tag.startswith("owner="))
+        for key in ("environment", "cost_center", "purpose"):
             if data.get(key):
                 tags.append("%s=%s" % (key, data[key].strip()))
         try:
