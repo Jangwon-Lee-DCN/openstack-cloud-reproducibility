@@ -3,8 +3,8 @@ kind: VPCPolicyImageLock
 metadata:
   name: production
 spec:
-  sourceRevision: 24ac4b8a471822f243f72528eb95e10923c36153
-  controllerImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-controller-24ac4b8@sha256:3f4a1ae65321875d83fe5e886b790dbf40ab6744377a6ae5d8bd4eb746d5c392
-  facadeImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-facade-24ac4b8@sha256:d4b70d321b652910992be0f6b3814cbf07e14827e6094c5806cf56a267ef2af7
+  sourceRevision: 7c7373f1c2e5427efbf315e0ae4dbd15684e7405
+  controllerImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-controller-tenant-form-20260814@sha256:fffebf4e3d0b750341aab716e8eacb0b8fdcb0215ef3c8a82943b29fbf02b7e5
+  facadeImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-facade-tenant-form-final-20260814@sha256:53709fcdd1f26d06b03cd4742427ebe69da40d542016ad58e885a249d9298cf5
   metadataAttestorImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-metadata-attestor-24ac4b8@sha256:c0c1bad805315bd00c6a214298d8a20fd61eabe51bbe24ada44a35e1722d16e9
   endpointAgentImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-endpoint-agent-24ac4b8@sha256:c2ba50dbba131e619c99414b203c8a4481a659a3f23c50da8ca0d9a3c4e3cf59
