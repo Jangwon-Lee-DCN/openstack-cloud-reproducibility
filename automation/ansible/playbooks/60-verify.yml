@@ -29,6 +29,11 @@
       args:
         chdir: "{{ repro_repo_path }}"
       changed_when: false
+    - name: Verify Horizon project-owner capabilities and HA placement
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-horizon-capabilities.sh"
+      args:
+        chdir: "{{ repro_repo_path }}"
+      changed_when: false
     - name: Verify native OpenStack and VPC IAM persona boundaries
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-iam-dcn-personas.sh"
       args:
