@@ -4,6 +4,9 @@ set -euo pipefail
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 REGISTRY=${REGISTRY:-registry.dcn.ssu.ac.kr/openstack}
+REGISTRY_HOST=${REGISTRY_HOST:-${REGISTRY%%/*}}
+REGISTRY_IP=${REGISTRY_IP:-$(getent ahostsv4 "$REGISTRY_HOST" | awk 'NR == 1 {print $1}')}
+[[ -n "$REGISTRY_IP" ]] || { echo "cannot resolve registry host $REGISTRY_HOST" >&2; exit 1; }
 BUILD_ID=${BUILD_ID:-$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)}
 VPC_DASHBOARD_REPO=${VPC_DASHBOARD_REPO:-$REPO_ROOT/../openstack-vpc-dashboard}
 VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
@@ -71,6 +74,13 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      # The private registry zone is served to infrastructure hosts, while
+      # cluster DNS intentionally forwards public queries. Keep source builds
+      # deterministic by carrying the host-resolved registry address into the
+      # disposable Kaniko Pod.
+      hostAliases:
+        - ip: "$REGISTRY_IP"
+          hostnames: ["$REGISTRY_HOST"]
       nodeSelector: {openstack-control-plane: enabled}
       tolerations:
         - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
