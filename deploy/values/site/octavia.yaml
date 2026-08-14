@@ -259,7 +259,9 @@ pod:
             timeoutSeconds: 10
   replicas:
     api: 2
-    driver_agent: 6
+    # One replica per currently schedulable control-plane/infra node while
+    # dcn-1a-controller-1 remains cordoned for reboot diagnosis.
+    driver_agent: 5
     housekeeping: 2
   lifecycle:
     disruption_budget:
@@ -270,7 +272,7 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
   load_balancer:
     host_fqdn_override:
