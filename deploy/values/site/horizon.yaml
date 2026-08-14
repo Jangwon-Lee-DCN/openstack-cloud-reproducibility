@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-placement-20260814@sha256:72840aefb0f9a4e97a0adeba068c3b174d4984a14d25b3322fd9059eae37c65e
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-qoe-region-vpc-20260814@sha256:8959459741306ab9eb67f29b5298c5516d9d60effee7fdbd0c021a28fbdd3371
 pod:
   # Internal endpoint names already contain multiple labels. ndots:5 makes
   # glibc query an impossible search-suffixed name before the real service
@@ -138,11 +138,6 @@ conf:
         # touching any of these four settings; each one only exercises
         # one of the two paths, and both must be checked independently.
         raw:
-          # Keep the only production region visible in the header and make
-          # plugin SDK clients resolve the consolidated service catalog rather
-          # than falling back to the historical RegionOne name.
-          AVAILABLE_REGIONS: "[('https://cloud.dcn.ssu.ac.kr/identity/v3', 'seoul-ssu-1')]"
-          DEFAULT_SERVICE_REGIONS: "{'*': 'seoul-ssu-1'}"
           FORCE_SCRIPT_NAME: /horizon
           WEBROOT: /horizon/
           # Horizon replicas share the Django cache. Caching this fragment

@@ -142,6 +142,7 @@ build_horizon_complete() {
   cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
   cp "$REPO_ROOT/images/horizon-complete/region_selector.html" "$horizon_context/region_selector.html"
   cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
+  cp "$REPO_ROOT/images/horizon-complete/enabled/_0001_production_region.py" "$horizon_context/enabled/_0001_production_region.py"
   cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
   cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
   cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"
