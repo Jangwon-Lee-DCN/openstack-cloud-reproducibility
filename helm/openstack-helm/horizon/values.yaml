@@ -94,9 +94,10 @@ conf:
 
       <VirtualHost *:{{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}>
           WSGIApplicationGroup %{GLOBAL}
-          WSGIScriptReloading On
+          WSGIScriptReloading Off
           WSGIDaemonProcess horizon-http processes=5 threads=1 user=horizon group=horizon display-name=%{GROUP}
           WSGIProcessGroup horizon-http
+          WSGIImportScript /var/www/cgi-bin/horizon/django.wsgi process-group=horizon-http application-group=%{GLOBAL}
           WSGIScriptAlias / /var/www/cgi-bin/horizon/django.wsgi
           WSGIPassAuthorization On
           RewriteEngine on
@@ -111,6 +112,9 @@ conf:
           <Location "/static">
               SetHandler static
           </Location>
+          <LocationMatch "^/static/.*\.[0-9a-f]{12}\.\w+$">
+              Header set Cache-Control "public, max-age=31536000, immutable"
+          </LocationMatch>
 
           ErrorLogFormat "%{cu}t %M"
           ErrorLog /dev/stdout

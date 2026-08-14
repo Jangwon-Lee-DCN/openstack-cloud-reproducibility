@@ -91,6 +91,9 @@ done
 # Horizon stores compressed bundles on a pod-local emptyDir. Its compressor
 # metadata must therefore also be pod-local; sharing that cache previously let
 # one replica advertise a JavaScript hash which existed only on another pod.
+# Offline mode is safe because each Pod runs collectstatic + compress with the
+# final /horizon STATIC_URL before Apache starts. It prevents expensive
+# request-time template compression in every WSGI worker.
 mapfile -t horizon_pods < <(kubectl get pods -n "$NAMESPACE" \
   -l application=horizon,component=server \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
@@ -101,7 +104,7 @@ horizon_bundle=''
 for pod in "${horizon_pods[@]}"; do
   settings=$(kubectl exec -n "$NAMESPACE" "$pod" -- /tmp/manage.py shell -c \
     'from django.conf import settings; print(settings.COMPRESS_OFFLINE, settings.COMPRESS_CACHE_BACKEND, settings.CACHES[settings.COMPRESS_CACHE_BACKEND]["BACKEND"], settings.STATIC_URL)')
-  [[ "$settings" == *"False compressor django.core.cache.backends.locmem.LocMemCache /horizon/static/"* ]] || {
+  [[ "$settings" == *"True compressor django.core.cache.backends.locmem.LocMemCache /horizon/static/"* ]] || {
     echo "$pod has unsafe Horizon compressor settings: $settings" >&2; exit 1;
   }
   bundle=$(kubectl exec -n "$NAMESPACE" "$pod" -- sh -c \
@@ -116,6 +119,20 @@ for pod in "${horizon_pods[@]}"; do
   fi
   horizon_bundle=$bundle
 done
+
+# Catch regressions where login rendering silently performs runtime asset
+# compression again. Use the median to tolerate one connection/setup outlier.
+mapfile -t login_samples < <(for _ in 1 2 3 4 5; do
+  curl -ksS -o /dev/null -w '%{time_starttransfer}\n' \
+    https://cloud.dcn.ssu.ac.kr/horizon/auth/login/
+done | sort -n)
+python3 - "${login_samples[2]}" <<'PY'
+import sys
+median = float(sys.argv[1])
+if median >= 1.0:
+    raise SystemExit(f"Horizon login median TTFB too high: {median:.3f}s (limit 1.000s)")
+print(f"Horizon login median TTFB: {median:.3f}s")
+PY
 
 kubectl get pdb -n "$NAMESPACE" skyline >/dev/null
 [[ "$(kubectl get deployment -n "$NAMESPACE" barbican-api -o jsonpath='{.status.readyReplicas}')" == "2" ]]

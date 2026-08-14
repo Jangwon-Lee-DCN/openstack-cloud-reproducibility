@@ -59,10 +59,12 @@ conf:
         # the shared Horizon MariaDB instead; both replicas use the same
         # django_session table and the browser carries only a short key.
         session_engine: 'django.contrib.sessions.backends.db'
-        # Runtime compression is required because Horizon's compressed blocks
-        # include the request-aware /horizon prefix. The chart isolates only
-        # compressor metadata per pod, matching its pod-local static volume.
-        compress_offline: false
+        # The chart runs collectstatic + compressor with this same runtime
+        # configuration before Apache starts, so the generated manifest already
+        # contains the /horizon prefix. Use it at request time instead of
+        # recompiling template blocks in every WSGI worker (2-3 seconds per
+        # login-page render in the accepted production topology).
+        compress_offline: true
         raw:
           FORCE_SCRIPT_NAME: /horizon
           LOGIN_REDIRECT_URL: /horizon/
