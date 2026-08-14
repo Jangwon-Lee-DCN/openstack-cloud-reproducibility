@@ -25,8 +25,11 @@ conf:
   # Read-only exporter access. No create, update, or delete rule is granted.
   policy:
     "os_compute_api:os-services:list": "role:admin or role:monitoring"
-    "os_compute_api:os-availability-zone:list": "role:admin or role:monitoring"
-    "os_compute_api:limits": "role:admin or role:monitoring"
+    # Preserve Nova's project-user defaults. These endpoints are required by
+    # Horizon's project overview and instance workflows; narrowing them to
+    # monitoring accidentally locks out ordinary federated members/readers.
+    "os_compute_api:os-availability-zone:list": "@"
+    "os_compute_api:limits": "@"
     "os_compute_api:limits:other_project": "role:admin or role:monitoring"
     "os_compute_api:os-hypervisors:list-detail": "role:admin or role:monitoring"
     "os_compute_api:servers:detail:get_all_tenants": "role:admin or role:monitoring"

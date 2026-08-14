@@ -101,6 +101,21 @@ check_persona() {
     --os-project-domain-name "$DOMAIN" --os-auth-type password \
     token issue -f value -c id)
 
+  compute_url=$(openstack endpoint list --service compute --interface public \
+    --region RegionOne -f value -c URL | head -1)
+  for path in '/limits?reserved=1' '/os-availability-zone'; do
+    code=$(curl -ksS --connect-timeout 5 --max-time 15 -o /tmp/nova_verify_out.$$ \
+      -w '%{http_code}' -H "X-Auth-Token: $token" "${compute_url%/}${path}")
+    if [ "$code" = 200 ]; then
+      echo "PASS: nova $path -> HTTP 200"
+    else
+      echo "FAIL: nova $path -> HTTP $code, expected 200"
+      cat /tmp/nova_verify_out.$$ 2>/dev/null || true
+      fail=1
+    fi
+    rm -f /tmp/nova_verify_out.$$
+  done
+
   # Query a known administrator rather than merely executing `user list`:
   # Keystone may legally return a filtered/self-only list with exit status 0.
   for check in "network list:net:$expect_net" "loadbalancer list:lb:$expect_lb" "user show --domain $OS_USER_DOMAIN_NAME $OS_USERNAME:users:$expect_users"; do
