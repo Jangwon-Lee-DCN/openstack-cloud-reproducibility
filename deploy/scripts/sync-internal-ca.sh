@@ -3,6 +3,7 @@ set -euo pipefail
 
 TARGET_NS=openstack
 TARGET_CONFIGMAP=openstack-internal-ca
+PUBLIC_CONFIGMAP=openstack-public-ca
 
 work_dir="$(mktemp -d)"
 cleanup() {
@@ -29,4 +30,7 @@ fi
 } >"${work_dir}/ca.crt"
 kubectl -n "${TARGET_NS}" create configmap "${TARGET_CONFIGMAP}" \
   --from-file=ca.crt="${work_dir}/ca.crt" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n "${TARGET_NS}" create configmap "${PUBLIC_CONFIGMAP}" \
+  --from-file=ca.crt="${work_dir}/public-ca.crt" \
   --dry-run=client -o yaml | kubectl apply -f -

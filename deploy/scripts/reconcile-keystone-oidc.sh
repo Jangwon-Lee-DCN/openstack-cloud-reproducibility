@@ -18,6 +18,8 @@ test "$(sha256sum "$ROOT/$package" | awk '{print $1}')" = "$expected"
 sops -d "$ROOT/$snapshot" > "$work/base.yaml"
 "$ROOT/deploy/scripts/generate-keycloak-oidc-override.py" "$work/base.yaml" "$work/oidc.yaml"
 "$ROOT/deploy/scripts/generate-database-admin-override.py" keystone "$work/database.yaml"
+"$ROOT/deploy/scripts/sync-internal-ca.sh"
+"$ROOT/deploy/scripts/fix-keystone-fernet-permissions.sh" --restore-chart-state
 helm upgrade --install keystone "$ROOT/$package" -n openstack \
   -f "$work/base.yaml" -f "$ROOT/deploy/values/site/keystone.yaml" \
   -f "$work/oidc.yaml" -f "$work/database.yaml" --timeout 15m

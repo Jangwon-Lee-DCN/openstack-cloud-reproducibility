@@ -23,4 +23,13 @@ wsgi = base["conf"]["wsgi_keystone"]
 updated, count = re.subn(r'OIDCClientSecret\s+"[^"]*"', f'OIDCClientSecret "{client_secret}"', wsgi)
 if count != 1:
     raise SystemExit("expected exactly one OIDCClientSecret directive")
+ca_directive = 'OIDCCABundlePath "/usr/local/share/ca-certificates/openstack-public-ca.crt"'
+if "OIDCCABundlePath" not in updated:
+    updated, count = re.subn(
+        r"(OIDCSSLValidateServer\s+On)",
+        rf"\1\n    {ca_directive}",
+        updated,
+    )
+    if count != 1:
+        raise SystemExit("expected exactly one OIDCSSLValidateServer On directive")
 pathlib.Path(output_path).write_text(yaml.safe_dump({"conf": {"wsgi_keystone": updated}}, sort_keys=False))

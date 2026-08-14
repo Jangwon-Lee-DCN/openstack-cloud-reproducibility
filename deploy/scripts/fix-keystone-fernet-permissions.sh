@@ -40,6 +40,37 @@ set -euo pipefail
 NAMESPACE=openstack
 DEPLOYMENT=keystone-api
 
+# Helm's three-way merge preserves the init container and sidecar added by this
+# script, while restoring the chart's Secret-backed volume. That combination
+# cannot start because Secret volumes are read-only. Reconcile callers use this
+# mode immediately before Helm so the chart sees a clean, internally consistent
+# Deployment; the normal mode below reinstates the hardened layout afterwards.
+if [[ "${1:-}" == "--restore-chart-state" ]]; then
+  patch=$(kubectl -n "${NAMESPACE}" get deployment "${DEPLOYMENT}" -o json | python3 -c '
+import json, sys
+d = json.load(sys.stdin)["spec"]["template"]["spec"]
+patch = []
+for field, name in (("containers", "fernet-sync"), ("initContainers", "fernet-perms-init")):
+    for i in range(len(d.get(field, [])) - 1, -1, -1):
+        if d[field][i]["name"] == name:
+            patch.append({"op": "remove", "path": f"/spec/template/spec/{field}/{i}"})
+for i in range(len(d.get("volumes", [])) - 1, -1, -1):
+    volume = d["volumes"][i]
+    if volume["name"] == "keystone-fernet-keys-raw":
+        patch.append({"op": "remove", "path": f"/spec/template/spec/volumes/{i}"})
+    elif volume["name"] == "keystone-fernet-keys" and "emptyDir" in volume:
+        patch.append({"op": "replace", "path": f"/spec/template/spec/volumes/{i}",
+                      "value": {"name": "keystone-fernet-keys",
+                                "secret": {"secretName": "keystone-fernet-keys"}}})
+print(json.dumps(patch))
+')
+  if [[ "${patch}" != "[]" ]]; then
+    kubectl -n "${NAMESPACE}" patch deployment "${DEPLOYMENT}" --type=json -p="${patch}"
+  fi
+  echo "Keystone Deployment restored to chart-managed Fernet volume state."
+  exit 0
+fi
+
 existing=$(kubectl -n "${NAMESPACE}" get deployment "${DEPLOYMENT}" \
   -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="fernet-perms-init")].name}' 2>/dev/null || true)
 current_secret=$(kubectl -n "${NAMESPACE}" get deployment "${DEPLOYMENT}" \

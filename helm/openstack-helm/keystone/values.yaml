@@ -155,6 +155,8 @@ dependencies:
           service: local_image_registry
 
 pod:
+  env:
+    keystone_api: []
   security_context:
     keystone:
       pod:

@@ -7,6 +7,26 @@ pod:
       - name: telemetry-harbor-push
   replicas:
     api: 2
+  env:
+    keystone_api:
+      - name: CURL_CA_BUNDLE
+        value: /usr/local/share/ca-certificates/openstack-public-ca.crt
+  mounts:
+    keystone_api:
+      keystone_api:
+        volumeMounts:
+          # Replace the image-baked temporary CA with the currently issued
+          # public Gateway CA. The existing update-ca-certificates hash link
+          # then resolves to this live certificate without disabling TLS
+          # verification in mod_auth_openidc.
+          - name: openstack-public-ca
+            mountPath: /usr/local/share/ca-certificates/openstack-public-ca.crt
+            subPath: ca.crt
+            readOnly: true
+        volumes:
+          - name: openstack-public-ca
+            configMap:
+              name: openstack-public-ca
 images:
   tags:
     keystone_api: registry.dcn.ssu.ac.kr/openstack/keystone@sha256:5c4a6ecb5ec01d6de6f273ad39a8330058e5df49660477fc9aedaf0e8fb5727e

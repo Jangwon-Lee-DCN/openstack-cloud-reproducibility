@@ -109,7 +109,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: 29.0.0
     package: helm/packages/upstream/keystone-2026.1.0.tgz
-    sha256: a24039fedeef085425fba38b4e0394c0a09d43ededfd0254dbe0e6a808967955
+    sha256: 1791658a3c8378641c1d6f6783ce077ba444a905c893aceb6eca33b11ebebc81
     valuesSnapshot: deploy/releases/keystone.values.sops.yaml
   - name: libvirt
     chart: libvirt
