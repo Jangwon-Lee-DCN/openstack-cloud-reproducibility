@@ -48,6 +48,7 @@ rendered_region = get_template("horizon/common/_region_selector.html").render({
 assert "seoul-ssu-1" in rendered_region
 masakari_api = (site_packages / "masakaridashboard/api/api.py").read_text()
 assert "getattr(request.user," in masakari_api and "services_region" in masakari_api
+assert "RegionOne-VM" in masakari_api and "region_name = None" in masakari_api
 vpc_launch = (
     site_packages
     / "openstack_vpc_dashboard/dashboards/project/compute/network_interfaces/launch.py"
