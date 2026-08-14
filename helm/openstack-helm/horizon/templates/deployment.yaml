@@ -49,6 +49,10 @@ spec:
 {{- end }}
 {{ dict "envAll" $envAll "podName" "horizon" "containerNames" (list "horizon" "init" ) | include "helm-toolkit.snippets.kubernetes_mandatory_access_control_annotation" | indent 8 }}
     spec:
+{{- with .Values.pod.dns_config }}
+      dnsConfig:
+{{ toYaml . | indent 8 }}
+{{- end }}
 {{ tuple "horizon" . | include "helm-toolkit.snippets.kubernetes_pod_priority_class" | indent 6 }}
 {{ tuple "horizon" . | include "helm-toolkit.snippets.kubernetes_pod_runtime_class" | indent 6 }}
 {{ tuple $envAll "horizon" | include "helm-toolkit.snippets.kubernetes_image_pull_secrets" | indent 6 }}
@@ -56,6 +60,10 @@ spec:
 {{ dict "envAll" $envAll "application" "horizon" | include "helm-toolkit.snippets.kubernetes_pod_security_context" | indent 6 }}
       affinity:
 {{ tuple $envAll "horizon" "server" | include "helm-toolkit.snippets.kubernetes_pod_anti_affinity" | indent 8 }}
+{{- with .Values.pod.topology_spread_constraints }}
+      topologySpreadConstraints:
+{{ toYaml . | indent 8 }}
+{{- end }}
       nodeSelector:
         {{ .Values.labels.dashboard.node_selector_key }}: {{ .Values.labels.dashboard.node_selector_value }}
 {{ if $envAll.Values.pod.tolerations.horizon.enabled }}

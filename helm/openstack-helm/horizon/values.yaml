@@ -50,6 +50,8 @@ labels:
 
 network:
   dashboard:
+    session_affinity: None
+    session_affinity_timeout: 10800
     ingress:
       public: true
       classes:
@@ -95,18 +97,28 @@ conf:
       <VirtualHost *:{{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}>
           WSGIApplicationGroup %{GLOBAL}
           WSGIScriptReloading Off
-          WSGIDaemonProcess horizon-http processes=5 threads=1 user=horizon group=horizon display-name=%{GROUP}
+      # Horizon spends most request time waiting on OpenStack APIs. A small
+      # threaded pool keeps unrelated navigation responsive while those I/O
+      # calls are in flight, without multiplying the Python process memory.
+      WSGIDaemonProcess horizon-http processes=4 threads=2 maximum-requests=2000 user=horizon group=horizon display-name=%{GROUP}
           WSGIProcessGroup horizon-http
           WSGIImportScript /var/www/cgi-bin/horizon/django.wsgi process-group=horizon-http application-group=%{GLOBAL}
           WSGIScriptAlias / /var/www/cgi-bin/horizon/django.wsgi
-          WSGIPassAuthorization On
+      WSGIPassAuthorization On
+      KeepAlive On
+      KeepAliveTimeout 5
+      MaxKeepAliveRequests 100
           RewriteEngine on
           RewriteCond %{REQUEST_METHOD} !^(POST|PUT|GET|DELETE|PATCH)
           RewriteRule .* - [F]
 
-          <Location "/">
-              Require all granted
-          </Location>
+      <Location "/">
+          Require all granted
+          # mod_headers prefixes %D with "D=". Keep it in a diagnostic
+          # response header instead of emitting an invalid Server-Timing
+          # numeric duration.
+          Header always set X-Horizon-Request-Time "%D"
+      </Location>
 
           Alias /static /var/www/html/horizon
           <Location "/static">
@@ -224,6 +236,8 @@ conf:
         session_cookie_secure: "False"
         session_cookie_httponly: "False"
         session_engine: 'django.contrib.sessions.backends.cache'
+        database_conn_max_age: 60
+        database_conn_health_checks: true
         compress_offline: true
         cache_backend: 'django.core.cache.backends.memcached.PyMemcacheCache'
         # Compressed assets are written to a pod-local emptyDir. Do not share
@@ -238,6 +252,9 @@ conf:
         allowed_hosts:
           - '*'
         horizon_images_upload_mode: 'legacy'
+        # Nova already returns its network-info cache with each server. Avoid
+        # a second full Neutron port walk on every instance-list navigation.
+        openstack_instance_retrieve_ip_addresses: false
         openstack_cinder_features:
           enable_backup: "True"
         openstack_neutron_network:
@@ -434,6 +451,11 @@ conf:
                 'PASSWORD': '{{ .Values.endpoints.oslo_db.auth.horizon.password }}',
                 'HOST': '{{ tuple "oslo_db" "internal" . | include "helm-toolkit.endpoints.hostname_fqdn_endpoint_lookup" }}',
                 'default-character-set': 'utf8',
+                # Reuse the session database connection in each WSGI worker.
+                # The default of zero opens a new Galera connection for every
+                # authenticated page request.
+                'CONN_MAX_AGE': {{ .Values.conf.horizon.local_settings.config.database_conn_max_age }},
+                'CONN_HEALTH_CHECKS': {{ ternary "True" "False" .Values.conf.horizon.local_settings.config.database_conn_health_checks }},
                 {{- if .Values.manifests.certificates }}
                 'OPTIONS':{
                     'ssl': {
@@ -467,6 +489,7 @@ conf:
 
         OPENSTACK_KEYSTONE_URL = "{{ tuple "identity" "internal" "api" . | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}"
         OPENSTACK_KEYSTONE_DEFAULT_ROLE = "member"
+        OPENSTACK_INSTANCE_RETRIEVE_IP_ADDRESSES = {{ ternary "True" "False" .Values.conf.horizon.local_settings.config.openstack_instance_retrieve_ip_addresses }}
 
         # This setting specifies the name of the header with remote IP address. If not present,
         # then REMOTE_ADDR header is used. The commom value for this setting is HTTP_X_REAL_IP
@@ -983,6 +1006,25 @@ conf:
         # http://tinyurl.com/anticlickjack
         DISALLOW_IFRAME_EMBED = {{ .Values.conf.horizon.local_settings.config.disallow_iframe_embed }}
 
+        # Keep slow downstream calls observable without logging tokens,
+        # request bodies, or ordinary fast traffic. This covers all Horizon
+        # plugins using keystoneauth and makes panel QoE regressions actionable.
+        import logging as _qoe_logging
+        import time as _qoe_time
+        from keystoneauth1 import session as _qoe_ks_session
+        _qoe_original_request = _qoe_ks_session.Session.request
+        def _qoe_timed_request(self, url, method, **kwargs):
+            started = _qoe_time.monotonic()
+            try:
+                return _qoe_original_request(self, url, method, **kwargs)
+            finally:
+                elapsed = _qoe_time.monotonic() - started
+                if elapsed >= 0.5:
+                    _qoe_logging.getLogger('horizon.qoe').warning(
+                        'slow downstream request method=%s url=%s elapsed=%.3fs',
+                        method, url.split('?', 1)[0], elapsed)
+        _qoe_ks_session.Session.request = _qoe_timed_request
+
         STATIC_ROOT = '/var/www/html/horizon'
 
         {{- range $option, $value := .Values.conf.horizon.local_settings.config.raw }}
@@ -1121,6 +1163,8 @@ dependencies:
           service: dashboard
 
 pod:
+  dns_config: {}
+  topology_spread_constraints: []
   probes:
     horizon:
       readiness:

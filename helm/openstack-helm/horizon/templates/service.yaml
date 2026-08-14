@@ -20,6 +20,12 @@ kind: Service
 metadata:
   name: {{ tuple "dashboard" "internal" . | include "helm-toolkit.endpoints.hostname_short_endpoint_lookup" }}
 spec:
+  sessionAffinity: {{ .Values.network.dashboard.session_affinity }}
+  {{- if eq .Values.network.dashboard.session_affinity "ClientIP" }}
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: {{ .Values.network.dashboard.session_affinity_timeout }}
+  {{- end }}
   ports:
     {{ if .Values.network.node_port.enabled }}
     - name: web

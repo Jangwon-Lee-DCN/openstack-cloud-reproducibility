@@ -31,6 +31,15 @@ PYLOCK
   }
 done
 
+[[ "$(kubectl get deployment -n "$NAMESPACE" neutron-server -o jsonpath='{.status.readyReplicas}')" == 3 ]] || {
+  echo "Neutron API does not have three ready replicas" >&2; exit 1;
+}
+[[ "$(kubectl get pods -n "$NAMESPACE" -l application=neutron,component=server \
+  -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | \
+  xargs -r -n1 kubectl get node -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)" == 3 ]] || {
+  echo "Neutron API is not spread across all three rack zones" >&2; exit 1;
+}
+
 for release in $(helm list -n "$NAMESPACE" -q); do
   status=$(helm status -n "$NAMESPACE" "$release" -o json     | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["status"])')
   [[ "$status" == deployed ]] || { echo "$release status=$status" >&2; exit 1; }
@@ -80,8 +89,10 @@ done
 for dashboard in skyline horizon; do
   component=skyline
   [[ "$dashboard" == horizon ]] && component=server
-  [[ "$(kubectl get deployment -n "$NAMESPACE" "$dashboard" -o jsonpath='{.status.readyReplicas}')" == "2" ]] || {
-    echo "$dashboard does not have two ready replicas" >&2; exit 1;
+  expected_replicas=2
+  [[ "$dashboard" == horizon ]] && expected_replicas=3
+  [[ "$(kubectl get deployment -n "$NAMESPACE" "$dashboard" -o jsonpath='{.status.readyReplicas}')" == "$expected_replicas" ]] || {
+    echo "$dashboard does not have $expected_replicas ready replicas" >&2; exit 1;
   }
   [[ "$(kubectl get pods -n "$NAMESPACE" -l "application=$dashboard,component=$component" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 2 ]] || {
     echo "$dashboard replicas are not spread across two nodes" >&2; exit 1;
@@ -97,15 +108,27 @@ done
 mapfile -t horizon_pods < <(kubectl get pods -n "$NAMESPACE" \
   -l application=horizon,component=server \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
-[[ "${#horizon_pods[@]}" -eq 2 ]] || {
-  echo "expected two Horizon server pods" >&2; exit 1;
+[[ "${#horizon_pods[@]}" -eq 3 ]] || {
+  echo "expected three Horizon server pods" >&2; exit 1;
+}
+[[ "$(kubectl get service -n "$NAMESPACE" horizon-int -o jsonpath='{.spec.sessionAffinity}')" == ClientIP ]] || {
+  echo "Horizon service does not use ClientIP affinity" >&2; exit 1;
+}
+[[ "$(printf '%s\n' "${horizon_pods[@]}" | xargs -r -n1 kubectl get pod -n "$NAMESPACE" \
+  -o jsonpath='{.spec.nodeName}{"\n"}' | xargs -r -n1 kubectl get node \
+  -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)" == 3 ]] || {
+  echo "Horizon replicas are not spread across all three rack zones" >&2; exit 1;
 }
 horizon_bundle=''
 for pod in "${horizon_pods[@]}"; do
   settings=$(kubectl exec -n "$NAMESPACE" "$pod" -- /tmp/manage.py shell -c \
-    'from django.conf import settings; print(settings.COMPRESS_OFFLINE, settings.COMPRESS_CACHE_BACKEND, settings.CACHES[settings.COMPRESS_CACHE_BACKEND]["BACKEND"], settings.STATIC_URL)')
-  [[ "$settings" == *"True compressor django.core.cache.backends.locmem.LocMemCache /horizon/static/"* ]] || {
+    'from django.conf import settings; print(settings.COMPRESS_OFFLINE, settings.COMPRESS_CACHE_BACKEND, settings.CACHES[settings.COMPRESS_CACHE_BACKEND]["BACKEND"], settings.STATIC_URL, settings.DATABASES["default"]["CONN_MAX_AGE"], settings.DATABASES["default"]["CONN_HEALTH_CHECKS"])')
+  [[ "$settings" == *"True compressor django.core.cache.backends.locmem.LocMemCache /horizon/static/ 60 True"* ]] || {
     echo "$pod has unsafe Horizon compressor settings: $settings" >&2; exit 1;
+  }
+  apache=$(kubectl exec -n "$NAMESPACE" "$pod" -- grep WSGIDaemonProcess /etc/apache2/sites-enabled/000-default.conf)
+  [[ "$apache" == *"processes=4 threads=2 maximum-requests=2000"* ]] || {
+    echo "$pod has unexpected Horizon WSGI concurrency: $apache" >&2; exit 1;
   }
   bundle=$(kubectl exec -n "$NAMESPACE" "$pod" -- sh -c \
     "find /var/www/html -name 'angular_template_cache_preloads*.js' -printf '%f %s\\n' | sort")

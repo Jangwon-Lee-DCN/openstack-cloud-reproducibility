@@ -33,6 +33,16 @@
     line: "{{ kubernetes_api_vip }} {{ kubernetes_api_fqdn }}"
     state: present
 
+- name: Make the internal image registry resolvable for containerd
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "\\s{{ registry_fqdn | regex_escape }}(?:\\s|$)"
+    line: "{{ registry_gateway_ip }} {{ registry_fqdn }}"
+    state: present
+  when:
+    - registry_fqdn is defined
+    - registry_gateway_ip is defined
+
 - name: Load Kubernetes and OpenStack kernel modules at boot
   ansible.builtin.copy:
     dest: /etc/modules-load.d/dcn-cloud.conf

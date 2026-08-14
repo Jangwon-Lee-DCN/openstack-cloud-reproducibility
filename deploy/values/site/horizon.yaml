@@ -1,20 +1,52 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-vpcops-be8d5da@sha256:8154d8cb72b52367245610d96b571f09ef9eebf34b9e454b6eb9cc169debd11b
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-qoe-955b0d3@sha256:c6e5f49864b24c34f6100b8e7c52869d9e84a9a21b01fd7023fcd51e31346a12
 pod:
+  # Internal endpoint names already contain multiple labels. ndots:5 makes
+  # glibc query an impossible search-suffixed name before the real service
+  # FQDN, and one lost DNS packet adds the default five-second retry to an
+  # otherwise fast dashboard request.
+  dns_config:
+    options:
+      - name: ndots
+        value: "2"
+      - name: timeout
+        value: "1"
+      - name: attempts
+        value: "3"
+      - name: single-request-reopen
   image_pull_secrets:
     horizon:
       - name: telemetry-harbor-push
+  topology_spread_constraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          application: horizon
+          component: server
   tolerations:
     horizon:
       enabled: true
   replicas:
-    server: 2
+    # One replica per rack prevents a slow API-bound WSGI request on either of
+    # two pods from becoming visible as whole-dashboard navigation stalls.
+    server: 3
   lifecycle:
     disruption_budget:
       horizon:
-        min_available: 1
+        min_available: 2
+  resources:
+    enabled: true
+    server:
+      requests:
+        memory: 768Mi
+        cpu: 250m
+      limits:
+        memory: 2Gi
+        cpu: "2"
 conf:
   horizon:
     local_settings:
@@ -65,13 +97,6 @@ conf:
         # recompiling template blocks in every WSGI worker (2-3 seconds per
         # login-page render in the accepted production topology).
         compress_offline: true
-        raw:
-          FORCE_SCRIPT_NAME: /horizon
-          LOGIN_REDIRECT_URL: /horizon/
-          LOGIN_URL: /horizon/auth/login/
-          LOGOUT_URL: /horizon/auth/logout/
-          STATIC_URL: /horizon/static/
-          WEBROOT: /horizon/
         csrf_trusted_origins:
           - https://cloud.dcn.ssu.ac.kr
         allowed_hosts:
@@ -139,6 +164,12 @@ endpoints:
     port:
       web:
         public: 443
+network:
+  dashboard:
+    # Keep a browser/Gateway flow on one replica long enough to reuse Horizon's
+    # short-lived API caches. Kubernetes remaps it automatically on pod failure.
+    session_affinity: ClientIP
+    session_affinity_timeout: 10800
 manifests:
   ingress_api: false
   service_ingress: false

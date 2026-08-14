@@ -88,7 +88,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: 25.7.1
     package: helm/packages/patched/horizon-2026.1.0.tgz
-    sha256: a244f7ba411da3a3bef92a71d0925525399f979fb00076b79adbd185b8d23160
+    sha256: d999aa2006e6afc0f12418e5577e2015884a4e348a900e3ed51a9d0f33072084
     valuesSnapshot: deploy/releases/horizon.values.sops.yaml
   - name: skyline
     chart: skyline

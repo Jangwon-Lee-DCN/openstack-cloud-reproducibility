@@ -11,6 +11,26 @@ if [[ -z ${KUBECONFIG:-} && -r /etc/kubernetes/admin.conf ]]; then
   export KUBECONFIG=/etc/kubernetes/admin.conf
 fi
 
+mapfile -t coredns_zones < <(
+  kubectl get pods -n kube-system -l k8s-app=kube-dns -o json \
+    | python3 -c '
+import json, subprocess, sys
+pods = json.load(sys.stdin).get("items", [])
+nodes = sorted({p.get("spec", {}).get("nodeName", "") for p in pods if p.get("status", {}).get("phase") == "Running"})
+for node in nodes:
+    zone = subprocess.check_output(["kubectl", "get", "node", node, "-o", "jsonpath={.metadata.labels.topology\\.kubernetes\\.io/zone}"], text=True)
+    print(zone)
+'
+)
+[[ ${#coredns_zones[@]} -eq 3 ]] || {
+  echo "CoreDNS is not running in three rack zones: ${coredns_zones[*]}" >&2
+  exit 1
+}
+[[ $(printf '%s\n' "${coredns_zones[@]}" | sort -u | wc -l) -eq 3 ]] || {
+  echo "CoreDNS replicas are not rack-spread: ${coredns_zones[*]}" >&2
+  exit 1
+}
+
 cleanup() {
   kubectl delete namespace "$namespace" --ignore-not-found --wait=true >/dev/null
 }
