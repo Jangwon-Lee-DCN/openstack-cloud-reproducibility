@@ -22,12 +22,6 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
-    environment = forms.ChoiceField(
-        label=_("Environment"),
-        choices=(("production", _("Production")), ("staging", _("Staging")), ("development", _("Development")), ("test", _("Test"))),
-    )
-    cost_center = forms.CharField(label=_("Cost Center"), required=False)
-    purpose = forms.CharField(label=_("Purpose"), required=False)
     initial_members = forms.CharField(
         label=_("Initial Members"), required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
@@ -39,11 +33,7 @@ class CreateProjectForm(horizon_forms.SelfHandlingForm):
             members = BulkAddMemberForm._parse_usernames(data.get("initial_members", ""))
             project = facade.create_project(
                 request, data["name"], data.get("description", ""),
-                tags=[
-                    f"owner={_request_owner(request)}", f"environment={data['environment']}",
-                    *([f"cost_center={data['cost_center']}"] if data.get("cost_center") else []),
-                    *([f"purpose={data['purpose']}"] if data.get("purpose") else []),
-                ],
+                tags=[f"owner={_request_owner(request)}"],
                 initial_members=members,
             )
         except facade.FacadeError as exc:
@@ -466,12 +456,6 @@ class ManageProjectTagsForm(horizon_forms.SelfHandlingForm):
     `required_tag` checks against."""
 
     project_id = forms.CharField(widget=forms.HiddenInput)
-    environment = forms.ChoiceField(
-        label=_("Environment"), required=False,
-        choices=(("", _("Not set")), ("production", _("Production")), ("staging", _("Staging")), ("development", _("Development")), ("test", _("Test"))),
-    )
-    cost_center = forms.CharField(label=_("Cost Center"), required=False)
-    purpose = forms.CharField(label=_("Purpose"), required=False)
     extra_tags = forms.CharField(
         label=_("Additional Tags"),
         required=False,
@@ -486,9 +470,6 @@ class ManageProjectTagsForm(horizon_forms.SelfHandlingForm):
             self.api_error(str(exc))
             return False
         tags.extend(tag for tag in current if tag.startswith("owner="))
-        for key in ("environment", "cost_center", "purpose"):
-            if data.get(key):
-                tags.append("%s=%s" % (key, data[key].strip()))
         try:
             saved = facade.set_project_tags(request, data["project_id"], tags)
         except facade.FacadeError as exc:

@@ -54,7 +54,10 @@ vpc_launch = (
     / "openstack_vpc_dashboard/dashboards/project/compute/network_interfaces/launch.py"
 ).read_text()
 assert "pools = client.list" not in vpc_launch
-assert "load_public_pools" in vpc_launch
+assert "Public IP pool" not in vpc_launch
+assert "\"ipPoolRef\": \"public\"" in vpc_launch
+assert "label=_(\"Environment\")" not in vpc_launch
+assert "label=_(\"Cost center\")" not in vpc_launch
 for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
     assert app in settings.INSTALLED_APPS
 for template in (
@@ -101,6 +104,12 @@ from openstack_dashboard.dashboards.identity.projects import tabs as project_tab
 from openstack_dashboard.dashboards.identity.projects import views as project_views
 from openstack_dashboard.dashboards.project.instances import tables as instance_tables
 from openstack_dashboard.api import base as api_base
+from project_selfservice_dashboard.forms import CreateProjectForm, ManageProjectTagsForm
+from openstack_vpc_dashboard.dashboards.project.vpc.elastic_ips.forms import CreateElasticIPForm
+from openstack_vpc_dashboard.dashboards.project.vpc.internet_gateways.forms import CreateGatewayForm
+from openstack_vpc_dashboard.dashboards.project.vpc.load_balancers.forms import CreateLoadBalancerForm
+from openstack_vpc_dashboard.dashboards.project.vpc.nat_gateways.forms import CreateNatGatewayForm
+from openstack_vpc_dashboard.dashboards.project.vpc.subnets.forms import CreateSubnetForm
 assert [tab.slug for tab in project_tabs.ProjectDetailTabs.tabs] == [
     "overview", "members", "groups", "quota_usage", "credentials", "health", "audit",
 ]
@@ -108,6 +117,15 @@ assert len(project_views.IndexView.table_classes) == 1
 assert project_views.IndexView.table_classes[0]._meta.name == "tenants"
 assert instance_tables.LaunchLinkNG.url == "horizon:project:instances:launch_instance"
 assert "ajax-modal" in instance_tables.LaunchLinkNG.classes
+# Placement, provider-network internals, and unused governance labels are
+# platform-owned. A rebuild must never reintroduce them as tenant form inputs.
+assert not {"environment", "cost_center", "purpose"} & set(CreateProjectForm.base_fields)
+assert not {"environment", "cost_center", "purpose"} & set(ManageProjectTagsForm.base_fields)
+assert "availability_zone" not in CreateSubnetForm.base_fields
+assert "external_network_id" not in CreateGatewayForm.base_fields
+assert not {"connectivity_type", "ip_pool_ref"} & set(CreateNatGatewayForm.base_fields)
+assert "external_network_id" not in CreateLoadBalancerForm.base_fields
+assert "ip_pool_ref" not in CreateElasticIPForm.base_fields
 # Horizon must never feed the VM-facing, path-prefixed Identity catalog URL
 # back into generic keystoneauth token re-scoping. That client normalizes the
 # URL to origin-root /v3 and previously broke every Nova-backed owner panel.
