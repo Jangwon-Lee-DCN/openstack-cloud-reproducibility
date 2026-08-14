@@ -103,13 +103,23 @@ Project > Container Infra > Clusters is tailored to this deployment rather
 than presenting the upstream Heat-oriented vocabulary. Cluster creation keeps
 the public Magnum API schema unchanged and exposes the following flow:
 
-1. choose the deployment profile, availability zone and SSH key;
+1. choose the deployment profile and SSH key in the current Region;
 2. size control-plane and worker groups, including autoscaling bounds;
 3. select an isolated or existing Neutron network and the Kubernetes API
    endpoint exposure;
 4. select CAPI machine-health remediation and optional add-ons;
 5. review the exact topology, access policy and expected OpenStack/CAPI outputs
    before submission.
+
+The workflow deliberately does not expose Magnum's raw `availability_zone`
+field. With an existing Subnet, the driver reads the owning Neutron Network's
+single approved `availability_zone_hints` rack. For a newly created overlay
+network, it chooses one configured rack deterministically from the immutable
+cluster UUID. That decision drives the CAPO control-plane/worker failure domain
+and the matching `public-rack-N` external network together. Consequently a
+tenant cannot accidentally place cluster VMs in one rack while placing the API
+VIP/FIP path in another. Raw AZ remains observable to operators, not a normal
+cluster-create choice.
 
 The supported Octavia API endpoint, one control plane and one worker are the
 UI defaults for the acceptance topology. A public API without allowed CIDRs is

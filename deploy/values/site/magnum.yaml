@@ -3,14 +3,14 @@ images:
   tags:
     bootstrap: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     db_init: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
-    magnum_db_sync: registry.dcn.ssu.ac.kr/openstack/magnum:source-04a74060e973@sha256:1d95033814dc30a28b7dcf7fa2aff715b990588aa9504fb1b588061e977dc096
+    magnum_db_sync: registry.dcn.ssu.ac.kr/openstack/magnum:source-placement-20260814@sha256:cab71047a87ca16941ec7dde666937361c43498b82aa0f9ed7dac5afd7bc80ff
     db_drop: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
     ks_user: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_service: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
     ks_endpoints: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
-    magnum_api: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops:source-04a74060e973@sha256:2e08daaa44bf6ee79a8bc9edefd72f62d90cff3a9bf8194d3502aaa1c0fd5b29
-    magnum_conductor: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops:source-04a74060e973@sha256:2e08daaa44bf6ee79a8bc9edefd72f62d90cff3a9bf8194d3502aaa1c0fd5b29
+    magnum_api: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops:source-placement-20260814@sha256:d6b09cbe6fa36f4e8a44a77c4fa186e1a849cf3b11a55d8955d8a78d8d6619a2
+    magnum_conductor: registry.dcn.ssu.ac.kr/openstack/magnum-capi-gitops:source-placement-20260814@sha256:d6b09cbe6fa36f4e8a44a77c4fa186e1a849cf3b11a55d8955d8a78d8d6619a2
     dep_check: quay.io/airshipit/kubernetes-entrypoint:latest-ubuntu_noble
 
 labels:
@@ -88,27 +88,29 @@ conf:
       helm_chart_repo: http://magnum-chart-repository.openstack.svc.cluster.local
       helm_chart_name: openstack-cluster
       default_helm_chart_version: 0.26.0
-      app_cred_interface_type: internal
+      # The unified region keeps cluster-local URLs on the internal interface.
+      # Workload clusters therefore consume the routed public catalog.
+      app_cred_interface_type: public
     cinder_client:
-      region_name: RegionOne-VM
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     glance_client:
-      region_name: RegionOne
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     nova_client:
-      region_name: RegionOne
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     neutron_client:
-      region_name: RegionOne
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     octavia_client:
-      region_name: RegionOne
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     heat_client:
-      region_name: RegionOne
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     barbican_client:
-      region_name: RegionOne
+      region_name: seoul-ssu-1
       endpoint_type: internalURL
     drivers:
       verify_ca: true
@@ -124,15 +126,15 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
       magnum:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: service
         user_domain_name: default
         project_domain_name: default
       magnum_stack_user:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         domain_name: magnum
   container_infra:
     host_fqdn_override:

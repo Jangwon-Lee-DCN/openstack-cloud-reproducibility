@@ -9,7 +9,7 @@
       <dl class="dl-horizontal">
         <dt>Name</dt><dd>{$ model.name || 'Not set' $}</dd>
         <dt>Profile</dt><dd>{$ model.cluster_template_id || 'Not set' $}</dd>
-        <dt>Availability zone</dt><dd>{$ model.availability_zone || 'Not set' $}</dd>
+        <dt>Placement</dt><dd>Automatic from cluster subnet and rack capacity</dd>
         <dt>SSH key</dt><dd>{$ model.keypair || 'Not set' $}</dd>
       </dl>
     </section>
@@ -27,7 +27,7 @@
     <section class="col-md-6">
       <h4>Network contract</h4>
       <dl class="dl-horizontal">
-        <dt>Cluster network</dt><dd>{$ model.create_network ? 'Create isolated network' : model.fixed_network $}</dd>
+        <dt>Cluster network</dt><dd>{$ model.create_network ? 'Create isolated network (rack selected automatically)' : model.fixed_network $}</dd>
         <dt>API endpoint</dt><dd>{$ model.master_lb_enabled ? 'Octavia load balancer' : 'Experimental direct endpoint' $}</dd>
         <dt>External access</dt><dd>{$ model.master_lb_floating_ip_enabled ? 'Floating IP' : 'Private only' $}</dd>
         <dt>Allowed CIDRs</dt><dd>{$ model.api_master_lb_allowed_cidrs || 'Unrestricted — review before production use' $}</dd>

@@ -25,6 +25,25 @@ def replace(path: str, old: str, new: str, count: int = 1) -> None:
 workflow = "clusters/workflow/workflow.service.js"
 replace(
     workflow,
+    """      var availabilityZoneTitleMap = [{value: '',
+        name: gettext('Choose an Availability Zone')}];
+""",
+    "",
+)
+replace(
+    workflow,
+    """                    {
+                      key: 'availability_zone',
+                      type: 'select',
+                      title: gettext('Availability Zone'),
+                      titleMap: availabilityZoneTitleMap,
+                      required: true
+                    },
+""",
+    "",
+)
+replace(
+    workflow,
     """          master_count: null,
           master_flavor_id: '',
           node_count: null,

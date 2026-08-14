@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-owner-access-repro-c21c298@sha256:5f457d4529072dc8236c4df2d03b98a131075f2022c43b47e50542871dd14159
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-placement-20260814@sha256:72840aefb0f9a4e97a0adeba068c3b174d4984a14d25b3322fd9059eae37c65e
 pod:
   # Internal endpoint names already contain multiple labels. ndots:5 makes
   # glibc query an impossible search-suffixed name before the real service
@@ -153,7 +153,7 @@ endpoints:
   identity:
     auth:
       admin:
-        region_name: RegionOne
+        region_name: seoul-ssu-1
         project_name: admin
   dashboard:
     host_fqdn_override:

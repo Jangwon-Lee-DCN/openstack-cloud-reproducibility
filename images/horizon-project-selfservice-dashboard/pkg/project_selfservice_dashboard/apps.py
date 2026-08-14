@@ -64,3 +64,28 @@ class ProjectSelfserviceDashboardConfig(AppConfig):
         from . import facade
 
         os_keystone.is_domain_admin = facade.is_domain_admin
+
+        # Keep physical failure-domain knobs out of ordinary tenant create
+        # forms. VPC Subnet placement is the product-level input; native
+        # Neutron AZ hints remain available to cloud administrators for
+        # diagnostics and exceptional infrastructure work.
+        from openstack_dashboard.dashboards.project.networks import workflows
+        from openstack_dashboard.dashboards.project.routers import (
+            forms as router_forms,
+        )
+
+        def hide_tenant_az_field(form_class):
+            original = form_class.__init__
+            if getattr(original, "_dcn_hides_tenant_az", False):
+                return
+
+            def wrapped(instance, request, *args, **kwargs):
+                original(instance, request, *args, **kwargs)
+                if not getattr(request.user, "is_superuser", False):
+                    instance.fields.pop("az_hints", None)
+
+            wrapped._dcn_hides_tenant_az = True
+            form_class.__init__ = wrapped
+
+        hide_tenant_az_field(workflows.CreateNetworkInfoAction)
+        hide_tenant_az_field(router_forms.CreateForm)
