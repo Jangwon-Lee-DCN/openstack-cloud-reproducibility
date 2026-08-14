@@ -64,6 +64,12 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      # Image builds must not depend on the cluster DNS view of the site's
+      # Harbor name. This is the same stable management endpoint used by the
+      # checked-in one-shot image-build manifests.
+      hostAliases:
+        - ip: 192.168.21.4
+          hostnames: [registry.dcn.ssu.ac.kr]
       nodeSelector: {openstack-control-plane: enabled}
       tolerations:
         - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
