@@ -40,6 +40,13 @@ if not match:
 print(match.group(1))
 PY
 )
+region=$(python3 - "$login" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+match = re.search(r'name="region" value="([^"]+)"', text)
+print(match.group(1) if match else "default")
+PY
+)
 
 username=$(secret_value OS_USERNAME)
 password=$(secret_value OS_PASSWORD)
@@ -48,7 +55,7 @@ status=$(curl "${curl_args[@]}" -b "$cookie" -c "$cookie" -o "$work_dir/auth-res
   -w '%{http_code}' -X POST "$HORIZON_URL/auth/login/" \
   --data-urlencode "csrfmiddlewaretoken=$csrf" \
   --data-urlencode auth_type=credentials \
-  --data-urlencode region=default \
+  --data-urlencode "region=$region" \
   --data-urlencode "username=$username" \
   --data-urlencode "password=$password" \
   --data-urlencode "domain=$domain" \
@@ -76,6 +83,7 @@ pages=(
   "object-storage|project/cloud_s3/|4.0"
   "vpc-list|project/vpcs/|7.0"
   "vpc-topology|project/vpc_topology/|5.0"
+  "vpc-launch|project/network_interfaces/instances/launch/|7.0"
 )
 
 failed=0

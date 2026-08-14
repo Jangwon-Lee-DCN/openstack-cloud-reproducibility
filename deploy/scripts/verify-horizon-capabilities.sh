@@ -38,13 +38,21 @@ region_selector = (
     site_packages / "horizon/templates/horizon/common/_region_selector.html"
 ).read_text()
 assert "regions.current.name or regions.available" in region_selector
+rendered_region = get_template("horizon/common/_region_selector.html").render({
+    "regions": {
+        "support": False,
+        "current": {"name": "seoul-ssu-1", "endpoint": settings.AVAILABLE_REGIONS[0][0]},
+        "available": [{"name": "seoul-ssu-1", "endpoint": settings.AVAILABLE_REGIONS[0][0]}],
+    }
+})
+assert "seoul-ssu-1" in rendered_region
 masakari_api = (site_packages / "masakaridashboard/api/api.py").read_text()
 assert "getattr(request.user," in masakari_api and "services_region" in masakari_api
 vpc_launch = (
     site_packages
     / "openstack_vpc_dashboard/dashboards/project/compute/network_interfaces/launch.py"
 ).read_text()
-assert "elastic-ip-pools" not in vpc_launch
+assert "pools = client.list" not in vpc_launch
 assert "load_public_pools" in vpc_launch
 for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
     assert app in settings.INSTALLED_APPS
