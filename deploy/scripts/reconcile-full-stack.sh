@@ -245,6 +245,7 @@ sops -d "$REPO_ROOT/deploy/secrets/project-facade-keystone.secret.sops.yaml" | k
 kubectl apply -f "$REPO_ROOT/deploy/manifests/project-facade.yaml"
 kubectl apply -f "$REPO_ROOT/deploy/manifests/project-facade-routes.yaml"
 kubectl -n openstack rollout status deployment/project-facade --timeout=5m
+"$REPO_ROOT/deploy/scripts/reconcile-project-facade-keystone.sh"
 
 "$REPO_ROOT/deploy/scripts/verify-barbican.sh"
 if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then
