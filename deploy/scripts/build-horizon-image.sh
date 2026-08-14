@@ -65,10 +65,9 @@ spec:
     spec:
       restartPolicy: Never
       # Image builds must not depend on the cluster DNS view of the site's
-      # Harbor name. This is the same stable management endpoint used by the
-      # checked-in one-shot image-build manifests.
+      # Harbor name. Use the routed registry VIP reachable from every rack.
       hostAliases:
-        - ip: 192.168.21.4
+        - ip: 10.67.10.4
           hostnames: [registry.dcn.ssu.ac.kr]
       nodeSelector: {openstack-control-plane: enabled}
       tolerations:
