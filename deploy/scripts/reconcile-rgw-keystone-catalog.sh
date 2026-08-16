@@ -14,7 +14,7 @@ kubectl -n openstack get secret "$source_secret" -o json |
   kubectl apply -f - >/dev/null
 
 kubectl -n rook-ceph patch cephobjectstore "$store" --type=merge -p "$(cat <<EOF
-{"spec":{"auth":{"keystone":{"url":"http://keystone-api.openstack.svc.cluster.local:5000/v3","serviceUserSecretName":"$rgw_secret","acceptedRoles":["reader","member","admin","service"],"implicitTenants":"swift","tokenCacheSize":500,"revocationInterval":300}}}}
+{"spec":{"auth":{"keystone":{"url":"http://keystone-api.openstack.svc.cluster.local:5000","serviceUserSecretName":"$rgw_secret","acceptedRoles":["reader","member","admin","service"],"implicitTenants":"swift","tokenCacheSize":500,"revocationInterval":300}}}}
 EOF
 )"
 
@@ -65,12 +65,24 @@ spec:
             - |
               token="\$(openstack token issue -f value -c id)"
               project_id="\$(openstack token issue -f value -c project_id)"
-              python3 - "\$token" "\$project_id" <<'PY'
-              import sys, urllib.request
-              token, project = sys.argv[1:]
+              container="dcn-rgw-keystone-acceptance-\$(date +%s)-\$RANDOM"
+              python3 - "\$token" "\$project_id" "\$container" <<'PY'
+              import json, sys, urllib.request
+              token, project, container = sys.argv[1:]
               url = 'http://rook-ceph-rgw-openstack-object-store.rook-ceph.svc.cluster.local/swift/v1/AUTH_' + project
-              with urllib.request.urlopen(urllib.request.Request(url, headers={'X-Auth-Token': token}), timeout=10) as r:
-                  assert 200 <= r.status < 300
+              headers = {'X-Auth-Token': token}
+              container_url = url + '/' + container
+              created = False
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(container_url, headers=headers, method='PUT'), timeout=10) as r:
+                      assert 200 <= r.status < 300
+                  created = True
+                  with urllib.request.urlopen(urllib.request.Request(url + '?format=json', headers=headers), timeout=10) as r:
+                      assert any(item['name'] == container for item in json.load(r))
+              finally:
+                  if created:
+                      with urllib.request.urlopen(urllib.request.Request(container_url, headers=headers, method='DELETE'), timeout=10) as r:
+                          assert 200 <= r.status < 300
               PY
               service_id="\$(openstack service list --type object-store -f value -c ID | head -1)"
               if [[ -z "\$service_id" ]]; then
