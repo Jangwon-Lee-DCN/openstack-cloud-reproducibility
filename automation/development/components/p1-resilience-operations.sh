@@ -26,7 +26,10 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8080/openapi.json", timeout=3)); assert d["openapi"] == "3.1.0" and "/v1/backup-policies" in d["paths"]'
     # API must reject identity-free requests at the application boundary.
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import urllib.error,urllib.request; u="http://127.0.0.1:8080/v1/runs/backup-run"; r=urllib.request.Request(u,data=b"{}",method="POST"); exec("try:\n urllib.request.urlopen(r)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code == 401")'
-    kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8080/v1/capabilities",timeout=20)); assert d["ready"] and d["destructive_actions"]=="fenced" and len(d["services"])==9 and all(v.get("installed") for v in d["services"].values()) and d["track_a_url"]["contract_write"]=="canonical-v1alpha1" and d["track_b_url"]["contract_write"]=="canonical-v1alpha1"'
+    # Provider readiness remains independently fail-closed. This Track C
+    # consumer gate requires the two cross-track contracts, not unrelated RGW
+    # data-plane reachability from the controller namespace.
+    kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.error,urllib.request; exec("try:\n d=json.load(urllib.request.urlopen(\"http://127.0.0.1:8080/v1/capabilities\",timeout=20))\nexcept urllib.error.HTTPError as e:\n assert e.code==503; d=json.load(e)"); assert d["destructive_actions"]=="fenced" and len(d["services"])==9 and d["track_a_url"]["reachable"] and d["track_b_url"]["reachable"] and d["track_a_url"]["contract_write"]=="canonical-v1alpha1" and d["track_b_url"]["contract_write"]=="canonical-v1alpha1"'
     # Durable delivery schema is the restart/idempotency boundary for both consumers.
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import os,sqlite3; db=sqlite3.connect(os.environ["RESILIENCE_DB"]); cols={r[1] for r in db.execute("pragma table_info(deliveries)")}; assert {"target","delivery_key","state","attempts","last_error","response_json"}.issubset(cols)'
     # Central OPA must allow the shared read class, deny a privileged class for
