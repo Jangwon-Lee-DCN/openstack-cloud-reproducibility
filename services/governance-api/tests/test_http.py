@@ -8,11 +8,26 @@ import json
 from http.server import ThreadingHTTPServer
 
 from governance_api.http import Handler
+from governance_api.errors import GovernanceError
+from governance_api.providers import ProviderError
 from governance_api.service import GovernanceService
 from governance_api.store import Store
 
 
 class HttpSmokeTest(unittest.TestCase):
+    def test_central_opa_transport_failure_is_fail_closed(self):
+        request = type("Request", (), {})()
+        request.headers = {"X-Auth-Token": "token", "X-Project-Id": "project"}
+        request.command = "POST"
+        request.path = "/v1/budgets"
+        request.identity = type("Identity", (), {"validate": lambda self, token, project: {
+            "domain_id": "domain", "project_id": project, "user_id": "user", "roles": ["member"]}})()
+        request.authorizer = type("Authorizer", (), {"authorize": lambda self, value:
+            (_ for _ in ()).throw(ProviderError("provider is unreachable"))})()
+        with self.assertRaises(GovernanceError) as raised:
+            Handler.request_context(request)
+        self.assertEqual((raised.exception.status, raised.exception.code), (503, "policy_unavailable"))
+
     def serve(self):
         Handler.service = GovernanceService(Store())
         Handler.identity = type("Identity", (), {"validate": lambda self, token, project: {
