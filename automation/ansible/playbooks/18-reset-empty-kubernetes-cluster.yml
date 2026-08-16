@@ -39,6 +39,7 @@
   tasks:
     - name: Reset kubeadm state
       ansible.builtin.command: kubeadm reset --force
+      changed_when: true
       when: not ansible_check_mode
 
     - name: Remove kubeadm and CNI state
@@ -55,6 +56,7 @@
   tasks:
     - name: Reset bootstrap kubeadm state
       ansible.builtin.command: kubeadm reset --force
+      changed_when: true
       when: not ansible_check_mode
 
     - name: Remove bootstrap kubeadm and CNI state
