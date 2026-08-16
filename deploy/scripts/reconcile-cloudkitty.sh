@@ -50,12 +50,8 @@ if [[ "$mode" == diff ]]; then
 fi
 
 if [[ "$mode" == apply ]]; then
-  [[ "$(git -C "$root" branch --show-current)" == main ]] || {
-    echo "apply requires the promoted main branch" >&2; exit 1;
-  }
-  [[ -z "$(git -C "$root" status --porcelain)" ]] || {
-    echo "apply requires a clean promoted worktree" >&2; exit 1;
-  }
+  : "${DCN_SITE_ROOT:?apply requires the canonical site repository path}"
+  python3 "$root/deploy/scripts/verify-cloudkitty-source-lock.py" "$root" "$DCN_SITE_ROOT" >/dev/null
   helm upgrade --install "$release" "$package" -n "$namespace" \
     -f "$values" -f "$work_dir/secrets.yaml" --atomic --timeout 20m --wait
   kubectl apply -f "$route"
