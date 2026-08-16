@@ -8,6 +8,16 @@ spec:
     - from:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: development-gateway-system}}
       ports: [{port: 8080, protocol: TCP}]
+{{- range .Values.canonicalEventConsumers }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+          podSelector:
+            matchLabels:
+{{ toYaml .podLabels | indent 14 }}
+      ports: [{port: 8080, protocol: TCP}]
+{{- end }}
   egress:
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}

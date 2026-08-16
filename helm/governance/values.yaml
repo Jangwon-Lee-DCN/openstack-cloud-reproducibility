@@ -16,6 +16,7 @@ providerMode: fake
 credentialRevision: "unconfigured"
 localOpa:
   enabled: false
+canonicalEventConsumers: []
 providers:
   keystone: ""
   opa: ""
