@@ -106,6 +106,9 @@ spec:
             - name: masakari-etc
               mountPath: /etc/masakari/api-paste.ini
               subPath: api-paste.ini
+            - name: masakari-etc
+              mountPath: /etc/masakari/policy.yaml
+              subPath: policy.yaml
       volumes:
         - name: pod-tmp
           emptyDir: {}

@@ -546,6 +546,7 @@ pod:
           memory: "1024Mi"
           cpu: "2000m"
 conf:
+  policy: {}
   paste:
     composite:masakari_api:
       use: call:masakari.api.urlmap:urlmap_factory

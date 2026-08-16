@@ -206,6 +206,8 @@ for release in   mariadb rabbitmq memcached   keystone placement   glance cinder
 done
 [[ "$resume" == "1" ]] || { echo "unknown START_AT release: $START_AT" >&2; exit 2; }
 
+"$REPO_ROOT/deploy/scripts/reconcile-rgw-keystone-catalog.sh"
+
 # Gnocchi is intentionally manifest-managed because its upstream chart runtime
 # is obsolete. Its SOPS profile is environment-specific.
 for secret in telemetry-harbor-push.secret.sops.yaml gnocchi-runtime.secret.sops.yaml; do

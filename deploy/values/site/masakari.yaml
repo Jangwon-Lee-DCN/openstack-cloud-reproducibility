@@ -43,10 +43,24 @@ pod:
       masakari_engine:
         min_available: 1
 conf:
+  policy:
+    masakari_read_only: "role:reader or role:member"
+    os_masakari_api:extensions:index: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:extensions:detail: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:os-hosts:index: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:os-hosts:detail: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:notifications:index: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:notifications:detail: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:segments:index: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:segments:detail: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:vmoves:index: "rule:admin_api or rule:masakari_read_only"
+    os_masakari_api:vmoves:detail: "rule:admin_api or rule:masakari_read_only"
   masakari:
     DEFAULT:
       masakari_api_workers: 2
       host_failure_recovery_threads: 1
+    oslo_policy:
+      policy_file: /etc/masakari/policy.yaml
 endpoints:
   identity:
     auth:
