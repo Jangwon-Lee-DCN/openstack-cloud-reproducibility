@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools==75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dcn-resilience"
+version = "0.1.0"
+description = "Development-first OpenStack resilience orchestration control plane"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+dcn-resilience = "dcn_resilience.api:main"
+
+[tool.setuptools]
+packages = ["dcn_resilience"]

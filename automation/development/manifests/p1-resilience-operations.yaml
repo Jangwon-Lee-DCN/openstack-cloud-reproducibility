@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: p1-resilience-journal
+  namespace: __NAMESPACE__
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: p1-resilience-operations
+  namespace: __NAMESPACE__
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: p1-resilience-operations}}
+  template:
+    metadata:
+      labels: {app: p1-resilience-operations}
+    spec:
+      priorityClassName: dcn-development-interruptible
+      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+      tolerations:
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: api
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          env: [{name: RESILIENCE_DB, value: /data/resilience.db}]
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: journal, mountPath: /data}]
+      volumes: [{name: journal, persistentVolumeClaim: {claimName: p1-resilience-journal}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: p1-resilience-operations, namespace: __NAMESPACE__}
+spec: {selector: {app: p1-resilience-operations}, ports: [{name: http, port: 80, targetPort: http}]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: p1-resilience-operations, namespace: __NAMESPACE__}
+spec:
+  podSelector: {matchLabels: {app: p1-resilience-operations}}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}}]
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
