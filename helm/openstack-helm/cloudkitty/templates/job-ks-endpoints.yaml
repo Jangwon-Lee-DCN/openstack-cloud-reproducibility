@@ -12,14 +12,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{- define "metadata.annotations.job.ks_endpoints" }}
-helm.sh/hook: pre-install,pre-upgrade
-helm.sh/hook-weight: "-2"
-{{- end }}
-
 {{- if .Values.manifests.job_ks_endpoints }}
 {{- $ksServiceJob := dict "envAll" . "serviceName" "cloudkitty" "serviceTypes" ( tuple "rating" ) -}}
-{{- $_ := set $ksServiceJob "jobAnnotations" (include "metadata.annotations.job.ks_endpoints" . | fromYaml ) }}
 {{- if .Values.pod.tolerations.cloudkitty.enabled -}}
 {{- $_ := set $ksServiceJob "tolerationsEnabled" true -}}
 {{- end -}}
