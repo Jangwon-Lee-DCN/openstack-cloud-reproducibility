@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+store=openstack-object-store
+region=seoul-ssu-1
+client_image=quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
+source_secret=cinder-keystone-swift
+rgw_secret=rgw-keystone-service-user
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+
+kubectl -n openstack get secret "$source_secret" >/dev/null
+kubectl -n openstack get secret "$source_secret" -o json |
+  python3 -c 'import json,sys; x=json.load(sys.stdin); x["metadata"]={"name":sys.argv[1],"namespace":"rook-ceph"}; [x.pop(k,None) for k in ("status",)]; print(json.dumps(x))' "$rgw_secret" |
+  kubectl apply -f - >/dev/null
+
+kubectl -n rook-ceph patch cephobjectstore "$store" --type=merge -p "$(cat <<EOF
+{"spec":{"auth":{"keystone":{"url":"http://keystone-api.openstack.svc.cluster.local:5000","serviceUserSecretName":"$rgw_secret","acceptedRoles":["reader","member","admin","service"],"implicitTenants":"swift","tokenCacheSize":500,"revocationInterval":300}}}}
+EOF
+)"
+
+# The OpenStack Swift catalog contract below includes AUTH_<project_id> in the
+# account URL. Ceph defaults rgw_swift_account_in_url to false, which rejects
+# that otherwise valid Keystone-scoped request before token authorization.
+# Scope the setting to this RGW daemon instead of changing every object store.
+ceph_tools_pod="$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}')"
+test -n "$ceph_tools_pod"
+kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config set client.rgw.openstack.object.store.a rgw_swift_account_in_url true
+kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config set client.rgw.openstack.object.store.a rgw_keystone_url \
+  http://keystone-api.openstack.svc.cluster.local:5000
+test "$(kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config get client.rgw.openstack.object.store.a rgw_swift_account_in_url)" = true
+test "$(kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config get client.rgw.openstack.object.store.a rgw_keystone_url)" = \
+  http://keystone-api.openstack.svc.cluster.local:5000
+
+kubectl -n rook-ceph apply -f "$root/deploy/manifests/rgw-swift-route.yaml"
+# A monitor config update is persistent but is not pushed into the running RGW
+# process in this deployment. Restart only this gateway, then verify the
+# effective daemon value rather than trusting the config database alone.
+kubectl -n rook-ceph rollout restart deployment/rook-ceph-rgw-$store-a
+kubectl -n rook-ceph rollout status deployment/rook-ceph-rgw-$store-a --timeout=15m
+rgw_pod="$(kubectl -n rook-ceph get pod -l app=rook-ceph-rgw,rgw=$store -o jsonpath='{.items[0].metadata.name}')"
+test -n "$rgw_pod"
+test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
+  socket=$(find /run/ceph -maxdepth 1 -name "*client.rgw.openstack.object.store.a*.asok" -print -quit)
+  test -n "$socket"
+  ceph daemon "$socket" config get rgw_swift_account_in_url
+' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_swift_account_in_url"])')" = true
+test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
+  socket=$(find /run/ceph -maxdepth 1 -name "*client.rgw.openstack.object.store.a*.asok" -print -quit)
+  test -n "$socket"
+  ceph daemon "$socket" config get rgw_keystone_url
+' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_keystone_url"])')" = \
+  http://keystone-api.openstack.svc.cluster.local:5000
+
+# The catalog is reconciled only inside this Job, after a real Keystone token
+# has listed its Swift account through RGW. A dead endpoint can never be
+# published by a merely successful Kubernetes rollout.
+kubectl -n openstack delete job rgw-keystone-catalog --ignore-not-found --wait=true >/dev/null
+cat <<EOF | kubectl apply -f - >/dev/null
+apiVersion: batch/v1
+kind: Job
+metadata: {name: rgw-keystone-catalog, namespace: openstack}
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: reconcile
+          image: $client_image
+          envFrom: [{secretRef: {name: $source_secret}}]
+          command: [/bin/bash, -ceu]
+          args:
+            - |
+              token="\$(openstack token issue -f value -c id)"
+              project_id="\$(openstack token issue -f value -c project_id)"
+              container="dcn-rgw-keystone-acceptance-\$(date +%s)-\$RANDOM"
+              python3 - "\$token" "\$project_id" "\$container" <<'PY'
+              import json, sys, urllib.request
+              token, project, container = sys.argv[1:]
+              url = 'http://rook-ceph-rgw-openstack-object-store.rook-ceph.svc.cluster.local/swift/v1/AUTH_' + project
+              headers = {'X-Auth-Token': token}
+              container_url = url + '/' + container
+              created = False
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(container_url, headers=headers, method='PUT'), timeout=10) as r:
+                      assert 200 <= r.status < 300
+                  created = True
+                  with urllib.request.urlopen(urllib.request.Request(url + '?format=json', headers=headers), timeout=10) as r:
+                      assert any(item['name'] == container for item in json.load(r))
+              finally:
+                  if created:
+                      with urllib.request.urlopen(urllib.request.Request(container_url, headers=headers, method='DELETE'), timeout=10) as r:
+                          assert 200 <= r.status < 300
+              PY
+              service_id="\$(openstack service list --type object-store -f value -c ID | head -1)"
+              if [[ -z "\$service_id" ]]; then
+                service_id="\$(openstack service create --name swift object-store -f value -c id)"
+              fi
+              while read -r endpoint_id; do
+                [[ -z "\$endpoint_id" ]] || openstack endpoint delete "\$endpoint_id"
+              done < <(openstack endpoint list --service "\$service_id" --region $region -f value -c ID)
+              openstack endpoint create --region $region "\$service_id" public 'https://s3.cloud.dcn.ssu.ac.kr/swift/v1/AUTH_%(project_id)s'
+              openstack endpoint create --region $region "\$service_id" internal 'http://rook-ceph-rgw-openstack-object-store.rook-ceph.svc.cluster.local/swift/v1/AUTH_%(project_id)s'
+              openstack endpoint create --region $region "\$service_id" admin 'http://rook-ceph-rgw-openstack-object-store.rook-ceph.svc.cluster.local/swift/v1/AUTH_%(project_id)s'
+              test "\$(openstack endpoint list --service "\$service_id" --region $region -f value -c ID | wc -l)" -eq 3
+EOF
+kubectl -n openstack wait --for=condition=complete job/rgw-keystone-catalog --timeout=10m

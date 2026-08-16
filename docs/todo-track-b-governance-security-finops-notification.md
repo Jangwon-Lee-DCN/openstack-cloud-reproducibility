@@ -628,3 +628,4 @@ Track C와 다른 UI consumer는 Track B DB나 내부 worker endpoint를 직접 
 세부 경계, 인수 방법과 rollback은 `docs/governance-development-slice.md`에 기록한다.
 위 미완료 항목을 통과하기 전에는 이 슬라이스를 운영 기능으로 표현하거나 운영에
 승격하지 않는다.
+=======
