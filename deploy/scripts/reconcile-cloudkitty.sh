@@ -4,11 +4,11 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 namespace=openstack
 release=cloudkitty
-package="$root/helm/packages/upstream/cloudkitty-2026.1.0.tgz"
+package="$root/helm/packages/patched/cloudkitty-2026.1.0.tgz"
 values="$root/deploy/values/site/cloudkitty.yaml"
 secrets="$root/deploy/secrets/cloudkitty.values.sops.yaml"
 route="$root/deploy/manifests/cloudkitty-public-route.yaml"
-expected_package_sha=35b1db4df2f91b73637465f953535b8189e8fb8ba93bb561e2c965d3771ceb90
+expected_package_sha=37383178b564d1fbccf1cbdc42f40f0f6a774d7156ad73add8ba898d7f2163c4
 mode="${1:-check}"
 
 for command in helm kubectl sops sha256sum; do
