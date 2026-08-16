@@ -26,8 +26,14 @@ ceph_tools_pod="$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools -o jsonpat
 test -n "$ceph_tools_pod"
 kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
   ceph config set client.rgw.openstack.object.store.a rgw_swift_account_in_url true
+kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config set client.rgw.openstack.object.store.a rgw_keystone_url \
+  http://keystone-api.openstack.svc.cluster.local:5000
 test "$(kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
   ceph config get client.rgw.openstack.object.store.a rgw_swift_account_in_url)" = true
+test "$(kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config get client.rgw.openstack.object.store.a rgw_keystone_url)" = \
+  http://keystone-api.openstack.svc.cluster.local:5000
 
 kubectl -n rook-ceph apply -f "$root/deploy/manifests/rgw-swift-route.yaml"
 # A monitor config update is persistent but is not pushed into the running RGW
@@ -42,6 +48,12 @@ test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
   test -n "$socket"
   ceph daemon "$socket" config get rgw_swift_account_in_url
 ' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_swift_account_in_url"])')" = true
+test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
+  socket=$(find /run/ceph -maxdepth 1 -name "*client.rgw.openstack.object.store.a*.asok" -print -quit)
+  test -n "$socket"
+  ceph daemon "$socket" config get rgw_keystone_url
+' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_keystone_url"])')" = \
+  http://keystone-api.openstack.svc.cluster.local:5000
 
 # The catalog is reconciled only inside this Job, after a real Keystone token
 # has listed its Swift account through RGW. A dead endpoint can never be

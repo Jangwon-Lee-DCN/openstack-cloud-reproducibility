@@ -12,9 +12,12 @@ account_setting = script.index("ceph config set client.rgw.openstack.object.stor
 account_check = script.index("ceph config get client.rgw.openstack.object.store.a rgw_swift_account_in_url")
 runtime_restart = script.index("rollout restart deployment/rook-ceph-rgw-$store-a")
 runtime_check = script.index('ceph daemon "$socket" config get rgw_swift_account_in_url')
+url_setting = script.index("ceph config set client.rgw.openstack.object.store.a rgw_keystone_url")
+url_runtime_check = script.index('ceph daemon "$socket" config get rgw_keystone_url')
 assert account_setting < account_check < runtime_restart < runtime_check < accept, (
     "AUTH_<project_id> handling must be persisted, loaded and runtime-verified before acceptance"
 )
+assert account_setting < url_setting < runtime_restart < url_runtime_check < accept
 assert '"url":"http://keystone-api.openstack.svc.cluster.local:5000"' in script
 assert "method='PUT'" in script and "?format=json" in script and "method='DELETE'" in script
 assert script.index("method='PUT'") < script.index("?format=json") < script.index("method='DELETE'") < catalog
