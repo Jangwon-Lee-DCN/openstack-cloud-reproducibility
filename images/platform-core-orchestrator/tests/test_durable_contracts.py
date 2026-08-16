@@ -98,8 +98,10 @@ class DurableContractsTest(unittest.TestCase):
 
     def test_postgres_contract_uses_nonblocking_claim_and_jsonb_migration(self):
         migration = (Path(__file__).parent / ".." / "migrations" / "postgresql" / "001_core.sql").read_text(encoding="utf-8")
+        adapter = (Path(__file__).parent / ".." / "core" / "postgres_store.py").read_text(encoding="utf-8")
         self.assertIn("FOR UPDATE SKIP LOCKED", CLAIM_OPERATION)
         self.assertIn("FOR UPDATE SKIP LOCKED", PUBLISH_OUTBOX)
+        self.assertIn("action NOT LIKE 'producer.%%'", adapter)
         self.assertIn("jsonb", migration); self.assertIn("timestamptz", migration)
         self.assertIn("UNIQUE(project_id,idempotency_key)", migration)
 
