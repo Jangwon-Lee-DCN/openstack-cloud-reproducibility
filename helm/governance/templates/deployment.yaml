@@ -62,6 +62,7 @@ spec:
             - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
             - {name: GOVERNANCE_PROVIDER_MODE, value: {{ .Values.providerMode | quote }}}
             - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_PORT, value: "5432"}
             - {name: GOVERNANCE_POSTGRES_USER, value: governance}
             - {name: GOVERNANCE_POSTGRES_DB, value: governance}
             - name: GOVERNANCE_POSTGRES_PASSWORD
