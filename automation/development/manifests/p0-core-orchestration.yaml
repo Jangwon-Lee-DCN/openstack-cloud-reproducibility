@@ -148,6 +148,7 @@ data:
   policy.rego: |
     package vpc.authz
     import future.keywords.in
+    import future.keywords.if
     default allow := false
     allow if {
       input.context.authorization_class == "read"
