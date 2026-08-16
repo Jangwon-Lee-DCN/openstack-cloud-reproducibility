@@ -23,7 +23,8 @@ class PostgreSQLContractTest(unittest.TestCase):
         migration_dir = pathlib.Path(__file__).parents[1] / "migrations"
         migrations = sorted(migration_dir.glob("*.sql"))
         self.assertEqual([item.name for item in migrations], [
-            "001_governance.sql", "002_tenant_rls.sql", "003_canonical_event_ingestion.sql"])
+            "001_governance.sql", "002_tenant_rls.sql", "003_canonical_event_ingestion.sql",
+            "004_finops_ledger.sql"])
         combined = "\n".join(item.read_text() for item in migrations)
         for migration in migrations:
             text = migration.read_text().strip()
@@ -31,7 +32,8 @@ class PostgreSQLContractTest(unittest.TestCase):
             self.assertTrue(text.endswith("COMMIT;"))
         for required in ("governance_outbox", "governance_cost_ledger", "governance_audit_event",
                          "governance_canonical_event", "ENABLE ROW LEVEL SECURITY",
-                         "current_setting('dcn.project_id', true)"):
+                         "current_setting('dcn.project_id', true)",
+                         "governance_reject_immutable_change", "governance_budget_event"):
             self.assertIn(required, combined)
         for destructive in ("DROP TABLE", "TRUNCATE", "DELETE FROM"):
             self.assertNotIn(destructive, combined.upper())

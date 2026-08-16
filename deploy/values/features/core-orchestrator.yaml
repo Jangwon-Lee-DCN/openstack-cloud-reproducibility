@@ -1,0 +1,18 @@
+# Integration-owned production values template. This file is inert until an
+# approved development -> main promotion wires it into the production Phase.
+coreOrchestrator:
+  enabled: false
+  image:
+    repository: registry.dcn.ssu.ac.kr/openstack/platform-core-orchestrator
+    digest: ""
+  featureFlags:
+    launchTemplate: false
+    autoScaling: false
+    recycleBin: false
+  database:
+    backend: postgresql
+    secretRef: core-orchestrator-database
+  auth:
+    mode: signed-proxy
+    identityAssertionSecretRef: core-orchestrator-identity-assertion
+    aodhEventSecretRef: core-orchestrator-aodh-event

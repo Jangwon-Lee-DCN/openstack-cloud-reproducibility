@@ -6,10 +6,17 @@ from urllib.request import Request, urlopen
 from dataclasses import dataclass
 
 from governance_api.providers import OpenStackClient, ProviderError
+from .migrate import apply_migrations
 
 
 class IntegrationError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class RuntimeIntegrations:
+    event_bus: object
+    token: str
 
 
 def application_credential_token(auth_url: str, credential_id: str, secret: str) -> str:
@@ -36,6 +43,7 @@ class PostgresOutbox:
                           user=os.environ["GOVERNANCE_POSTGRES_USER"],
                           password=os.environ["GOVERNANCE_POSTGRES_PASSWORD"])
         with psycopg.connect(self.dsn, **kwargs) as connection:
+            apply_migrations(connection)
             connection.execute("""
               CREATE TABLE IF NOT EXISTS governance_worker_checkpoint(
                 worker TEXT PRIMARY KEY, checkpoint TEXT NOT NULL,
@@ -86,12 +94,13 @@ class GovernanceProviders:
             raise IntegrationError("test resource prefix must start governance-dev-")
         self.clients = {
             name: OpenStackClient(os.environ[f"GOVERNANCE_{name.upper()}_URL"], token)
-            for name in ("gnocchi", "barbican", "designate", "octavia", "nova", "cinder", "neutron", "glance")
+            for name in ("gnocchi", "cloudkitty", "barbican", "designate", "octavia", "nova", "cinder", "neutron", "glance")
         }
         self.project_id = os.environ["GOVERNANCE_KEYSTONE_PROJECT_ID"]
 
     def probe(self):
-        paths = {"gnocchi": "/v1/resource/generic?limit=1", "barbican": "/v1/secrets?limit=1",
+        paths = {"gnocchi": "/v1/resource/generic?limit=1", "cloudkitty": "/v2/summary?limit=1",
+                 "barbican": "/v1/secrets?limit=1",
                  "designate": "/v2/zones?limit=1", "octavia": "/v2.0/lbaas/loadbalancers?limit=1",
                  "nova": f"/v2.1/{self.project_id}/servers?limit=1",
                  "cinder": f"/v3/{self.project_id}/volumes?limit=1",
@@ -127,4 +136,4 @@ def initialize_real_integrations():
                                          credential_id, credential_secret)
     probes = GovernanceProviders(token, os.environ["GOVERNANCE_TEST_RESOURCE_PREFIX"]).probe()
     print(json.dumps({"provider_probe": probes}, sort_keys=True), flush=True)
-    return bus
+    return RuntimeIntegrations(bus, token)

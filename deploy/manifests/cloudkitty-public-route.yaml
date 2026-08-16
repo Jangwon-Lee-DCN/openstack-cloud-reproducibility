@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openstack-public-rating
+  namespace: openstack
+spec:
+  parentRefs:
+    - name: openstack-public-gateway
+      namespace: openstack-gateway-system
+      sectionName: https
+  hostnames: [cloud.dcn.ssu.ac.kr]
+  rules:
+    - matches: [{path: {type: PathPrefix, value: /rating}}]
+      filters: [{type: URLRewrite, urlRewrite: {path: {type: ReplacePrefixMatch, replacePrefixMatch: /}}}]
+      backendRefs: [{name: cloudkitty-api, port: 8089}]

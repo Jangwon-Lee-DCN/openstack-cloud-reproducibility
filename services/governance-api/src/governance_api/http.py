@@ -90,6 +90,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, self.service.get_canonical_event(ctx, event_id))
             if parsed.path == "/v1/audit-events":
                 return self.reply(200, {"items": self.service.search_audit(ctx)})
+            if parsed.path == "/v1/usage-summary":
+                query = parse_qs(parsed.query)
+                return self.reply(200, self.service.page_usage_ledger(
+                    ctx, limit=int(query.get("limit", [50])[0]),
+                    cursor=query.get("cursor", [None])[0],
+                    period=query.get("period", [None])[0], meter=query.get("meter", [None])[0]))
             route = ROUTES.get(parsed.path)
             if not route:
                 collection, resource_id = self._resource_path(parsed.path)
