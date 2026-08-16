@@ -8,6 +8,7 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
+import time
 
 from .adapters import ComputeAdapter, NetworkAdapter, ProviderError, VolumeAdapter
 
@@ -101,6 +102,13 @@ class NovaAdapter(ComputeAdapter):
 
     def delete_server(self, server_id):
         self.session.request("nova", "DELETE", f"/servers/{server_id}", expected=(202, 204, 404))
+        for _ in range(60):
+            try: self.session.request("nova", "GET", f"/servers/{server_id}", expected=(200,))
+            except ProviderError as exc:
+                if exc.code == "NOVA_HTTP_404": return
+                raise
+            time.sleep(2)
+        raise ProviderError("NOVA_DELETE_TIMEOUT", retryable=True)
 
 
 class NeutronAdapter(NetworkAdapter):
@@ -144,3 +152,10 @@ class CinderAdapter(VolumeAdapter):
 
     def delete_volume(self, volume_id):
         self.session.request("cinder", "DELETE", f"/v3/{self.session.project_id}/volumes/{volume_id}", expected=(202, 204, 404))
+        for _ in range(60):
+            try: self.session.request("cinder", "GET", f"/v3/{self.session.project_id}/volumes/{volume_id}", expected=(200,))
+            except ProviderError as exc:
+                if exc.code == "CINDER_HTTP_404": return
+                raise
+            time.sleep(2)
+        raise ProviderError("CINDER_DELETE_TIMEOUT", retryable=True)

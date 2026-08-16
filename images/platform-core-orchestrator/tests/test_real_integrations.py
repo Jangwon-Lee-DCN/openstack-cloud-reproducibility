@@ -100,14 +100,15 @@ class RealProviderContractTests(unittest.TestCase):
         self.assertEqual("2026-01-01T00:00:00+00:00", row["created_at"])
         json.dumps(row)
     def session(self, fail_service=None):
-        resources, calls = {}, []
+        resources, calls, deleted = {}, [], set()
         def transport(method, url, headers, body):
             calls.append((method, url))
             if url.endswith("/auth/tokens"):
                 return 201, {"X-Subject-Token": "token"}, {"token": {"project": {"id": "project-1"}}}
             service = next(name for name in ("nova", "neutron", "cinder") if name in url)
             if fail_service == service and method == "POST": return 400, {}, {}
-            if method == "DELETE": return 204, {}, {}
+            if method == "DELETE": deleted.add(service); return 204, {}, {}
+            if method == "GET" and service in deleted: return 404, {}, {}
             if service == "neutron": payload = {"port": {"id": "port-1"}}
             elif service == "cinder": payload = {"volume": {"id": "volume-1"}}
             else: payload = {"server": {"id": "server-1"}}
