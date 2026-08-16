@@ -48,6 +48,7 @@ case "$operation" in
     unset rabbit_password
     kubectl -n openstack exec "$rabbit_pod" -c rabbitmq -- rabbitmqctl set_permissions \
       -p /dcn-p0-track-a-development dcn_p0_track_a_dev '^dcn\.track-a\.' '^dcn\.track-a\.' '^dcn\.track-a\.' >/dev/null
+    kubectl -n "$DEVELOPMENT_NAMESPACE" delete configmap p0-core-opa-policy --ignore-not-found >/dev/null
     sed -e "s|__NAMESPACE__|$DEVELOPMENT_NAMESPACE|g" \
         -e "s|__IMAGE__|$CORE_ORCHESTRATOR_IMAGE|g" "$manifest" | kubectl apply -f -
     ;;
