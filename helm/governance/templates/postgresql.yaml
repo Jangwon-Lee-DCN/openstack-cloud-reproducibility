@@ -35,8 +35,16 @@ spec:
           readinessProbe: {tcpSocket: {port: postgresql}, initialDelaySeconds: 5, periodSeconds: 5}
           resources: {{- toYaml .Values.resources | nindent 12 }}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
-          volumeMounts: [{name: data, mountPath: /bitnami/postgresql}]
-      volumes: [{name: data, emptyDir: {}}]
+          volumeMounts:
+            - {name: data, mountPath: /bitnami/postgresql}
+            - {name: runtime, mountPath: /tmp, subPath: tmp}
+            - {name: runtime, mountPath: /opt/bitnami/postgresql/conf, subPath: conf}
+            - {name: runtime, mountPath: /opt/bitnami/postgresql/tmp, subPath: pg-tmp}
+            - {name: dshm, mountPath: /dev/shm}
+      volumes:
+        - {name: data, emptyDir: {}}
+        - {name: runtime, emptyDir: {}}
+        - {name: dshm, emptyDir: {medium: Memory}}
 ---
 apiVersion: v1
 kind: Service

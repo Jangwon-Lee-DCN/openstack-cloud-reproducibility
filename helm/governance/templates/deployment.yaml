@@ -43,6 +43,7 @@ spec:
             - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
             - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
             - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_PORT, value: "5432"}
             - {name: GOVERNANCE_RABBITMQ_HOST, value: {{ .Values.providers.rabbitmqHost | quote }}}
           ports: [{name: http, containerPort: 8080}]
           readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
