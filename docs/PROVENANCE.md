@@ -5,7 +5,8 @@
 - Repository: `https://opendev.org/openstack/openstack-helm.git`
 - Tag: `2026.1.0`
 - Commit: `c665eed`
-- Imported charts: every chart listed in `release-lock.yaml`, plus `gnocchi`
+- Imported charts: every chart listed in `release-lock.yaml`, including
+  `cloudkitty`, plus `gnocchi`
   and their shared `helm-toolkit` dependency
 
 The chart trees were exported directly from the Git object at that commit.

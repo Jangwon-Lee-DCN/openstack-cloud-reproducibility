@@ -1,0 +1,17 @@
+apiVersion: governance.dcn.ssu.ac.kr/v1alpha1
+kind: RateCard
+metadata:
+  name: dcn-showback-v1
+spec:
+  currency: DCN-CREDIT
+  billing: false
+  effectiveAt: "2026-08-01T00:00:00Z"
+  meters:
+    - {name: governance.acceptance, unit: unit-hour, unitPrice: "1.000000", acceptanceOnly: true}
+    - {name: instance, unit: instance-hour, unitPrice: "1.000000"}
+    - {name: memory, unit: GiB-hour, unitPrice: "0.010000"}
+    - {name: volume.size, unit: GiB-hour, unitPrice: "0.001000"}
+    - {name: snapshot.size, unit: GiB-hour, unitPrice: "0.001000"}
+    - {name: ip.floating, unit: ip-hour, unitPrice: "0.100000"}
+    - {name: network.services.lb, unit: lb-hour, unitPrice: "0.500000"}
+    - {name: radosgw.objects.size, unit: GiB-hour, unitPrice: "0.000500"}

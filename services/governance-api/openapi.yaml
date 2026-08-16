@@ -52,6 +52,17 @@ paths:
     get: {$ref: "#/components/x-list"}
     post: {$ref: "#/components/x-create"}
   /v1/usage/{id}: {$ref: "#/components/x-item"}
+  /v1/usage-summary:
+    get:
+      security: [{keystoneToken: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: period, in: query, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: meter, in: query, schema: {type: string}}
+      responses:
+        "200": {description: immutable project-scoped rated ledger, content: {application/json: {schema: {$ref: "#/components/schemas/UsageSummary"}}}}
+        "403": {description: scope or central OPA denial}
   /v1/rate-cards:
     get: {$ref: "#/components/x-list"}
     post: {$ref: "#/components/x-create"}
@@ -124,6 +135,19 @@ components:
       properties:
         items: {type: array, items: {$ref: "#/components/schemas/EventStatus"}}
         next: {type: [string, "null"]}
+    UsageSummary:
+      type: object
+      additionalProperties: false
+      required: [items, next, coverage, missing_meters, watermark, watermark_updated_at, currency, billing]
+      properties:
+        items: {type: array, items: {type: object, additionalProperties: true}}
+        next: {type: [string, "null"]}
+        coverage: {type: string, enum: [complete, incomplete]}
+        missing_meters: {type: array, items: {type: string}}
+        watermark: {type: [string, "null"]}
+        watermark_updated_at: {type: [string, "null"], format: date-time}
+        currency: {const: DCN-CREDIT}
+        billing: {const: false}
     Resource:
       type: object
       required: [id, domain_id, project_id, operation_id, revision]

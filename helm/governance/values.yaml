@@ -21,6 +21,7 @@ providers:
   keystone: ""
   opa: ""
   gnocchi: ""
+  cloudkitty: ""
   barbican: ""
   designate: ""
   octavia: ""

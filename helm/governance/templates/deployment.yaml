@@ -42,6 +42,7 @@ spec:
             - {name: GOVERNANCE_KEYSTONE_URL, value: {{ .Values.providers.keystone | quote }}}
             - {name: GOVERNANCE_OPA_URL, value: {{ .Values.providers.opa | quote }}}
             - {name: GOVERNANCE_GNOCCHI_URL, value: {{ .Values.providers.gnocchi | quote }}}
+            - {name: GOVERNANCE_CLOUDKITTY_URL, value: {{ .Values.providers.cloudkitty | quote }}}
             - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
             - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
             - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
@@ -78,6 +79,7 @@ spec:
               valueFrom: {secretKeyRef: {name: governance-real-integrations, key: rabbitmq-url}}
             - {name: GOVERNANCE_KEYSTONE_URL, value: {{ .Values.providers.keystone | quote }}}
             - {name: GOVERNANCE_GNOCCHI_URL, value: {{ .Values.providers.gnocchi | quote }}}
+            - {name: GOVERNANCE_CLOUDKITTY_URL, value: {{ .Values.providers.cloudkitty | quote }}}
             - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
             - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
             - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}

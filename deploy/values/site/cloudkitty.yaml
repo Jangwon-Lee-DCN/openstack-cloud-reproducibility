@@ -1,0 +1,186 @@
+# CloudKitty 2026.1 chart, pinned to the upstream-approved 2025.1 Noble images.
+# Secrets are supplied only by deploy/secrets/cloudkitty.values.sops.yaml.
+images:
+  tags:
+    bootstrap: quay.io/airshipit/openstack-client@sha256:2177e480c6ba553828067f5044f2ec2930f6c030b31d2c18660c05dfad24521d
+    cloudkitty_api: quay.io/airshipit/cloudkitty@sha256:62884240c83bf5a2bea3925a37f183f72ea8cb215cc6db1097220970e5d9c703
+    cloudkitty_db_sync: quay.io/airshipit/cloudkitty@sha256:62884240c83bf5a2bea3925a37f183f72ea8cb215cc6db1097220970e5d9c703
+    cloudkitty_processor: quay.io/airshipit/cloudkitty@sha256:62884240c83bf5a2bea3925a37f183f72ea8cb215cc6db1097220970e5d9c703
+    cloudkitty_storage_init: quay.io/airshipit/cloudkitty@sha256:62884240c83bf5a2bea3925a37f183f72ea8cb215cc6db1097220970e5d9c703
+    db_init: quay.io/airshipit/openstack-client@sha256:2177e480c6ba553828067f5044f2ec2930f6c030b31d2c18660c05dfad24521d
+    db_drop: quay.io/airshipit/openstack-client@sha256:2177e480c6ba553828067f5044f2ec2930f6c030b31d2c18660c05dfad24521d
+    dep_check: quay.io/airshipit/kubernetes-entrypoint@sha256:37a3a505dc2711ade9e9d028a74a6c0eeb4f69ab5baa1529b59f70971f08d532
+    ks_endpoints: quay.io/airshipit/openstack-client@sha256:2177e480c6ba553828067f5044f2ec2930f6c030b31d2c18660c05dfad24521d
+    ks_service: quay.io/airshipit/openstack-client@sha256:2177e480c6ba553828067f5044f2ec2930f6c030b31d2c18660c05dfad24521d
+    ks_user: quay.io/airshipit/openstack-client@sha256:2177e480c6ba553828067f5044f2ec2930f6c030b31d2c18660c05dfad24521d
+    rabbit_init: docker.io/library/rabbitmq@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: seoul-ssu-1
+        project_name: admin
+        user_domain_name: Default
+        project_domain_name: Default
+      cloudkitty:
+        role: service
+        region_name: seoul-ssu-1
+        username: cloudkitty
+        project_name: service
+        user_domain_name: Default
+        project_domain_name: Default
+    hosts:
+      default: keystone
+      internal: keystone-api
+    path:
+      default: /v3
+    port:
+      api:
+        default: 80
+        internal: 5000
+  rating:
+    hosts:
+      default: cloudkitty-api
+      internal: cloudkitty-api
+      public: cloud.dcn.ssu.ac.kr
+    host_fqdn_override:
+      public:
+        host: cloud.dcn.ssu.ac.kr
+    path:
+      public: /rating
+    scheme:
+      public: https
+    port:
+      api:
+        default: 8089
+        internal: 8089
+        public: 443
+  oslo_db:
+    hosts:
+      default: mariadb
+    path: /cloudkitty
+    port:
+      mysql:
+        default: 3306
+  oslo_messaging:
+    statefulset:
+      replicas: 2
+    hosts:
+      default: rabbitmq
+    path: /cloudkitty
+
+conf:
+  cloudkitty:
+    DEFAULT:
+      debug: false
+      auth_strategy: keystone
+    collect:
+      collector: gnocchi
+      period: 3600
+      wait_periods: 0
+    collector_gnocchi:
+      auth_section: keystone_authtoken
+      region_name: seoul-ssu-1
+    fetcher:
+      backend: gnocchi
+    fetcher_gnocchi:
+      auth_section: keystone_authtoken
+      region_name: seoul-ssu-1
+    storage:
+      backend: sqlalchemy
+      version: 2
+  processor_metrics: |
+    metrics:
+      governance.acceptance:
+        extra_args: {aggregation_method: mean, resource_type: generic}
+        groupby: [id, user_id, project_id]
+        unit: unit-hour
+      cpu:
+        alt_name: instance
+        extra_args: {aggregation_method: mean, resource_type: instance}
+        groupby: [id, user_id, project_id]
+        metadata: [flavor_name, flavor_id, vcpus, memory_mb]
+        mutate: NUMBOOL
+        unit: instance-hour
+      memory:
+        extra_args: {aggregation_method: mean, resource_type: instance}
+        factor: 1/1073741824
+        groupby: [id, user_id, project_id]
+        metadata: [flavor_name, flavor_id, vcpus, memory_mb]
+        unit: GiB-hour
+      volume.size:
+        extra_args: {aggregation_method: mean, resource_type: volume}
+        groupby: [id, user_id, project_id]
+        metadata: [volume_type]
+        unit: GiB-hour
+      snapshot.size:
+        extra_args: {aggregation_method: mean, resource_type: volume}
+        groupby: [id, user_id, project_id]
+        unit: GiB-hour
+      ip.floating:
+        extra_args: {aggregation_method: mean, resource_type: network}
+        groupby: [id, user_id, project_id]
+        mutate: NUMBOOL
+        unit: ip-hour
+      network.services.lb:
+        extra_args: {aggregation_method: mean, resource_type: network}
+        groupby: [id, user_id, project_id]
+        mutate: NUMBOOL
+        unit: lb-hour
+      radosgw.objects.size:
+        extra_args: {aggregation_method: mean, resource_type: ceph_account}
+        factor: 1/1073741824
+        groupby: [id, user_id, project_id]
+        unit: GiB-hour
+
+bootstrap:
+  enabled: true
+  ks_user: cloudkitty
+  script: |
+    set -euo pipefail
+    openstack rating module enable hashmap >/dev/null
+    ensure_rate() {
+      meter="$1"
+      price="$2"
+      service_id="$(openstack rating hashmap service list -f value -c Name -c 'Service ID' | awk -v name="$meter" '$1 == name {print $2}')"
+      if [ -z "$service_id" ]; then
+        service_id="$(openstack rating hashmap service create "$meter" -f value -c 'Service ID')"
+      fi
+      existing="$(openstack rating hashmap mapping list --service-id "$service_id" -f value -c Name | grep -Fx 'dcn-showback-v1' || true)"
+      if [ -z "$existing" ]; then
+        openstack rating hashmap mapping create --service-id "$service_id" --type flat \
+          --name dcn-showback-v1 --start 2026-08-01T00:00:00Z \
+          --description 'immutable DCN-CREDIT showback rate card v1' "$price" >/dev/null
+      fi
+    }
+    ensure_rate instance 1.000000
+    ensure_rate governance.acceptance 1.000000
+    ensure_rate memory 0.010000
+    ensure_rate volume.size 0.001000
+    ensure_rate snapshot.size 0.001000
+    ensure_rate ip.floating 0.100000
+    ensure_rate network.services.lb 0.500000
+    ensure_rate radosgw.objects.size 0.000500
+
+pod:
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+  replicas:
+    cloudkitty_api: 2
+    cloudkitty_processor: 2
+  lifecycle:
+    disruption_budget:
+      cloudkitty_api:
+        min_available: 1
+
+manifests:
+  ingress_api: false
+  job_image_repo_sync: false
+  network_policy: false
+  secret_ingress_tls: false
+  service_ingress_api: false

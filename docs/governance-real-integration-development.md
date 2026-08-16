@@ -11,7 +11,8 @@ Keystone token -> Governance API -> Keystone self-token validation
 
 Governance worker -> development PostgreSQL (checkpoint schema)
                   -> RabbitMQ /ceilometer vhost (dedicated durable queue)
-                  -> Gnocchi / Barbican / Designate / Octavia adapters
+                  -> Gnocchi -> CloudKitty -> immutable cost ledger / budget events
+                  -> Barbican / Designate / Octavia adapters
 ```
 
 The API exposes `/readyz`. Required providers are closed over an explicit list;
@@ -23,13 +24,13 @@ are listed as blockers and never replaced by deterministic fakes.
 | Integration | Development state |
 | --- | --- |
 | Keystone | discovered at `keystone-api.openstack.svc:5000`; self-token validation implemented |
-| OPA | development-local runtime uses the byte-identical `vpc.authz-v4` policy, source annotation and SHA-256 `25774f…ad2c`; shared OPA and its NetworkPolicy remain unchanged |
+| OPA | central `opa-pilot.vpc-control-plane-system` runtime uses the `vpc.authz-v4` policy and SHA-256 `25774f…ad2c` |
 | PostgreSQL | dedicated ephemeral development instance, immutable image digest |
 | RabbitMQ | real platform broker; least-privilege Ceilometer vhost credential copied without decoding into the development namespace |
 | Gnocchi | real API adapter and authenticated probe implemented |
 | Barbican / Designate / Octavia | real API adapters implemented; Designate/Octavia authenticated probes pass, while Barbican closes authenticated in-cluster connections and remains a provider-specific fail-closed blocker |
 | Nova / Cinder / Neutron / Glance native tags | real metadata/tag adapters and authenticated list probes; writes are limited to explicit `governance-dev-*` acceptance resources |
-| CloudKitty | **blocked: no service/endpoints discovered** |
+| CloudKitty | OpenStack-Helm 2026.1 API/processor, Keystone `rating` catalog in `seoul-ssu-1`, MariaDB/RabbitMQ/Gnocchi collector, immutable Hashmap rate v1 and Governance collector are reproducibly defined; acceptance is in `docs/governance-cloudkitty-finops.md` |
 | SMTP | **blocked: no platform SMTP relay or approved test-sink endpoint discovered** |
 | Webhook | **blocked: `hooks.dev.dcn.ssu.ac.kr` test sink is not deployed** |
 | Audit search/index/export backend | **blocked: no dedicated append-only/index backend discovered** |
@@ -53,6 +54,9 @@ prefix `governance-dev-`.
 6. Verify OPA allows `member/project-write`, denies `reader/project-write`, and
    the mounted policy checksum equals the recorded source checksum.
 7. Use only `governance-dev-*` resources for native tag mutation tests.
+8. Run `deploy/tests/cloudkitty-finops-acceptance.sh`; it must prove Gnocchi
+   measure to CloudKitty rating to Governance ledger, two budget events,
+   restart/reprocess stability and zero mutable test-resource residue.
 
 ## Rollback
 
