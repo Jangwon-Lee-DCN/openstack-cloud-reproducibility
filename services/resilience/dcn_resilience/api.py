@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import threading
 import time
 from urllib.parse import parse_qs
@@ -21,12 +22,36 @@ from .engine import Engine
 from .store import Journal
 from .workflows import DevelopmentAdapter
 from .integrations import integration_readiness
+from .integrations import KeystoneSession
+from .cross_track import TrackAHttpClient, TrackBHttpClient
+
+
+def _contract_schema(name: str) -> dict:
+    candidates = (Path(__file__).parents[1] / "contracts" / name, Path("/app/contracts") / name)
+    for path in candidates:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    raise RuntimeError(f"missing embedded contract schema {name}")
+
+
+def _engine(config: Config, database: str):
+    journal = Journal(database)
+    if config.mode == "development":
+        return Engine(journal, FakeOperationClient(), FakeEventClient(), DevelopmentAdapter()), None
+    session = KeystoneSession(config.integration["KEYSTONE_AUTH_URL"],
+                              config.integration["KEYSTONE_APPLICATION_CREDENTIAL_ID"],
+                              config.integration["KEYSTONE_APPLICATION_CREDENTIAL_SECRET"])
+    session.authenticate()
+    operations = TrackAHttpClient(config.integration["TRACK_A_URL"], session, journal,
+                                  _contract_schema("track-a.operation.v1alpha1.schema.json"))
+    events = TrackBHttpClient(config.integration["TRACK_B_URL"], session, journal,
+                              _contract_schema("track-b.event.v1alpha1.schema.json"))
+    return Engine(journal, operations, events, DevelopmentAdapter()), session
 
 
 def build_app(database: str | None = None):
     config = Config.from_env()
-    engine = Engine(Journal(database or config.database),
-                    FakeOperationClient(), FakeEventClient(), DevelopmentAdapter())
+    engine, session = _engine(config, database or config.database)
     controller = make_controller(engine)
 
     def app(environ, start_response):
@@ -51,6 +76,10 @@ def build_app(database: str | None = None):
                 if size > 65536:
                     raise ValueError("request too large")
                 body = json.loads(environ["wsgi.input"].read(size) or b"{}")
+                if session:
+                    if project_id != session.project_id:
+                        return respond(start_response, 403, {"error": "project does not match application credential scope"})
+                    body.update({"domain_id": session.domain_id, "requested_by": session.user_id})
                 operation = engine.submit(kind, project_id, environ.get("HTTP_IDEMPOTENCY_KEY", ""), body)
                 return respond(start_response, 201, public_operation(operation))
             if method == "GET" and path.startswith("/v1/operations/"):
@@ -150,7 +179,7 @@ def main():
 
 
 def _scheduler_controller(database):
-    engine = Engine(Journal(database), FakeOperationClient(), FakeEventClient(), DevelopmentAdapter())
+    engine, _ = _engine(Config.from_env(), database)
     return make_controller(engine)
 
 

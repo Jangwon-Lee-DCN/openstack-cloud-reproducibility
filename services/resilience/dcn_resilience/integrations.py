@@ -39,6 +39,8 @@ class KeystoneSession:
     token: str = ""
     catalog: tuple[dict[str, Any], ...] = ()
     project_id: str = ""
+    domain_id: str = ""
+    user_id: str = ""
 
     def authenticate(self) -> None:
         body = {"auth": {"identity": {"methods": ["application_credential"], "application_credential": {
@@ -48,7 +50,9 @@ class KeystoneSession:
         token = payload.get("token", {})
         self.catalog = tuple(token.get("catalog", []))
         self.project_id = token.get("project", {}).get("id", "")
-        if not self.token or not self.project_id:
+        self.domain_id = token.get("project", {}).get("domain", {}).get("id", "")
+        self.user_id = token.get("user", {}).get("id", "")
+        if not self.token or not self.project_id or not self.domain_id or not self.user_id:
             raise IntegrationError("Keystone response omitted scoped token or project")
 
     def endpoint(self, service_type: str, interface: str = "internal") -> str:
@@ -139,7 +143,7 @@ def integration_readiness(config) -> dict[str, Any]:
         for key in ("TRACK_A_URL", "TRACK_B_URL"):
             try:
                 status, _, _ = _request(config.integration[key].rstrip("/") + "/healthz")
-                result[key.lower()] = {"reachable": status == 200, "contract_write": "blocked-no-canonical-consumer-endpoint"}
+                result[key.lower()] = {"reachable": status == 200, "contract_write": "canonical-v1alpha1"}
             except IntegrationError as exc:
                 result[key.lower()] = {"reachable": False, "reason": str(exc)}
     except IntegrationError as exc:
@@ -151,7 +155,7 @@ def integration_readiness(config) -> dict[str, Any]:
         result["opa"] = {"reachable": False, "reason": str(exc), "authorization": "fail-closed"}
     blockers = [name for name, value in result["services"].items() if not value.get("installed")]
     blockers += [name for name in ("track_a_url", "track_b_url")
-                 if not result.get(name, {}).get("reachable") or result.get(name, {}).get("contract_write")]
+                 if not result.get(name, {}).get("reachable")]
     result["ready"] = not blockers
     result["blockers"] = blockers
     return result

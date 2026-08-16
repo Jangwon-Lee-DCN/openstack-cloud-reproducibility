@@ -21,7 +21,11 @@ class Engine:
             raise ValueError("project and idempotency key are required")
         request = dict(request)
         request["project_id"] = project_id
-        operation_id = str(uuid.uuid4())
+        operation_id = request.get("operation_id", str(uuid.uuid4()))
+        try:
+            operation_id = str(uuid.UUID(operation_id))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ValueError("operation_id must be a canonical UUID") from exc
         record, created = self.journal.create({
             "id": operation_id, "project_id": project_id, "kind": kind,
             "idempotency_key": idempotency_key, "correlation_id": str(uuid.uuid4()), "request": request,
@@ -37,7 +41,7 @@ class Engine:
         if not self.journal.acquire_lease(operation_id, self.worker_id):
             raise RuntimeError("operation is leased by another worker")
         self.journal.set_state(operation_id, "running")
-        self.operations.transition(operation_id, "RUNNING", {"kind": record["kind"]})
+        self._transition(operation_id, "RUNNING", {"kind": record["kind"]})
         completed = self.journal.completed_steps(operation_id)
         try:
             steps = WORKFLOWS[record["kind"]](record["request"], self.adapter)
@@ -51,7 +55,7 @@ class Engine:
                 completed.add(name)
             result = {"evidence_retained": True, "completed_steps": sorted(completed)}
             self.journal.set_state(operation_id, "succeeded", result)
-            self.operations.transition(operation_id, "SUCCEEDED", result)
+            self._transition(operation_id, "SUCCEEDED", result)
             self._event(record, "succeeded")
         except Exception as exc:
             compensation_evidence = []
@@ -61,14 +65,22 @@ class Engine:
                 compensation_evidence = [{"error": str(compensation_error), "manual_action_required": True}]
             result = {"error": str(exc), "compensation": compensation_evidence}
             self.journal.set_state(operation_id, "failed", result)
-            self.operations.transition(operation_id, "FAILED", result)
+            self._transition(operation_id, "FAILED", result)
             self._event(record, "failed")
         finally:
             self.journal.release_lease(operation_id, self.worker_id)
         return self.journal.get(operation_id, project_id)
 
+    def _transition(self, operation_id: str, state: str, detail: dict[str, Any]) -> None:
+        try:
+            self.operations.transition(operation_id, state, detail)
+        except Exception:
+            # Cross-track evidence is durable in the delivery journal. A target
+            # outage must not roll back an otherwise valid resilience workflow.
+            return
+
     def _event(self, record: dict[str, Any], outcome: str) -> None:
-        self.events.emit("resource.changed", {
+        envelope = {
             "contract_version": "track-b.event.v1alpha1", "event_id": str(uuid.uuid4()),
             "event_type": "resource.changed", "occurred_at": datetime.now(UTC).isoformat(),
             "domain_id": record["request"].get("domain_id", "default"),
@@ -79,4 +91,9 @@ class Engine:
             "operation_id": record["id"], "correlation_id": record["correlation_id"],
             "request_id": record["request"].get("request_id", record["correlation_id"]),
             "payload": {"action": f"{record['kind']}.{outcome}", "outcome": outcome},
-        })
+        }
+        try:
+            self.events.emit("resource.changed", envelope)
+        except Exception:
+            # The Track B delivery has its own checkpoint/DLQ lifecycle.
+            return

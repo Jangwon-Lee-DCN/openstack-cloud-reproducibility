@@ -34,8 +34,52 @@ class Journal:
               operation_id TEXT PRIMARY KEY, owner TEXT NOT NULL, expires_at REAL NOT NULL,
               FOREIGN KEY(operation_id) REFERENCES operations(id) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS deliveries (
+              target TEXT NOT NULL, delivery_key TEXT NOT NULL, operation_id TEXT NOT NULL,
+              contract_version TEXT NOT NULL, payload_json TEXT NOT NULL,
+              state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+              next_attempt_at REAL NOT NULL DEFAULT 0, last_error TEXT,
+              response_json TEXT NOT NULL DEFAULT '{}',
+              PRIMARY KEY(target, delivery_key)
+            );
             """
         )
+
+    def enqueue_delivery(self, target: str, key: str, operation_id: str,
+                         contract_version: str, payload: dict[str, Any]) -> None:
+        self.db.execute(
+            "INSERT OR IGNORE INTO deliveries(target,delivery_key,operation_id,contract_version,payload_json) VALUES(?,?,?,?,?)",
+            (target, key, operation_id, contract_version, json.dumps(payload, sort_keys=True)),
+        )
+        self.db.commit()
+
+    def delivery(self, target: str, key: str) -> dict[str, Any]:
+        row = self.db.execute("SELECT * FROM deliveries WHERE target=? AND delivery_key=?", (target, key)).fetchone()
+        if row is None:
+            raise KeyError((target, key))
+        value = dict(row)
+        value["payload"] = json.loads(value.pop("payload_json"))
+        value["response"] = json.loads(value.pop("response_json"))
+        return value
+
+    def mark_delivery(self, target: str, key: str, state: str, *, error: str | None = None,
+                      response: dict[str, Any] | None = None, delay: float = 0) -> None:
+        self.db.execute(
+            "UPDATE deliveries SET state=?,attempts=attempts+1,next_attempt_at=?,last_error=?,response_json=? "
+            "WHERE target=? AND delivery_key=?",
+            (state, time.time() + delay, error, json.dumps(response or {}, sort_keys=True), target, key),
+        )
+        self.db.commit()
+
+    def delivery_evidence(self, operation_id: str) -> list[dict[str, Any]]:
+        rows = self.db.execute(
+            "SELECT target,delivery_key,state,attempts,next_attempt_at,last_error,response_json "
+            "FROM deliveries WHERE operation_id=? ORDER BY target,delivery_key", (operation_id,)
+        )
+        result = []
+        for row in rows:
+            value = dict(row); value["response"] = json.loads(value.pop("response_json")); result.append(value)
+        return result
 
     def create(self, record: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         try:

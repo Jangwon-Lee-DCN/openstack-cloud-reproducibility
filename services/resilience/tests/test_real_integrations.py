@@ -25,7 +25,8 @@ class RealIntegrationTests(unittest.TestCase):
     def test_keystone_catalog_drives_all_nine_read_only_adapters(self, request):
         catalog = [{"type": kind, "endpoints": [{"interface": "internal", "url": f"http://{name}"}]}
                    for name, (kind, _) in SERVICE_PROBES.items()]
-        request.side_effect = [(201, {"token": {"project": {"id": "project"}, "catalog": catalog}},
+        request.side_effect = [(201, {"token": {"project": {"id": "project", "domain": {"id": "domain"}},
+                                      "user": {"id": "user"}, "catalog": catalog}},
                                 {"X-Subject-Token": "token"})] + [(200, {}, {})] * 9
         session = KeystoneSession("http://keystone", "id", "secret")
         session.authenticate()
@@ -55,7 +56,8 @@ class RealIntegrationTests(unittest.TestCase):
     def test_readiness_reports_missing_service_and_contract_write_blockers(self, request):
         catalog = [{"type": kind, "endpoints": [{"interface": "internal", "url": f"http://{name}"}]}
                    for name, (kind, _) in SERVICE_PROBES.items() if name != "rgw"]
-        request.side_effect = [(201, {"token": {"project": {"id": "project"}, "catalog": catalog}},
+        request.side_effect = [(201, {"token": {"project": {"id": "project", "domain": {"id": "domain"}},
+                                      "user": {"id": "user"}, "catalog": catalog}},
                                 {"X-Subject-Token": "token"})] + [(200, {}, {})] * 8 + [(200, {}, {})] * 3
         config = Config("integration", ":memory:", {
             "KEYSTONE_AUTH_URL": "http://keystone", "KEYSTONE_APPLICATION_CREDENTIAL_ID": "id",
@@ -64,7 +66,7 @@ class RealIntegrationTests(unittest.TestCase):
         result = integration_readiness(config)
         self.assertFalse(result["ready"])
         self.assertIn("rgw", result["blockers"])
-        self.assertIn("track_a_url", result["blockers"])
+        self.assertNotIn("track_a_url", result["blockers"])
 
 
 if __name__ == "__main__":

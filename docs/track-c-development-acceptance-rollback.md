@@ -24,7 +24,7 @@ failure-drill suites pass in the isolated boundary.
    - the namespace is exactly `development-p1-resilience-operations`;
    - scheduling selects only `dcn.ssu.ac.kr/workload-class=development`;
    - the deployed image is digest-pinned;
-   - health reports fake Track A/B integration explicitly;
+   - health reports real Track A/B v1alpha1 integration explicitly;
    - requests without verified project identity return HTTP 401;
    - there is no HTTPRoute, production Gateway reference or service-account token.
    - the non-authoritative journal uses the development-local `dcn-local-rwo`
@@ -47,6 +47,11 @@ failure-drill suites pass in the isolated boundary.
 - declared network reachability with a failed probe is recorded as mismatch;
 - active Masakari recovery blocks a competing maintenance campaign;
 - a revoked image digest requires Glance deactivation.
+- Track A transition and Track B ingest use distinct durable checkpoints,
+  bounded exponential retry, per-target circuit state and DLQ evidence;
+- an identical replay after process restart does not call either target twice;
+- one target's outage does not prevent the other target or rewrite a completed
+  resilience workflow as failed.
 
 These tests use deterministic adapters. They are contract evidence, not proof
 that Cinder, Nova, Neutron/OVN, Octavia, Designate or Glance integration works.
@@ -73,10 +78,6 @@ delete production resources. Source rollback is a revert PR.
 
 All remaining gates require real external integration:
 
-- replace Track A `v1alpha1` fake transitions with the accepted Operation/Task,
-  lock, cancellation, dry-run and compensation client;
-- replace Track B `v1alpha1` fake events with its authenticated producer and
-  validate notification/audit delivery and dead-letter behavior;
 - install Keystone middleware that overwrites identity headers and enforce the
   final OPA action matrix on every collection/action;
 - replace all nine deterministic provider fakes with scoped Cinder, Glance,

@@ -2,18 +2,15 @@
 
 ## Current discovery evidence (2026-08-16 UTC)
 
-The live Keystone catalog advertises `volumev3`, `image`, `sharev2`, `compute`,
-`network`, `load-balancer`, `dns`, and `instance-ha`. The in-cluster RGW service
-exists, but Keystone does not advertise an `object-store` endpoint. Track C
-therefore reports RGW as unavailable instead of substituting an unscoped URL.
-Masakari is catalogued, but the dedicated member credential receives HTTP 403
-for failure segments. This intended least-privilege result keeps evacuation
-execution blocked pending an explicitly reviewed operator role.
+The live Keystone catalog now advertises all nine required service types,
+including scoped `object-store` and GET-only `instance-ha` access. Track C still
+resolves every URL from the application-credential token catalog and never
+substitutes a guessed ClusterIP.
 
 The development Track A and Track B services respond to `/healthz`. Their
-canonical schemas are consumed by Track C, but the deployed Track A API has no
-external operation-transition endpoint and Track B has no canonical event
-ingestion endpoint. A health response is not treated as contract integration.
+canonical schemas are consumed by Track C. Track A publishes the revision- and
+idempotency-guarded `/v1/operations/{id}/transition` endpoint; Track B publishes
+the project-scoped canonical `/v1/events` ingest endpoint.
 
 OPA is deployed at `opa-pilot.vpc-control-plane-system.svc:8181`. Decisions are
 fail-closed: a missing response, missing `result`, or anything except an
@@ -38,8 +35,14 @@ read-only acceptance may enumerate.
 2. Resolve endpoints from the returned Keystone catalog; never hard-code a
    production ClusterIP.
 3. Perform list operations with `limit=1` against the credential's project.
-4. Check Track A/B health and separately require their canonical consumer
-   endpoints. Missing endpoints keep readiness false.
+4. Create a fenced Track A operation, then pass its UUID to Track C. Verify the
+   canonical VALIDATING/SCHEDULED/RUNNING/SUCCEEDED timeline and monotonic
+   revision/progress.
+5. Verify Track B accepts the emitted canonical event once and returns its
+   stored event on an identical idempotent replay.
+6. Restart Track C and prove delivered checkpoints suppress duplicate calls;
+   force each target down independently and retain bounded retry and DLQ
+   evidence without changing the completed local workflow result.
 5. Check OPA health and one explicit allow/deny decision using non-sensitive
    resource identifiers.
 6. Confirm every `execute` and `compensate` call returns `destructive action
@@ -50,7 +53,6 @@ read-only acceptance may enumerate.
 
 Integration mode may run only in `development-p1-resilience-operations` via
 `./deploy.sh development p1-resilience-operations`. Production promotion is
-blocked until the exact immutable digest passes the sequence above and Track
-A/B publish their missing consumer endpoints. Rollback redeploys the previously
+blocked until the exact immutable digest passes the sequence above. Rollback redeploys the previously
 accepted digest and removes only the dedicated development application
 credential; it never modifies tenant resources.
