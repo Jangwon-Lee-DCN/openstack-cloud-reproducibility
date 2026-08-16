@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dcn.ssu.ac.kr/contracts/track-a-operation-v1alpha1.json",
+  "title": "Track A Operation reference consumed by Track B",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "status", "contract_version"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "status": {
+      "enum": ["validating", "running", "succeeded", "failed", "rolling_back", "rolled_back"]
+    },
+    "contract_version": {"const": "track-a.operation.v1alpha1"}
+  }
+}

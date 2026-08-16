@@ -1,0 +1,13 @@
+image:
+  repository: registry.dcn.ssu.ac.kr/openstack/governance-api
+  digest: ""
+replicaCount: 1
+host: p1-governance-services.dev.dcn.ssu.ac.kr
+gateway:
+  name: development-gateway
+  namespace: development-gateway-system
+priorityClassName: dcn-development-interruptible
+webhookAllowedHosts: ""
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {cpu: 500m, memory: 256Mi}

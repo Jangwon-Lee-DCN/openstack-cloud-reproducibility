@@ -588,3 +588,20 @@ Track C와 다른 UI consumer는 Track B DB나 내부 worker endpoint를 직접 
   시나리오를 통과했다.
 - [ ] 기존 `Project Health`, Alertmanager, Keystone/Keycloak/OPA, Barbican,
   Ceilometer/Gnocchi 동작을 회귀시키지 않는다.
+
+## 17. 개발 구현 기록
+
+### Slice 0.1.0 — API/control model
+
+- [x] tenant-scoped repository, idempotency, canonical audit/redaction 기반
+- [x] 알림·구독, usage/rating/budget, 인증서·rotation policy, audit, tag API 모델
+- [x] `track-a.operation.v1alpha1` fake adapter 및 versioned contract fixture
+- [x] immutable-image-only Helm 차트와 독립 development component
+- [x] 단위·HTTP·tenant-negative·secret-redaction·audit-integrity 테스트
+- [ ] Keystone/OPA, PostgreSQL HA 및 실제 Track A Operation 연동
+- [ ] notification/telemetry/certificate/rotation/audit/tag worker adapter
+- [ ] Track B 전용 Horizon panel 및 development end-to-end acceptance
+
+세부 경계, 인수 방법과 rollback은 `docs/governance-development-slice.md`에 기록한다.
+위 미완료 항목을 통과하기 전에는 이 슬라이스를 운영 기능으로 표현하거나 운영에
+승격하지 않는다.

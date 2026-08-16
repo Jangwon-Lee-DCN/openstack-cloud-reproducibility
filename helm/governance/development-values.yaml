@@ -1,0 +1,4 @@
+# This overlay is consumed only by automation/development/components/p1-governance-services.sh.
+replicaCount: 1
+host: p1-governance-services.dev.dcn.ssu.ac.kr
+webhookAllowedHosts: hooks.dev.dcn.ssu.ac.kr

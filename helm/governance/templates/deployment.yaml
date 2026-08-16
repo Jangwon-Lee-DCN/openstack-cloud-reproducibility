@@ -1,0 +1,56 @@
+{{- required "image.digest must pin an immutable sha256 digest" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.image.digest) -}}
+{{- fail "image.digest must be sha256:<64 lowercase hex>" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: governance-api
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app.kubernetes.io/name: governance-api}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: governance-api
+        dcn.ssu.ac.kr/development-ingress: allowed
+    spec:
+      priorityClassName: {{ .Values.priorityClassName }}
+      automountServiceAccountToken: false
+      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+      tolerations:
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
+            - {name: GOVERNANCE_WEBHOOK_ALLOWED_HOSTS, value: {{ .Values.webhookAllowedHosts | quote }}}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts: [{name: data, mountPath: /var/lib/governance}]
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: governance-api}
+spec:
+  selector: {app.kubernetes.io/name: governance-api}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: governance-api}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/name: governance-api}}
