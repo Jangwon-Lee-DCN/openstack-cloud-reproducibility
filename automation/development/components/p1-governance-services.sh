@@ -89,10 +89,10 @@ case "$operation" in
     readiness=$(curl --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
       --resolve "$host:443:$DEVELOPMENT_GATEWAY_IP" "https://$host/readyz")
     python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","opa","gnocchi","barbican","designate","octavia","nova","cinder","neutron","glance","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required)' "$readiness"
-    policy_sha=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get configmap governance-opa-policy \
-      -o jsonpath='{.metadata.annotations.dcn\.ssu\.ac\.kr/source-sha256}')
+    policy_sha=$(kubectl -n vpc-control-plane-system get configmap opa-vpc-policy-v4 \
+      -o jsonpath='{.data.policy\.rego}' | sha256sum | awk '{print $1}')
     [[ $policy_sha == 25774f220e1f6f301948aa7ebd0a681a0bf6bb012d132c0e0da619d93f4dad2c ]]
-    opa_url="http://governance-opa.$DEVELOPMENT_NAMESPACE.svc.cluster.local:8181/v1/data/vpc/authz/decision"
+    opa_url="http://opa-pilot.vpc-control-plane-system.svc.cluster.local:8181/v1/data/vpc/authz/decision"
     allow=$(kubectl -n "$DEVELOPMENT_NAMESPACE" exec deployment/governance-api -c api -- \
       python3 -c 'import json,sys,urllib.request; body=json.dumps({"input":{"subject":{"roles":["member"]},"context":{"authorization_class":"project-write"}}}).encode(); print(json.load(urllib.request.urlopen(urllib.request.Request(sys.argv[1],data=body,headers={"Content-Type":"application/json"}),timeout=5))["result"]["allow"])' "$opa_url")
     deny=$(kubectl -n "$DEVELOPMENT_NAMESPACE" exec deployment/governance-api -c api -- \

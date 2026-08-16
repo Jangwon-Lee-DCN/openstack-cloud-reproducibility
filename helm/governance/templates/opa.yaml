@@ -1,3 +1,4 @@
+{{- if .Values.localOpa.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -56,3 +57,4 @@ spec:
     - from:
         - podSelector: {matchLabels: {app.kubernetes.io/name: governance-api}}
       ports: [{port: 8181, protocol: TCP}]
+{{- end }}
