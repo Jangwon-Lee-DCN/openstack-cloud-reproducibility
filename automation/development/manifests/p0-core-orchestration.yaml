@@ -45,7 +45,7 @@ spec:
             - {name: CORE_RUNTIME_MODE, value: real-openstack}
             - {name: CORE_AUTH_MODE, value: keystone-opa}
             - {name: CORE_KEYSTONE_URL, value: "http://keystone-api.openstack.svc.cluster.local:5000/v3"}
-            - {name: CORE_OPA_DECISION_URL, value: "http://opa-pilot.vpc-control-plane-system.svc.cluster.local:8181/v1/data/vpc/authz/decision"}
+            - {name: CORE_OPA_DECISION_URL, value: "http://127.0.0.1:8181/v1/data/vpc/authz/decision"}
             - name: CORE_DATABASE_URL
               valueFrom: {secretKeyRef: {name: p0-core-backends, key: database-url}}
             - name: CORE_APPROVAL_SIGNING_KEY
@@ -125,7 +125,56 @@ spec:
             capabilities: {drop: [ALL]}
             readOnlyRootFilesystem: true
             runAsUser: 10001
-      volumes: [{name: data, emptyDir: {}}]
+        - name: opa
+          image: openpolicyagent/opa:0.68.0-static@sha256:6a95ee2152d4006732916a8b63106a6e822827952234cc0e783d348ae1ead2cc
+          args: [run, --server, --addr=127.0.0.1:8181, /policies/policy.rego]
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 100m, memory: 96Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+            runAsUser: 10001
+          volumeMounts: [{name: opa-policy, mountPath: /policies, readOnly: true}]
+      volumes:
+        - {name: data, emptyDir: {}}
+        - {name: opa-policy, configMap: {name: p0-core-opa-policy}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: p0-core-opa-policy, namespace: __NAMESPACE__}
+data:
+  policy.rego: |
+    package vpc.authz
+    import future.keywords.in
+    default allow := false
+    allow if {
+      input.context.authorization_class == "read"
+      some role in input.subject.roles
+      role in {"reader", "member", "manager", "admin", "domain-admin", "load-balancer_admin", "monitoring", "network-admin", "network-operator", "security-admin", "security-operator"}
+    }
+    allow if {
+      input.context.authorization_class == "project-write"
+      some role in input.subject.roles
+      role in {"admin", "domain-admin", "manager", "member", "load-balancer_admin"}
+    }
+    allow if {
+      input.context.authorization_class == "network-sharing"
+      some role in input.subject.roles
+      role in {"admin", "domain-admin", "manager", "network-admin", "network-operator"}
+    }
+    allow if {
+      input.context.authorization_class == "security-policy"
+      some role in input.subject.roles
+      role in {"admin", "domain-admin", "manager", "security-admin", "security-operator"}
+    }
+    allow if {
+      input.context.authorization_class == "cross-domain-peering"
+      some role in input.subject.roles
+      role in {"admin", "domain-admin"}
+    }
+    decision := {"allow": allow, "policy": "vpc.authz", "policy_version": "vpc-authz-v4", "mode": "enforce"}
 ---
 apiVersion: v1
 kind: Service
