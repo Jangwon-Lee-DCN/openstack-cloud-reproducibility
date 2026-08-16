@@ -27,6 +27,8 @@ failure-drill suites pass in the isolated boundary.
    - health reports fake Track A/B integration explicitly;
    - requests without verified project identity return HTTP 401;
    - there is no HTTPRoute, production Gateway reference or service-account token.
+   - the non-authoritative journal uses the development-local `dcn-local-rwo`
+     StorageClass and does not attach PowerStore or production Ceph storage.
 6. Preserve the tested Git SHA, image digest and test output in the development
    PR. Do not rebuild that image for later promotion.
 
