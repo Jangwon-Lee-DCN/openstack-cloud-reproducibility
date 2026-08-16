@@ -16,10 +16,17 @@ CREATE TABLE IF NOT EXISTS operations (
  correlation_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  lease_owner TEXT, lease_expires_at TEXT, attempt INTEGER NOT NULL DEFAULT 0,
  next_attempt_at TEXT, checkpoint_json TEXT, request_json TEXT NOT NULL DEFAULT '{}',
+ revision INTEGER NOT NULL DEFAULT 0,
  UNIQUE(project_id,idempotency_key));
 CREATE TABLE IF NOT EXISTS operation_events (
  id INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL,
  event_type TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL,
+ FOREIGN KEY(operation_id) REFERENCES operations(id));
+CREATE TABLE IF NOT EXISTS operation_transitions (
+ project_id TEXT NOT NULL, operation_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+ fingerprint TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+ response_json TEXT NOT NULL, created_at TEXT NOT NULL,
+ PRIMARY KEY(project_id,operation_id,idempotency_key),
  FOREIGN KEY(operation_id) REFERENCES operations(id));
 CREATE TABLE IF NOT EXISTS outbox (
  id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT NOT NULL, aggregate_id TEXT NOT NULL,
@@ -83,6 +90,7 @@ class Store:
                 "lease_owner": "TEXT", "lease_expires_at": "TEXT",
                 "attempt": "INTEGER NOT NULL DEFAULT 0", "next_attempt_at": "TEXT",
                 "checkpoint_json": "TEXT", "request_json": "TEXT NOT NULL DEFAULT '{}'",
+                "revision": "INTEGER NOT NULL DEFAULT 0",
             }
             for name, definition in additions.items():
                 if name not in columns:
@@ -108,6 +116,7 @@ class Store:
         with self.tx() as db:
             row = db.execute(
                 "SELECT id FROM operations WHERE state IN ('REQUESTED','VALIDATING','SCHEDULED','RUNNING','ROLLING_BACK') "
+                "AND action NOT LIKE 'producer.%' "
                 "AND (next_attempt_at IS NULL OR next_attempt_at<=?) "
                 "AND (lease_expires_at IS NULL OR lease_expires_at<=?) ORDER BY created_at LIMIT 1",
                 (current_time, current_time),
@@ -135,7 +144,7 @@ class Store:
         with self.tx() as db:
             owner, expiry = (None, None) if release else (worker_id, db.execute("SELECT lease_expires_at FROM operations WHERE id=?", (operation_id,)).fetchone()[0])
             changed = db.execute(
-                "UPDATE operations SET state=?,current_step=?,checkpoint_json=?,updated_at=?,next_attempt_at=?,lease_owner=?,lease_expires_at=? "
+                "UPDATE operations SET state=?,current_step=?,checkpoint_json=?,updated_at=?,next_attempt_at=?,lease_owner=?,lease_expires_at=?,revision=revision+1 "
                 "WHERE id=? AND lease_owner=?",
                 (state, step, json.dumps(checkpoint, sort_keys=True), current_time, next_attempt_at, owner, expiry, operation_id, worker_id),
             ).rowcount
@@ -155,7 +164,7 @@ class Store:
     def dead_letter(self, operation_id, reason, checkpoint, failed_at):
         with self.tx() as db:
             db.execute("INSERT OR REPLACE INTO dead_letters VALUES(?,?,?,?)", (operation_id, reason, json.dumps(checkpoint, sort_keys=True), failed_at))
-            db.execute("UPDATE operations SET state='FAILED',lease_owner=NULL,lease_expires_at=NULL,updated_at=? WHERE id=?", (failed_at, operation_id))
+            db.execute("UPDATE operations SET state='FAILED',lease_owner=NULL,lease_expires_at=NULL,revision=revision+1,updated_at=? WHERE id=?", (failed_at, operation_id))
             db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("operation.dead-lettered.v1", operation_id, json.dumps({"reason": reason}, sort_keys=True), failed_at))
 
     def list_dead_letters(self):

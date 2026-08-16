@@ -9,7 +9,7 @@
     "target_type", "target_id", "fingerprint", "idempotency_key", "state",
     "progress", "current_step", "error", "correlation_id", "created_at",
     "updated_at", "lease_owner", "lease_expires_at", "attempt",
-    "next_attempt_at", "checkpoint", "request"
+    "next_attempt_at", "checkpoint", "request", "revision"
   ],
   "properties": {
     "contract_version": {"const": "track-a.operation.v1alpha1"},
@@ -33,6 +33,7 @@
     "attempt": {"type": "integer", "minimum": 0},
     "next_attempt_at": {"type": ["string", "null"], "format": "date-time"},
     "checkpoint": {"type": ["object", "null"]},
-    "request": {"type": "object"}
+    "request": {"type": "object"},
+    "revision": {"type": "integer", "minimum": 0, "description": "Optimistic concurrency revision."}
   }
 }

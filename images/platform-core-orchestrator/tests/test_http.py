@@ -47,5 +47,20 @@ class HTTPContractTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught: urllib.request.urlopen(request)
         self.assertEqual(401, caught.exception.code)
 
+    def test_revisioned_transition_replay_and_conflict_statuses(self):
+        create = {"region_id": "seoul-ssu-1", "action": "producer.track-c", "target_type": "artifact", "payload": {}}
+        status, _, operation = self.call("POST", "/v1/operations", create, {"Idempotency-Key": "producer-http-create"})
+        self.assertEqual(202, status)
+        transition = {"expected_revision": 0, "state": "VALIDATING", "progress": 10, "current_step": "validate"}
+        path = f"/v1/operations/{operation['id']}/transition"
+        status, headers, changed = self.call("POST", path, transition, {"Idempotency-Key": "producer-http-transition"})
+        self.assertEqual(202, status); self.assertEqual(1, changed["revision"])
+        status, headers, replayed = self.call("POST", path, transition, {"Idempotency-Key": "producer-http-transition"})
+        self.assertEqual(200, status); self.assertEqual("true", headers["X-Idempotent-Replay"]); self.assertEqual(changed, replayed)
+        status, _, error = self.call("POST", path, transition | {"progress": 11}, {"Idempotency-Key": "producer-http-transition"})
+        self.assertEqual(409, status); self.assertEqual("IDEMPOTENCY_KEY_REUSED", error["error"]["code"])
+        status, _, error = self.call("POST", path, transition | {"state": "SCHEDULED"}, {"Idempotency-Key": "producer-http-stale"})
+        self.assertEqual(409, status); self.assertEqual("OPERATION_REVISION_CONFLICT", error["error"]["code"])
+
 
 if __name__ == "__main__": unittest.main()

@@ -36,8 +36,10 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         return json.loads(self.rfile.read(length) or b"{}")
 
-    def identity(self):
-        return self.identity_verifier.verify(self.headers)
+    def identity(self, authorization_class=None):
+        headers = dict(self.headers.items())
+        if authorization_class: headers["X-DCN-Authorization-Class"] = authorization_class
+        return self.identity_verifier.verify(headers)
 
     def send_json(self, status, payload, headers=None):
         raw = json.dumps(payload, sort_keys=True).encode()
@@ -53,7 +55,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path)
         if path.path == "/healthz":
             return 200, {"status": "ok"}, {}
-        identity = self.identity(); project, user = identity["project_id"], identity["user_id"]
+        is_transition = self.command == "POST" and re.fullmatch(r"/v1/operations/[^/]+/transition", path.path)
+        identity = self.identity("project-write" if is_transition else None); project, user = identity["project_id"], identity["user_id"]
         body = self.body() if self.command in {"POST", "PUT", "DELETE"} else {}
         query = parse_qs(path.query)
         if self.command == "GET" and path.path == "/v1/operations":
@@ -67,6 +70,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.command == "POST" and action == "retry":
                 op, created = self.service.retry_operation(project, ident, self.headers.get("Idempotency-Key"))
                 return 202, op, {"Location": f"/v1/operations/{op['id']}"}
+        match = re.fullmatch(r"/v1/operations/([^/]+)/transition", path.path)
+        if self.command == "POST" and match:
+            operation, replay = self.service.transition_operation(project, match.group(1), body, self.headers.get("Idempotency-Key"))
+            return (200 if replay else 202), operation, {"X-Idempotent-Replay": str(replay).lower()}
         match = re.fullmatch(r"/v1/preflight/(instances|auto-scaling-groups|deletions)", path.path)
         if self.command == "POST" and match:
             return 200, self.service.preflight(project, match.group(1).rstrip("s"), body), {}

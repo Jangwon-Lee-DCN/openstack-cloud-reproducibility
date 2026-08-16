@@ -63,6 +63,7 @@ class PostgresStore(Store):
         with self.tx() as db:
             row = db.execute(
                 "SELECT id FROM operations WHERE state IN ('REQUESTED','VALIDATING','SCHEDULED','RUNNING','ROLLING_BACK') "
+                "AND action NOT LIKE 'producer.%' "
                 "AND (next_attempt_at IS NULL OR next_attempt_at<=?) AND (lease_expires_at IS NULL OR lease_expires_at<=?) "
                 "ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1", (current_time, current_time)).fetchone()
             if not row: return None

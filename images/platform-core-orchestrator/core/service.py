@@ -10,6 +10,14 @@ from .store import Store
 
 
 TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED"}
+TRANSITIONS = {
+    "REQUESTED": {"VALIDATING", "FAILED", "CANCELLED"},
+    "VALIDATING": {"SCHEDULED", "FAILED", "CANCELLED"},
+    "SCHEDULED": {"RUNNING", "FAILED", "CANCELLED"},
+    "RUNNING": {"ROLLING_BACK", "SUCCEEDED", "FAILED", "CANCELLED"},
+    "ROLLING_BACK": {"FAILED", "CANCELLED"},
+    "SUCCEEDED": set(), "FAILED": set(), "CANCELLED": set(),
+}
 OPERATION_CONTRACT_VERSION = "track-a.operation.v1alpha1"
 RESTORE_CAPABILITIES = {
     "instance": "FULL",
@@ -101,12 +109,55 @@ class CoreService:
         with self.store.tx() as db:
             return [Store.row(x) for x in db.execute("SELECT * FROM operation_events WHERE operation_id=? ORDER BY id", (operation_id,))]
 
+    def transition_operation(self, project_id, operation_id, body, key):
+        require(key and len(key) <= 255, 400, "IDEMPOTENCY_KEY_REQUIRED", "a bounded Idempotency-Key is required")
+        require(set(body) <= {"expected_revision", "state", "progress", "current_step", "error", "checkpoint"},
+                400, "TRANSITION_BODY_INVALID", "transition body contains unknown fields")
+        expected, target, progress = body.get("expected_revision"), body.get("state"), body.get("progress")
+        require(isinstance(expected, int) and expected >= 0, 400, "REVISION_INVALID", "expected_revision must be non-negative")
+        require(target in TRANSITIONS, 400, "STATE_INVALID", "operation state is invalid")
+        require(isinstance(progress, int) and 0 <= progress <= 100, 400, "PROGRESS_INVALID", "progress must be between 0 and 100")
+        transition_fingerprint, timestamp = fingerprint(body), now()
+        with self.store.tx() as db:
+            replay = db.execute("SELECT * FROM operation_transitions WHERE project_id=? AND operation_id=? AND idempotency_key=?",
+                                (project_id, operation_id, key)).fetchone()
+            if replay:
+                replay = Store.row(replay)
+                require(replay["fingerprint"] == transition_fingerprint, 409, "IDEMPOTENCY_KEY_REUSED", "transition key was reused with another request")
+                return replay["response"], True
+            operation = self._owned(db, "operations", operation_id, project_id)
+            require(operation["revision"] == expected, 409, "OPERATION_REVISION_CONFLICT", "operation revision changed")
+            require(target in TRANSITIONS[operation["state"]], 409, "OPERATION_TRANSITION_INVALID", "operation state transition is invalid")
+            require(progress >= operation["progress"], 409, "OPERATION_PROGRESS_REGRESSION", "operation progress cannot decrease")
+            require(target != "SUCCEEDED" or progress == 100, 409, "OPERATION_SUCCESS_INCOMPLETE", "successful operation progress must be 100")
+            next_revision = expected + 1
+            error = body.get("error")
+            require(target != "FAILED" or isinstance(error, dict), 400, "OPERATION_ERROR_REQUIRED", "failed transition requires an error object")
+            changed = db.execute(
+                "UPDATE operations SET state=?,progress=?,current_step=?,error_json=?,checkpoint_json=?,revision=?,updated_at=? "
+                "WHERE id=? AND project_id=? AND revision=?",
+                (target, progress, body.get("current_step"), canonical(error) if error is not None else None,
+                 canonical(body.get("checkpoint")) if body.get("checkpoint") is not None else None,
+                 next_revision, timestamp, operation_id, project_id, expected)).rowcount
+            require(changed == 1, 409, "OPERATION_REVISION_CONFLICT", "operation revision changed")
+            response = self._operation_view(Store.row(db.execute("SELECT * FROM operations WHERE id=?", (operation_id,)).fetchone()))
+            event = {"from_state": operation["state"], "state": target, "revision": next_revision,
+                     "progress": progress, "current_step": body.get("current_step"), "error": error,
+                     "correlation_id": operation["correlation_id"]}
+            db.execute("INSERT INTO operation_events(operation_id,event_type,payload_json,created_at) VALUES(?,?,?,?)",
+                       (operation_id, "operation.transition", canonical(event), timestamp))
+            db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)",
+                       ("operation.transitioned.v1", operation_id, canonical(response), timestamp))
+            db.execute("INSERT INTO operation_transitions VALUES(?,?,?,?,?,?,?)",
+                       (project_id, operation_id, key, transition_fingerprint, next_revision, canonical(response), timestamp))
+        return response, False
+
     def cancel_operation(self, project_id, operation_id):
         with self.store.tx() as db:
             op = self._owned(db, "operations", operation_id, project_id)
             require(op["state"] not in TERMINAL, 409, "OPERATION_NOT_CANCELLABLE", "terminal operations cannot be cancelled")
             timestamp = now()
-            db.execute("UPDATE operations SET state='CANCELLED',updated_at=? WHERE id=?", (timestamp, operation_id))
+            db.execute("UPDATE operations SET state='CANCELLED',revision=revision+1,updated_at=? WHERE id=?", (timestamp, operation_id))
             db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("operation.cancelled.v1", operation_id, "{}", timestamp))
         return self.get_operation(project_id, operation_id)
 

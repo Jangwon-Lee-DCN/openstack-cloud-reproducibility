@@ -15,7 +15,7 @@ components:
     Operation:
       type: object
       additionalProperties: false
-      required: [contract_version, id, project_id, region_id, action, target_type, target_id, fingerprint, idempotency_key, state, progress, current_step, error, correlation_id, created_at, updated_at, lease_owner, lease_expires_at, attempt, next_attempt_at, checkpoint, request]
+      required: [contract_version, id, project_id, region_id, action, target_type, target_id, fingerprint, idempotency_key, state, progress, current_step, error, correlation_id, created_at, updated_at, lease_owner, lease_expires_at, attempt, next_attempt_at, checkpoint, request, revision]
       properties:
         contract_version: {const: track-a.operation.v1alpha1}
         id: {type: string, format: uuid, description: Platform Operation UUID.}
@@ -39,6 +39,7 @@ components:
         next_attempt_at: {type: [string, "null"], format: date-time}
         checkpoint: {type: [object, "null"]}
         request: {type: object}
+        revision: {type: integer, minimum: 0, description: Optimistic concurrency revision.}
     Page:
       type: object
       required: [items]
@@ -54,6 +55,31 @@ paths:
     get: {operationId: getOperation, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: Operation}}}
   /operations/{id}/events:
     get: {operationId: operationTimeline, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: Ordered timeline}}}
+  /operations/{id}/transition:
+    post:
+      operationId: transitionOperation
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string, maxLength: 255}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_revision, state, progress]
+              properties:
+                expected_revision: {type: integer, minimum: 0}
+                state: {$ref: '#/components/schemas/Operation/properties/state'}
+                progress: {type: integer, minimum: 0, maximum: 100}
+                current_step: {type: [string, "null"]}
+                error: {type: [object, "null"]}
+                checkpoint: {type: [object, "null"]}
+      responses:
+        '200': {description: Idempotent replay}
+        '202': {description: Transition committed}
+        '409': {description: Revision, idempotency, or state conflict}
   /operations/{id}/cancel:
     post: {operationId: cancelOperation, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Cancelled}}}
   /operations/{id}/retry:

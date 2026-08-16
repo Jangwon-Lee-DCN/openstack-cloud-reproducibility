@@ -90,5 +90,25 @@ class CoreServiceTest(unittest.TestCase):
             row = db.execute("SELECT topic,aggregate_id FROM outbox").fetchone()
         self.assertEqual(("operation.requested.v1", op["id"]), tuple(row))
 
+    def test_project_scoped_revisioned_transition_replay_and_conflicts(self):
+        operation, _ = self.svc.create_operation(self.project, "r", "producer.track-c", "artifact", {}, "create")
+        body = {"expected_revision": 0, "state": "VALIDATING", "progress": 10, "current_step": "track-c.validate"}
+        transitioned, replay = self.svc.transition_operation(self.project, operation["id"], body, "transition-1")
+        self.assertFalse(replay); self.assertEqual(1, transitioned["revision"]); self.assertEqual("VALIDATING", transitioned["state"])
+        replayed, replay = self.svc.transition_operation(self.project, operation["id"], body, "transition-1")
+        self.assertTrue(replay); self.assertEqual(transitioned, replayed)
+        self.assertCode("IDEMPOTENCY_KEY_REUSED", lambda: self.svc.transition_operation(
+            self.project, operation["id"], body | {"progress": 11}, "transition-1"))
+        self.assertCode("OPERATION_REVISION_CONFLICT", lambda: self.svc.transition_operation(
+            self.project, operation["id"], body | {"state": "SCHEDULED"}, "transition-2"))
+        self.assertCode("OPERATION_TRANSITION_INVALID", lambda: self.svc.transition_operation(
+            self.project, operation["id"], {"expected_revision": 1, "state": "SUCCEEDED", "progress": 100}, "transition-3"))
+        self.assertCode("RESOURCE_NOT_FOUND", lambda: self.svc.transition_operation(self.other, operation["id"], body, "other"))
+        events = self.svc.operation_events(self.project, operation["id"])
+        self.assertEqual(["operation.requested", "operation.transition"], [event["event_type"] for event in events])
+        with self.svc.store.tx() as db:
+            topics = [row[0] for row in db.execute("SELECT topic FROM outbox ORDER BY id")]
+        self.assertEqual(["operation.requested.v1", "operation.transitioned.v1"], topics)
+
 
 if __name__ == "__main__": unittest.main()
