@@ -163,6 +163,7 @@ class Store:
             return None
         value = dict(row)
         for key in tuple(value):
-            if key.endswith("_json") and value[key] is not None:
-                value[key[:-5]] = json.loads(value.pop(key))
+            if key.endswith("_json"):
+                raw = value.pop(key)
+                value[key[:-5]] = json.loads(raw) if raw is not None else None
         return value

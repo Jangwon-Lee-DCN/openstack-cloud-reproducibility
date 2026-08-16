@@ -10,6 +10,7 @@ from .store import Store
 
 
 TERMINAL = {"SUCCEEDED", "FAILED", "CANCELLED"}
+OPERATION_CONTRACT_VERSION = "track-a.operation.v1alpha1"
 RESTORE_CAPABILITIES = {
     "instance": "FULL",
     "launch_template": "METADATA_ONLY",
@@ -61,20 +62,24 @@ class CoreService:
 
     def get_operation(self, project_id, operation_id):
         with self.store.tx() as db:
-            return self._owned(db, "operations", operation_id, project_id)
+            return self._operation_view(self._owned(db, "operations", operation_id, project_id))
+
+    @staticmethod
+    def _operation_view(operation):
+        return {**operation, "contract_version": OPERATION_CONTRACT_VERSION}
 
     def list_operations(self, project_id, state=None):
         query, args = "SELECT * FROM operations WHERE project_id=?", [project_id]
         if state:
             query += " AND state=?"; args.append(state)
         with self.store.tx() as db:
-            return [Store.row(x) for x in db.execute(query + " ORDER BY created_at DESC", args)]
+            return [self._operation_view(Store.row(x)) for x in db.execute(query + " ORDER BY created_at DESC", args)]
 
     def page_operations(self, project_id, state=None, limit=50, marker=None):
         limit = max(1, min(int(limit), 200)); query, args = "SELECT * FROM operations WHERE project_id=?", [project_id]
         if state: query += " AND state=?"; args.append(state)
         if marker: query += " AND id>?"; args.append(marker)
-        with self.store.tx() as db: rows = [Store.row(row) for row in db.execute(query + " ORDER BY id LIMIT ?", args + [limit + 1])]
+        with self.store.tx() as db: rows = [self._operation_view(Store.row(row)) for row in db.execute(query + " ORDER BY id LIMIT ?", args + [limit + 1])]
         return {"items": rows[:limit], "next_marker": rows[limit - 1]["id"] if len(rows) > limit else None}
 
     def _page(self, db, table, project_id, limit=50, marker=None):
