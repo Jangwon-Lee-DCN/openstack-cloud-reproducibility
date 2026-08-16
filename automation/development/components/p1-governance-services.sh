@@ -58,11 +58,14 @@ case "$operation" in
       kill "$port_forward_pid" 2>/dev/null || true
       trap - EXIT
     fi
+    credential_revision=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get secret \
+      governance-keystone-application-credential -o jsonpath='{.metadata.resourceVersion}')
     helm upgrade --install governance "$chart" \
       --namespace "$DEVELOPMENT_NAMESPACE" \
       --values "$values" \
       --set-string "image.digest=$GOVERNANCE_IMAGE_DIGEST" \
       --set-string "workerImage.digest=$GOVERNANCE_WORKER_IMAGE_DIGEST" \
+      --set-string "credentialRevision=$credential_revision" \
       --wait --timeout 5m --atomic
     ;;
   verify)

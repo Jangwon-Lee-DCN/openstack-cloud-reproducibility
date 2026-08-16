@@ -19,6 +19,8 @@ spec:
       labels:
         app.kubernetes.io/name: governance-api
         dcn.ssu.ac.kr/development-ingress: allowed
+      annotations:
+        dcn.ssu.ac.kr/credential-revision: {{ .Values.credentialRevision | quote }}
     spec:
       priorityClassName: {{ .Values.priorityClassName }}
       automountServiceAccountToken: false

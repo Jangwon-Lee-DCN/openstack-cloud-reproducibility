@@ -13,6 +13,7 @@ priorityClassName: dcn-development-interruptible
 webhookAllowedHosts: ""
 mode: development
 providerMode: fake
+credentialRevision: "unconfigured"
 providers:
   keystone: ""
   opa: ""
