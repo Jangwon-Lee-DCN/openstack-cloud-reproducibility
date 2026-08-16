@@ -86,6 +86,18 @@ class CertificateWorkflow:
     def rollback_ref(self) -> str | None:
         return self.previous_ref if self.phase == CertificatePhase.FAILED else None
 
+    def compensation_actions(self) -> list[dict[str, str]]:
+        if self.phase != CertificatePhase.FAILED:
+            return []
+        actions = []
+        if self.previous_ref:
+            actions.append({"action": "restore_consumer", "secret_ref": self.previous_ref})
+        if self.candidate_ref:
+            actions.append({"action": "retire_candidate", "secret_ref": self.candidate_ref})
+        if self.challenge_ref:
+            actions.append({"action": "delete_dns_challenge", "challenge_ref": self.challenge_ref})
+        return actions
+
     def _require(self, phase):
         if self.phase != phase:
             raise WorkflowError(f"expected {phase}, found {self.phase}")
@@ -152,3 +164,12 @@ class RotationWorkflow:
         self.consumers = dict(self.original_consumers)
         self.candidate_ref = None
         self.phase = RotationPhase.ROLLED_BACK
+
+    def compensation_actions(self) -> list[dict[str, str]]:
+        if self.phase != RotationPhase.ROLLING_BACK:
+            return []
+        actions = [{"action": "restore_consumer", "consumer": name, "secret_ref": ref}
+                   for name, ref in sorted(self.original_consumers.items())]
+        if self.candidate_ref:
+            actions.append({"action": "revoke_candidate", "secret_ref": self.candidate_ref})
+        return actions

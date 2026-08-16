@@ -53,6 +53,15 @@ class GovernanceService:
             db.execute("INSERT INTO idempotency VALUES(?,?,?,?)", (
                 ctx.project_id, action, key, self.store.encode(record),
             ))
+            event_id = str(uuid4())
+            db.execute(
+                "INSERT INTO outbox(id,project_id,event_type,dedup_key,payload,status,available_at,created_at) "
+                "VALUES(?,?,?,?,?,'pending',?,?)",
+                (event_id, ctx.project_id, "resource.changed", f"{action}:{key}",
+                 self.store.encode({"resource_id": record["id"], "resource_type": kind,
+                                    "operation_id": operation.id, "request_id": request_id}),
+                 created, created),
+            )
         self.append_audit(ctx, action=action, target={"type": kind, "id": record["id"]},
                           outcome="success", request_id=request_id, operation_id=operation.id)
         return record

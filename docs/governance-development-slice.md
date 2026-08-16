@@ -101,15 +101,61 @@ blocked until a PostgreSQL forward/restore procedure is implemented and tested.
 ## Remaining Track B gates
 
 1. Replace trusted identity headers with Keystone token validation and OPA.
-2. Implement PostgreSQL repositories, migrations, cursor pagination and HA.
-3. Add outbox/lease workers with delivery retry, HMAC nonce/replay storage and
-   DLQ, then SMTP/webhook development fixtures.
-4. Integrate Gnocchi/Ceilometer checkpoints and immutable rated ledger.
+2. Exercise the PostgreSQL contract against a disposable HA development
+   database, including migration/restore and cursor pagination.
+3. Connect the tested outbox contract to RabbitMQ plus credential-backed SMTP
+   and webhook adapters; persist nonce expiry and prove DLQ recovery.
+4. Replace the deterministic telemetry source with Gnocchi/Ceilometer adapters
+   and reconcile their totals against the immutable raw/rated ledger.
 5. Integrate Designate/CA/Barbican/Octavia certificate overlap probes.
-6. Implement credential-type rotators with fenced two-phase rollback.
-7. Add signed audit ingestion/export/index rebuild and retention/legal hold.
-8. Add Nova/Cinder/Neutron/Glance/Octavia native tag adapters and drift loops.
+6. Implement credential-type Barbican rotators using the tested fencing and
+   compensation contract, then run consumer failure injection.
+7. Replace the HMAC audit fixture with asymmetric signing, object export,
+   index rebuild, retention and legal hold.
+8. Replace fake native tag adapters with Nova/Cinder/Neutron/Glance/Octavia
+   clients and run event/poll drift loops.
 9. Replace the fake Operation adapter after Track A publishes the accepted
    real contract and run cross-track contract tests.
 10. Add the Track B Horizon panel only in its independently owned image path;
     common Horizon navigation remains an integration change.
+
+## Slice 0.2.0 — durable workflow contracts
+
+The second source-tested slice adds the failure and compensation contracts that
+must exist before any real external adapter is enabled:
+
+- resource writes and an outbox event commit in one transaction;
+- expiring worker leases, exponential retry, stale-lease recovery and bounded
+  dead-letter transition;
+- development SMTP/webhook fixtures with destination allowlists, DNS-result
+  public-address checks, HMAC, timestamp windows, nonces and replay rejection;
+- raw telemetry checkpoints plus an immutable Decimal-rated ledger. Missing
+  meters stay explicitly `incomplete` and can be rated later without replaying
+  or rewriting earlier entries;
+- certificate and rotation compensation plans that restore old consumers,
+  retire/revoke candidates and remove DNS challenges after partial failure;
+- signed audit ingestion and a signed export manifest with payload/hash-chain
+  verification. HMAC is a deterministic development fixture only; production
+  requires an asymmetric signer backed by an approved key service;
+- native tag adapter protocol, revision fencing, dry-run and drift reconciliation
+  fakes; and
+- transactional PostgreSQL migrations with tenant RLS plus a parameterized
+  repository/session contract and `FOR UPDATE SKIP LOCKED` worker claim.
+
+All queue envelopes contain identifiers only. No worker performs network I/O,
+loads an external credential or calls SMTP, Gnocchi, Barbican, Designate,
+Octavia, OpenStack APIs or a production database.
+
+### 0.2 acceptance and rollback
+
+`deploy/tests/governance/run.sh` covers stale lease takeover, retry-to-DLQ,
+idempotent raw/rated telemetry, late rate coverage, DNS rebinding, bad HMAC,
+replay, SMTP header injection, partial rotation rollback, signed audit tamper,
+tag revision conflicts, PostgreSQL parameterization and RLS DDL.
+
+The two PostgreSQL migrations are forward-only contracts and have not been run
+against any cluster. Before a development PostgreSQL deployment, add a disposable
+database apply/restore test and capture its exact image/dump versions. Rollback
+of an accepted persistent schema is restore/forward-fix; never run ad-hoc `DROP`
+or `TRUNCATE`. The current development Helm release still runs only the
+non-authoritative SQLite API from slice 0.1 and remains undeployed.

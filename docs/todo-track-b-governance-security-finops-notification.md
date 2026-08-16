@@ -602,6 +602,17 @@ Track C와 다른 UI consumer는 Track B DB나 내부 worker endpoint를 직접 
 - [ ] notification/telemetry/certificate/rotation/audit/tag worker adapter
 - [ ] Track B 전용 Horizon panel 및 development end-to-end acceptance
 
+### Slice 0.2.0 — durable workflow contracts
+
+- [x] transactional outbox, expiring lease, retry/backoff 및 DLQ 상태 계약
+- [x] SMTP/webhook development fixture, SSRF·DNS rebinding·HMAC·replay 방어
+- [x] telemetry checkpoint, immutable raw aggregate 및 Decimal cost ledger
+- [x] certificate/secret rotation partial-failure compensation plan
+- [x] signed audit ingestion/export와 tamper 검증 fixture
+- [x] native tag adapter interface, dry-run 및 drift reconciliation fake
+- [x] PostgreSQL transaction/RLS migration과 parameterized repository 계약
+- [ ] 실제 PostgreSQL·RabbitMQ 및 외부 서비스 adapter development 통합
+
 세부 경계, 인수 방법과 rollback은 `docs/governance-development-slice.md`에 기록한다.
 위 미완료 항목을 통과하기 전에는 이 슬라이스를 운영 기능으로 표현하거나 운영에
 승격하지 않는다.

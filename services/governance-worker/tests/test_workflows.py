@@ -27,6 +27,8 @@ class WorkflowTest(unittest.TestCase):
         workflow.apply_consumer("barbican://active")
         workflow.probe(False)
         self.assertEqual(workflow.rollback_ref(), "barbican://active")
+        self.assertEqual([item["action"] for item in workflow.compensation_actions()],
+                         ["restore_consumer", "retire_candidate", "delete_dns_challenge"])
         self.assertTrue(workflow.cleanup_required)
         workflow.challenge_cleaned()
         self.assertFalse(workflow.cleanup_required)
@@ -37,6 +39,7 @@ class WorkflowTest(unittest.TestCase):
         workflow.consumer_updated("lb")
         workflow.begin_verification({"lb", "app"})
         self.assertEqual(workflow.phase, RotationPhase.ROLLING_BACK)
+        self.assertEqual(workflow.compensation_actions()[-1]["action"], "revoke_candidate")
         workflow.rollback()
         self.assertEqual(workflow.consumers, {"lb": "barbican://v1", "app": "barbican://v1"})
 

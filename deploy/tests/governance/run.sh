@@ -33,4 +33,10 @@ if grep -Eiq 'namespace: (openstack|production)$' "$rendered" ||
   exit 1
 fi
 bash -n automation/development/components/p1-governance-services.sh
+if rg -n --hidden -g '!*.md' \
+  '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16})' \
+  automation/development deploy/tests helm/governance images/governance-api services; then
+  echo 'potential committed credential found' >&2
+  exit 1
+fi
 git diff --check

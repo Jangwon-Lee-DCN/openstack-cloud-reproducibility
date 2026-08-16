@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import RLock
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 
 class Store:
@@ -42,7 +42,35 @@ class Store:
           previous_hash TEXT NOT NULL, integrity_hash TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS audit_scope ON audit_events(project_id,seq);
+        CREATE TABLE IF NOT EXISTS outbox(
+          id TEXT PRIMARY KEY, project_id TEXT NOT NULL, event_type TEXT NOT NULL,
+          dedup_key TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0, available_at TEXT NOT NULL,
+          lease_owner TEXT, lease_until TEXT, last_error TEXT, created_at TEXT NOT NULL,
+          UNIQUE(project_id,dedup_key)
+        );
+        CREATE INDEX IF NOT EXISTS outbox_ready ON outbox(status,available_at,lease_until);
+        CREATE TABLE IF NOT EXISTS telemetry_checkpoints(
+          source TEXT NOT NULL, project_id TEXT NOT NULL, watermark TEXT NOT NULL,
+          updated_at TEXT NOT NULL, PRIMARY KEY(source,project_id)
+        );
+        CREATE TABLE IF NOT EXISTS usage_raw(
+          project_id TEXT NOT NULL, sample_id TEXT NOT NULL, period TEXT NOT NULL,
+          meter TEXT NOT NULL, quantity TEXT NOT NULL, watermark TEXT NOT NULL,
+          received_at TEXT NOT NULL, PRIMARY KEY(project_id,sample_id)
+        );
+        CREATE TABLE IF NOT EXISTS cost_ledger(
+          entry_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, sample_id TEXT NOT NULL,
+          period TEXT NOT NULL, meter TEXT NOT NULL, quantity TEXT NOT NULL,
+          unit_price TEXT NOT NULL, cost TEXT NOT NULL, rate_version TEXT NOT NULL,
+          created_at TEXT NOT NULL, UNIQUE(project_id,sample_id)
+        );
+        CREATE TABLE IF NOT EXISTS replay_nonces(
+          consumer_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at TEXT NOT NULL,
+          PRIMARY KEY(consumer_id,nonce)
+        );
         """)
+        self.connection.execute("UPDATE schema_version SET version=?", (SCHEMA_VERSION,))
         self.connection.commit()
 
     @contextmanager
