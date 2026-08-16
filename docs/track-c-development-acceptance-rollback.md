@@ -69,11 +69,21 @@ delete production resources. Source rollback is a revert PR.
 
 ## Integration blockers
 
-- Track A must publish its final versioned Operation/Task and dry-run clients.
-- Track B must publish its final event producer contract and receiver.
-- The integration owner must supply Keystone middleware, OPA actions, scoped
-  OpenStack credentials and common Horizon navigation.
-- Real adapter drills require an isolated project/network and disposable
-  resources; live failover and production image promotion remain prohibited.
-- The feature worktree must contain the common `deploy.sh` development wrapper
-  before Kubernetes acceptance can run from this branch.
+All remaining gates require real external integration:
+
+- replace Track A `v1alpha1` fake transitions with the accepted Operation/Task,
+  lock, cancellation, dry-run and compensation client;
+- replace Track B `v1alpha1` fake events with its authenticated producer and
+  validate notification/audit delivery and dead-letter behavior;
+- install Keystone middleware that overwrites identity headers and enforce the
+  final OPA action matrix on every collection/action;
+- replace all nine deterministic provider fakes with scoped Cinder, Glance,
+  Manila, RGW, Nova, Neutron/OVN, Octavia, Designate and Masakari clients;
+- run disposable-project integration drills against real service quotas,
+  asynchronous states, API microversions and failure behavior;
+- integrate the independent Horizon package through the common navigation and
+  authenticated `/resilience-api/` edge;
+- build/push the container, record its immutable digest and run the common
+  `./deploy.sh development p1-resilience-operations` wrapper;
+- obtain explicit operator approval before any real failover, image promotion,
+  production Phase or production data mutation.

@@ -48,6 +48,29 @@ source-tested contracts:
 Event `v1alpha1`. They are compatibility fixtures, not authority to freeze the
 providers' final API.
 
+## Resource API and controller loops
+
+`GET /openapi.json` describes project-scoped CRUD, optimistic generation
+updates, marker pagination and explicit reconcile actions for:
+
+```text
+backup-policies       backup-runs          restore-drills
+protection-groups     dr-plans             dr-executions
+network-diagnostics  maintenance-campaigns
+image-products        image-builds         image-revocations
+```
+
+The runnable scheduler reconciles due backup policies and pending DR plans,
+diagnostics, campaigns, image builds and revocations. Development fake
+providers retain deterministic observations and compensation evidence. A
+controller restart reads resource status and operation checkpoints before
+issuing another action.
+
+`RESILIENCE_MODE=production` is deliberately unavailable in this build. Even
+when endpoints are configured, startup fails until real authenticated clients
+are installed. This prevents the development identity header and fake
+providers from being exposed as a production service.
+
 ## Test
 
 ```bash

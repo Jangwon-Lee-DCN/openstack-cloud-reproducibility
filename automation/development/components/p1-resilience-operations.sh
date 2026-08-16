@@ -22,6 +22,7 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment p1-resilience-operations -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -Eq '@sha256:[0-9a-f]{64}$'
     pod=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get pod -l app=p1-resilience-operations -o jsonpath='{.items[0].metadata.name}')
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import urllib.request; assert b"fake/v1alpha1" in urllib.request.urlopen("http://127.0.0.1:8080/healthz", timeout=3).read()'
+    kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8080/openapi.json", timeout=3)); assert d["openapi"] == "3.1.0" and "/v1/backup-policies" in d["paths"]'
     # API must reject identity-free requests at the application boundary.
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import urllib.error,urllib.request; u="http://127.0.0.1:8080/v1/runs/backup-run"; r=urllib.request.Request(u,data=b"{}",method="POST"); exec("try:\n urllib.request.urlopen(r)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code == 401")'
     ;;
