@@ -73,8 +73,11 @@ def main():
     call(f"{base}/users/{user['id']}", admin_token, "PATCH", {"user": {"password": password}})
     _, role_doc = call(base + "/roles", admin_token)
     roles = {role["name"]: role["id"] for role in role_doc["roles"]}
+    if "creator" not in roles:
+        _, created_role = call(base + "/roles", admin_token, "POST", {"role": {"name": "creator"}})
+        roles["creator"] = created_role["role"]["id"]
     assigned = []
-    for name in ("reader", "member", "load-balancer_member"):
+    for name in ("reader", "member", "load-balancer_member", "creator"):
         if name in roles:
             call(f"{base}/projects/{project['id']}/users/{user['id']}/roles/{roles[name]}",
                  admin_token, "PUT")

@@ -46,6 +46,8 @@ endpoints:
       admin:
         region_name: seoul-ssu-1
         project_name: admin
+      barbican:
+        region_name: seoul-ssu-1
   key_manager:
     host_fqdn_override:
       public:
