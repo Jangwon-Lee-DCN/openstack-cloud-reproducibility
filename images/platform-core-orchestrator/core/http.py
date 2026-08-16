@@ -142,7 +142,10 @@ def main():
     Handler.service = build_service()
     mode = os.environ.get("CORE_AUTH_MODE", "signed-proxy")
     assertion_key = os.environ.get("CORE_IDENTITY_ASSERTION_KEY", "").encode()
-    Handler.identity_verifier = IdentityVerifier(mode, assertion_key)
+    Handler.identity_verifier = IdentityVerifier(
+        mode, assertion_key,
+        keystone_url=os.environ.get("CORE_KEYSTONE_URL"),
+        opa_url=os.environ.get("CORE_OPA_DECISION_URL"))
     event_key = os.environ.get("CORE_AODH_EVENT_KEY", "").encode()
     Handler.event_verifier = SignedEventVerifier(event_key)
     server = ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", "8080"))), Handler)

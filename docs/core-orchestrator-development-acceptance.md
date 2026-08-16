@@ -102,9 +102,12 @@ All remaining blockers require real integration or an integration environment:
 
 - run the committed schema through a real PostgreSQL repository adapter and
   test HA/failover, migrations, backup and restore;
-- connect Keystone token validation and live OPA decisions at the signed proxy;
-- replace deterministic Nova/Neutron/Cinder/Placement/LB adapters and run quota,
-  rollback, drain and orphan-resource acceptance;
+- execute the implemented Keystone-token/OPA boundary against live allow and
+  deny decisions from the development route;
+- run `python -m core.provider_probe` in the immutable development image, then
+  perform create/compensate acceptance only in `dcn-p0-track-a-development`;
+- implement Placement and Octavia mutation adapters (their current integration
+  is intentionally read-only) and run quota, rollback, drain and orphan checks;
 - connect a real Aodh webhook, rotate its credential and verify clock skew;
 - validate native Nova soft-delete against the deployed microversion;
 - run three API replicas, multiple workers and schedulers with RabbitMQ/outbox
