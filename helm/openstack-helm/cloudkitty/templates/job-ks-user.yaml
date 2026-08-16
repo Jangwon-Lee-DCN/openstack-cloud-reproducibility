@@ -12,14 +12,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{- define "metadata.annotations.job.ks_user" }}
-helm.sh/hook: pre-install,pre-upgrade
-helm.sh/hook-weight: "-1"
-{{- end }}
-
 {{- if .Values.manifests.job_ks_user }}
 {{- $ksUserJob := dict "envAll" . "serviceName" "cloudkitty" -}}
-{{- $_ := set $ksUserJob "jobAnnotations" (include "metadata.annotations.job.ks_user" . | fromYaml ) }}
 {{- if .Values.pod.tolerations.cloudkitty.enabled -}}
 {{- $_ := set $ksUserJob "tolerationsEnabled" true -}}
 {{- end -}}

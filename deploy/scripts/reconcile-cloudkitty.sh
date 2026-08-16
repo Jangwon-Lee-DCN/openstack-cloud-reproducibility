@@ -8,7 +8,7 @@ package="$root/helm/packages/patched/cloudkitty-2026.1.0.tgz"
 values="$root/deploy/values/site/cloudkitty.yaml"
 secrets="$root/deploy/secrets/cloudkitty.values.sops.yaml"
 route="$root/deploy/manifests/cloudkitty-public-route.yaml"
-expected_package_sha=d2d26ef7dc3c6e5579beb08ce5a6fdf28f091788ebfa2f45d30101cfb9746a0f
+expected_package_sha=cfb0df843ccb9d23bb0d8e8966bddd90532c41c1260b2e96c1a962b5ae05702e
 mode="${1:-check}"
 
 for command in helm kubectl sops sha256sum; do
@@ -52,6 +52,12 @@ fi
 if [[ "$mode" == apply ]]; then
   : "${DCN_SITE_ROOT:?apply requires the canonical site repository path}"
   python3 "$root/deploy/scripts/verify-cloudkitty-source-lock.py" "$root" "$DCN_SITE_ROOT" >/dev/null
+  if helm status "$release" -n "$namespace" >/dev/null 2>&1; then
+    kubectl delete job -n "$namespace" --ignore-not-found --wait=true \
+      cloudkitty-db-init cloudkitty-db-sync cloudkitty-rabbit-init \
+      cloudkitty-storage-init cloudkitty-ks-service cloudkitty-ks-endpoints \
+      cloudkitty-ks-user
+  fi
   helm upgrade --install "$release" "$package" -n "$namespace" \
     -f "$values" -f "$work_dir/secrets.yaml" --atomic --timeout 20m --wait
   kubectl apply -f "$route"
