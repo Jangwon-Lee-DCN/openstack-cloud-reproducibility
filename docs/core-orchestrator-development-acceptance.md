@@ -100,6 +100,22 @@ reuse this procedure for production. Production rollback must retain the
 PostgreSQL schema/data and deploy the previously accepted digest by the same
 approved Phase.
 
+## Live ASG acceptance (2026-08-16)
+
+Commit `9ed90ce` was deployed as
+`platform-core-orchestrator@sha256:9b26f51e2a60bdcdfc8d640e0f5eb1c146175df07f9c2d92a6cf25926e2c5509`.
+Migration `002_asg_resource_sets` was present in PostgreSQL and all four
+containers were ready with zero restarts.
+
+In the dedicated `dcn-p0-track-a-development` project, an isolated temporary
+network and pinned Launch Template completed `0 -> 1 -> 2 -> 1 -> 0`. Each
+scale-out waited for Nova servers to become `ACTIVE`; scale-in waited for
+provider deletion to reach 404 before removing the durable member row. An
+injected Nova failure after a real Neutron port creation exercised reverse
+compensation. Final inventory checks found zero Track A servers, ports, volumes
+or temporary networks. The first drill exposed and fixed an asynchronous Nova
+delete race, and the complete sequence passed after rebuilding that fix.
+
 ## Promotion blockers
 
 All remaining blockers require real integration or an integration environment:
