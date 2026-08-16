@@ -63,13 +63,18 @@ helm upgrade --install prometheus-blackbox-exporter \
 
 mariadb_password="$(kubectl -n monitoring get secret \
   openstack-mariadb-exporter -o jsonpath='{.data.password}' | base64 -d)"
-kubectl -n openstack exec mariadb-server-0 -c mariadb -- \
+mariadb_pod="$(kubectl -n openstack get pods \
+  -l application=mariadb,component=server \
+  --field-selector=status.phase=Running \
+  -o jsonpath='{.items[0].metadata.name}')"
+test -n "${mariadb_pod}"
+kubectl -n openstack exec "${mariadb_pod}" -c mariadb -- \
   mariadb --defaults-extra-file=/etc/mysql/admin_user.cnf \
   -e "CREATE USER IF NOT EXISTS 'prometheus'@'%' IDENTIFIED BY '${mariadb_password}';
       ALTER USER 'prometheus'@'%' IDENTIFIED BY '${mariadb_password}';
       GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'prometheus'@'%';
       FLUSH PRIVILEGES;"
-unset mariadb_password
+unset mariadb_password mariadb_pod
 
 helm upgrade --install prometheus-mysql-exporter \
   prometheus-community/prometheus-mysql-exporter --version 2.14.0 \
