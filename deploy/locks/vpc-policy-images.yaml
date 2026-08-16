@@ -3,8 +3,8 @@ kind: VPCPolicyImageLock
 metadata:
   name: production
 spec:
-  sourceRevision: 7c7373f1c2e5427efbf315e0ae4dbd15684e7405
+  sourceRevision: 33df167750f8d91f990772383f0e3a18dfa6bc87
   controllerImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-controller-tenant-form-20260814@sha256:fffebf4e3d0b750341aab716e8eacb0b8fdcb0215ef3c8a82943b29fbf02b7e5
-  facadeImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-facade-tenant-form-final-20260814@sha256:53709fcdd1f26d06b03cd4742427ebe69da40d542016ad58e885a249d9298cf5
+  facadeImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-facade-keystone-refresh-retry-20260816@sha256:be55862b52942dc877c139bda1171a2f3c8f1d18cfa63fae49e2a2d738f031a3
   metadataAttestorImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-metadata-attestor-24ac4b8@sha256:c0c1bad805315bd00c6a214298d8a20fd61eabe51bbe24ada44a35e1722d16e9
   endpointAgentImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-endpoint-agent-24ac4b8@sha256:c2ba50dbba131e619c99414b203c8a4481a659a3f23c50da8ca0d9a3c4e3cf59
