@@ -9,6 +9,9 @@ description = "Development-first OpenStack resilience orchestration control plan
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+test = ["jsonschema==4.10.3"]
+
 [project.scripts]
 dcn-resilience = "dcn_resilience.api:main"
 

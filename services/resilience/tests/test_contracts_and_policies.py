@@ -3,8 +3,10 @@ import os
 import tempfile
 import unittest
 
+from jsonschema import Draft202012Validator, FormatChecker
+
 from dcn_resilience.adapters import development_catalog
-from dcn_resilience.contracts import EVENT_CONTRACT, OPERATION_CONTRACT, FakeEventClient
+from dcn_resilience.contracts import EVENT_CONTRACT, OPERATION_CONTRACT, FakeEventClient, FakeOperationClient
 from dcn_resilience.policies import (
     dr_objectives, explain_network_path, image_attestation_gate,
     maintenance_action, retention_decision, validate_restore_evidence,
@@ -146,12 +148,38 @@ class CrossTrackFixtureTest(unittest.TestCase):
 
     def test_track_a_fixture_matches_consumer_version(self):
         fixture = self.load("track-a-operation-v1alpha1.json")
-        self.assertEqual(OPERATION_CONTRACT, fixture["apiVersion"])
-        self.assertTrue({"id", "project_id", "idempotency_key", "correlation_id", "state"} <= fixture["operation"].keys())
+        schema = self.load("track-a.operation.v1alpha1.schema.json")
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+        self.assertEqual(OPERATION_CONTRACT, fixture["contract_version"])
+        self.assertEqual("RUNNING", fixture["state"])
+
+    def test_track_a_schema_rejects_legacy_lowercase_state(self):
+        fixture = self.load("track-a-operation-v1alpha1.json")
+        fixture["state"] = "running"
+        schema = self.load("track-a.operation.v1alpha1.schema.json")
+        errors = list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(fixture))
+        self.assertTrue(any(list(error.path) == ["state"] for error in errors))
+
+    def test_track_a_fake_rejects_legacy_transition_state(self):
+        with self.assertRaises(ValueError):
+            FakeOperationClient().transition("00000000-0000-4000-8000-000000000001", "running", {})
 
     def test_track_b_fixture_is_accepted_by_fake_producer(self):
         fixture = self.load("track-b-event-v1alpha1.json")
-        self.assertEqual(EVENT_CONTRACT, fixture["apiVersion"])
+        schema = self.load("track-b.event.v1alpha1.schema.json")
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+        self.assertEqual(EVENT_CONTRACT, fixture["contract_version"])
         client = FakeEventClient()
-        client.emit(fixture["event"]["type"], fixture["event"]["envelope"])
+        client.emit(fixture["event_type"], fixture)
         self.assertEqual(1, len(client.events))
+
+    def test_track_b_schema_rejects_legacy_event_and_extra_top_level_field(self):
+        fixture = self.load("track-b-event-v1alpha1.json")
+        fixture["event_type"] = "restore.drill.failed"
+        fixture["deduplication_key"] = "legacy"
+        schema = self.load("track-b.event.v1alpha1.schema.json")
+        errors = list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(fixture))
+        self.assertTrue(any(list(error.path) == ["event_type"] for error in errors))
+        self.assertTrue(any(error.validator == "additionalProperties" for error in errors))

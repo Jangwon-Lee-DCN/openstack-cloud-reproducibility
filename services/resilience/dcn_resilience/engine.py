@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from .contracts import EventClient, OperationClient
@@ -36,7 +37,7 @@ class Engine:
         if not self.journal.acquire_lease(operation_id, self.worker_id):
             raise RuntimeError("operation is leased by another worker")
         self.journal.set_state(operation_id, "running")
-        self.operations.transition(operation_id, "running", {"kind": record["kind"]})
+        self.operations.transition(operation_id, "RUNNING", {"kind": record["kind"]})
         completed = self.journal.completed_steps(operation_id)
         try:
             steps = WORKFLOWS[record["kind"]](record["request"], self.adapter)
@@ -50,7 +51,7 @@ class Engine:
                 completed.add(name)
             result = {"evidence_retained": True, "completed_steps": sorted(completed)}
             self.journal.set_state(operation_id, "succeeded", result)
-            self.operations.transition(operation_id, "succeeded", result)
+            self.operations.transition(operation_id, "SUCCEEDED", result)
             self._event(record, "succeeded")
         except Exception as exc:
             compensation_evidence = []
@@ -60,14 +61,22 @@ class Engine:
                 compensation_evidence = [{"error": str(compensation_error), "manual_action_required": True}]
             result = {"error": str(exc), "compensation": compensation_evidence}
             self.journal.set_state(operation_id, "failed", result)
-            self.operations.transition(operation_id, "failed", result)
+            self.operations.transition(operation_id, "FAILED", result)
             self._event(record, "failed")
         finally:
             self.journal.release_lease(operation_id, self.worker_id)
         return self.journal.get(operation_id, project_id)
 
     def _event(self, record: dict[str, Any], outcome: str) -> None:
-        self.events.emit(f"{record['kind']}.{outcome}", {
-            "project_id": record["project_id"], "correlation_id": record["correlation_id"],
-            "operation_id": record["id"], "deduplication_key": f"{record['id']}:{outcome}",
+        self.events.emit("resource.changed", {
+            "contract_version": "track-b.event.v1alpha1", "event_id": str(uuid.uuid4()),
+            "event_type": "resource.changed", "occurred_at": datetime.now(UTC).isoformat(),
+            "domain_id": record["request"].get("domain_id", "default"),
+            "project_id": record["project_id"],
+            "actor_id": record["request"].get("requested_by", "track-c-controller"),
+            "resource": {"type": record["kind"], "id": record["id"]},
+            "severity": "INFO" if outcome == "succeeded" else "ERROR",
+            "operation_id": record["id"], "correlation_id": record["correlation_id"],
+            "request_id": record["request"].get("request_id", record["correlation_id"]),
+            "payload": {"action": f"{record['kind']}.{outcome}", "outcome": outcome},
         })

@@ -32,6 +32,11 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(first["id"], second["id"])
         self.assertEqual(1, self.adapter.calls.count("backup.capture"))
         self.assertIn("backup.cleanup", self.adapter.calls)
+        self.assertEqual(["RUNNING", "SUCCEEDED"], [item["state"] for item in self.operations.transitions])
+        event = self.events.events[0]["envelope"]
+        self.assertEqual("track-b.event.v1alpha1", event["contract_version"])
+        self.assertEqual("resource.changed", event["event_type"])
+        self.assertEqual("backup-run.succeeded", event["payload"]["action"])
 
     def test_backup_failure_always_thaws(self):
         self.adapter.failures.add("backup.capture")

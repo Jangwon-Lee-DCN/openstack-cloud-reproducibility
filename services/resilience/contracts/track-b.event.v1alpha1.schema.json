@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dcn.ssu.ac.kr/contracts/track-b.event.v1alpha1.schema.json",
+  "title": "Track B Canonical Event v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "event_id", "event_type", "occurred_at", "domain_id",
+    "project_id", "actor_id", "resource", "severity", "operation_id",
+    "correlation_id", "request_id", "payload"
+  ],
+  "properties": {
+    "contract_version": {"const": "track-b.event.v1alpha1"},
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "resource.changed", "notification.delivery.succeeded", "notification.delivery.failed",
+        "budget.threshold.crossed", "certificate.renewal.succeeded", "certificate.renewal.failed",
+        "credential.rotation.succeeded", "credential.rotation.failed", "audit.export.succeeded",
+        "audit.export.failed", "tag.drift.detected", "tag.drift.reconciled"
+      ]
+    },
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "domain_id": {"type": "string", "minLength": 1},
+    "project_id": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "format": "uuid"}
+      }
+    },
+    "severity": {"type": "string", "enum": ["INFO", "WARNING", "ERROR", "CRITICAL"]},
+    "operation_id": {"type": "string", "format": "uuid"},
+    "correlation_id": {"type": "string", "format": "uuid"},
+    "request_id": {"type": "string", "minLength": 1},
+    "payload": {"type": "object", "additionalProperties": true}
+  }
+}
