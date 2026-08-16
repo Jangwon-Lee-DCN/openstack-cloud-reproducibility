@@ -1,0 +1,15 @@
+{
+  "apiVersion": "dcn.events/v1alpha1",
+  "kind": "EventFixture",
+  "event": {
+    "type": "restore.drill.failed",
+    "envelope": {
+      "project_id": "project-fixture",
+      "correlation_id": "00000000-0000-4000-8000-000000000002",
+      "operation_id": "00000000-0000-4000-8000-000000000001",
+      "deduplication_key": "00000000-0000-4000-8000-000000000001:failed",
+      "severity": "error",
+      "target": {"type": "backup-run", "id": "backup-fixture"}
+    }
+  }
+}

@@ -38,6 +38,13 @@ failure-drill suites pass in the isolated boundary.
 - cross-project network diagnostics never start a probe;
 - migration failure restores the pre-campaign scheduler state;
 - invalid official-image ownership prevents promotion.
+- competing workers cannot steal a live operation lease, but an expired lease
+  can be recovered from the last durable checkpoint;
+- retention cannot expire running, held, actively restored or latest-success
+  generations;
+- declared network reachability with a failed probe is recorded as mismatch;
+- active Masakari recovery blocks a competing maintenance campaign;
+- a revoked image digest requires Glance deactivation.
 
 These tests use deterministic adapters. They are contract evidence, not proof
 that Cinder, Nova, Neutron/OVN, Octavia, Designate or Glance integration works.

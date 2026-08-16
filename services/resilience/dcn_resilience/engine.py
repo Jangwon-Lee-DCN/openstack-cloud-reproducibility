@@ -11,6 +11,7 @@ from .workflows import DevelopmentAdapter, WORKFLOWS, compensation
 class Engine:
     def __init__(self, journal: Journal, operations: OperationClient, events: EventClient, adapter: DevelopmentAdapter):
         self.journal, self.operations, self.events, self.adapter = journal, operations, events, adapter
+        self.worker_id = str(uuid.uuid4())
 
     def submit(self, kind: str, project_id: str, idempotency_key: str, request: dict[str, Any]) -> dict[str, Any]:
         if kind not in WORKFLOWS:
@@ -32,6 +33,8 @@ class Engine:
         record = self.journal.get(operation_id, project_id)
         if record["state"] == "succeeded":
             return record
+        if not self.journal.acquire_lease(operation_id, self.worker_id):
+            raise RuntimeError("operation is leased by another worker")
         self.journal.set_state(operation_id, "running")
         self.operations.transition(operation_id, "running", {"kind": record["kind"]})
         completed = self.journal.completed_steps(operation_id)
@@ -40,6 +43,8 @@ class Engine:
             for ordinal, (name, action) in enumerate(steps):
                 if name in completed:
                     continue
+                if not self.journal.renew_lease(operation_id, self.worker_id):
+                    raise RuntimeError("operation lease lost")
                 evidence = action()
                 self.journal.step_done(operation_id, ordinal, name, evidence)
                 completed.add(name)
@@ -57,6 +62,8 @@ class Engine:
             self.journal.set_state(operation_id, "failed", result)
             self.operations.transition(operation_id, "failed", result)
             self._event(record, "failed")
+        finally:
+            self.journal.release_lease(operation_id, self.worker_id)
         return self.journal.get(operation_id, project_id)
 
     def _event(self, record: dict[str, Any], outcome: str) -> None:

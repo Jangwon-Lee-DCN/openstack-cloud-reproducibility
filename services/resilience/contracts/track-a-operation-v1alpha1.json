@@ -1,0 +1,16 @@
+{
+  "apiVersion": "dcn.operations/v1alpha1",
+  "kind": "OperationFixture",
+  "operation": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "project_id": "project-fixture",
+    "kind": "restore-drill",
+    "idempotency_key": "fixture-key",
+    "correlation_id": "00000000-0000-4000-8000-000000000002",
+    "state": "running"
+  },
+  "transition": {
+    "state": "running",
+    "detail": {"checkpoint": "restore-isolated", "progress_percent": 60}
+  }
+}

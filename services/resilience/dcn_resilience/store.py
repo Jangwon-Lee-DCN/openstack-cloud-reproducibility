@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,10 @@ class Journal:
               operation_id TEXT NOT NULL, ordinal INTEGER NOT NULL, name TEXT NOT NULL,
               state TEXT NOT NULL, evidence_json TEXT NOT NULL DEFAULT '{}',
               PRIMARY KEY(operation_id, name),
+              FOREIGN KEY(operation_id) REFERENCES operations(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS leases (
+              operation_id TEXT PRIMARY KEY, owner TEXT NOT NULL, expires_at REAL NOT NULL,
               FOREIGN KEY(operation_id) REFERENCES operations(id) ON DELETE CASCADE
             );
             """
@@ -83,3 +88,25 @@ class Journal:
         return {row[0] for row in self.db.execute(
             "SELECT name FROM steps WHERE operation_id=? AND state='succeeded'", (operation_id,)
         )}
+
+    def acquire_lease(self, operation_id: str, owner: str, ttl_seconds: int = 30, now: float | None = None) -> bool:
+        current = time.time() if now is None else now
+        cursor = self.db.execute(
+            """INSERT INTO leases(operation_id,owner,expires_at) VALUES(?,?,?)
+               ON CONFLICT(operation_id) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at
+               WHERE leases.expires_at <= ? OR leases.owner = excluded.owner""",
+            (operation_id, owner, current + ttl_seconds, current),
+        )
+        self.db.commit()
+        return cursor.rowcount == 1
+
+    def renew_lease(self, operation_id: str, owner: str, ttl_seconds: int = 30, now: float | None = None) -> bool:
+        current = time.time() if now is None else now
+        cursor = self.db.execute("UPDATE leases SET expires_at=? WHERE operation_id=? AND owner=? AND expires_at>?",
+                                 (current + ttl_seconds, operation_id, owner, current))
+        self.db.commit()
+        return cursor.rowcount == 1
+
+    def release_lease(self, operation_id: str, owner: str) -> None:
+        self.db.execute("DELETE FROM leases WHERE operation_id=? AND owner=?", (operation_id, owner))
+        self.db.commit()

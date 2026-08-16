@@ -8,4 +8,9 @@ python3 -m unittest -v \
   tests.test_resilience.EngineTest.test_dr_fencing_is_fail_closed \
   tests.test_resilience.EngineTest.test_network_cross_project_is_rejected_and_no_probe_runs \
   tests.test_resilience.EngineTest.test_maintenance_failure_restores_scheduler_state \
-  tests.test_resilience.EngineTest.test_image_promotion_requires_full_supply_chain
+  tests.test_resilience.EngineTest.test_image_promotion_requires_full_supply_chain \
+  tests.test_contracts_and_policies.LeaseCheckpointTest.test_lease_exclusion_expiry_and_checkpoint \
+  tests.test_contracts_and_policies.BackupPolicyTest.test_retention_preserves_hold_restore_reference_and_latest_success \
+  tests.test_contracts_and_policies.NetworkExplanationTest.test_declared_allowed_but_probe_failed_is_mismatch \
+  tests.test_contracts_and_policies.MaintenanceMatrixTest.test_masakari_lock_blocks_competing_campaign \
+  tests.test_contracts_and_policies.ImageAttestationTest.test_revocation_forces_deactivation

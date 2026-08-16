@@ -26,9 +26,27 @@ request -> project/idempotency gate -> SQLite operation journal
 ```
 
 The SQLite journal makes completed steps resumable and prevents duplicate
-external actions after restart. OpenStack adapters are intentionally absent:
+external actions after restart. Real OpenStack adapters are intentionally absent:
 the next integration slice must replace `DevelopmentAdapter` with scoped
 Keystone service clients and preserve the workflow tests.
+
+The second development slice adds explicit `discover/execute/observe/compensate`
+ports and deterministic fakes for Cinder, Glance, Manila, RGW, Nova, Neutron,
+Octavia, Designate and Masakari. It also fixes the following pure policies as
+source-tested contracts:
+
+- exclusive expiring operation leases and durable step checkpoints;
+- backup retention protection for legal holds, active restores, running work
+  and the latest successful recovery point;
+- checksum, probe and cleanup-aware restore evidence;
+- measured DR RPO/RTO values with fencing remaining a workflow precondition;
+- ordered route, SG, NACL, NAT and load-balancer explanations with redaction;
+- planned migration versus evacuation constraints and Masakari collision locks;
+- official-image attestation and revoked-digest deactivation.
+
+`contracts/` contains consumer fixtures for Track A Operation and Track B
+Event `v1alpha1`. They are compatibility fixtures, not authority to freeze the
+providers' final API.
 
 ## Test
 
