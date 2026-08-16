@@ -6,6 +6,9 @@ The live Keystone catalog advertises `volumev3`, `image`, `sharev2`, `compute`,
 `network`, `load-balancer`, `dns`, and `instance-ha`. The in-cluster RGW service
 exists, but Keystone does not advertise an `object-store` endpoint. Track C
 therefore reports RGW as unavailable instead of substituting an unscoped URL.
+Masakari is catalogued, but the dedicated member credential receives HTTP 403
+for failure segments. This intended least-privilege result keeps evacuation
+execution blocked pending an explicitly reviewed operator role.
 
 The development Track A and Track B services respond to `/healthz`. Their
 canonical schemas are consumed by Track C, but the deployed Track A API has no

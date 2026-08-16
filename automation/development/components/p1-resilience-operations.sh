@@ -26,9 +26,9 @@ case "$operation" in
     # API must reject identity-free requests at the application boundary.
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import urllib.error,urllib.request; u="http://127.0.0.1:8080/v1/runs/backup-run"; r=urllib.request.Request(u,data=b"{}",method="POST"); exec("try:\n urllib.request.urlopen(r)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code == 401")'
     # Readiness is deliberately degraded until RGW is catalogued and Track A/B
-    # publish canonical consumer write endpoints. Eight OpenStack adapters must
-    # still pass scoped, read-only discovery and all mutation stays fenced.
-    kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.error,urllib.request; exec("try:\n urllib.request.urlopen(\"http://127.0.0.1:8080/v1/capabilities\",timeout=15)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code==503\n d=json.load(e)\n assert d[\"destructive_actions\"]==\"fenced\"\n assert sum(1 for v in d[\"services\"].values() if v.get(\"installed\"))==8\n assert \"rgw\" in d[\"blockers\"]")'
+    # publish canonical consumer write endpoints. Seven tenant-visible adapters
+    # pass scoped discovery; Masakari remains operator-only (HTTP 403).
+    kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.error,urllib.request; exec("try:\n urllib.request.urlopen(\"http://127.0.0.1:8080/v1/capabilities\",timeout=15)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code==503\n d=json.load(e)\n assert d[\"destructive_actions\"]==\"fenced\"\n assert sum(1 for v in d[\"services\"].values() if v.get(\"installed\"))==7\n assert {\"rgw\",\"masakari\"}.issubset(d[\"blockers\"])")'
     ;;
   *) exit 2 ;;
 esac
