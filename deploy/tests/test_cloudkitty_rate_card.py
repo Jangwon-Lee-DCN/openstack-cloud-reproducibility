@@ -28,6 +28,18 @@ class CloudKittyRateCardContract(unittest.TestCase):
                 continue
             self.assertIn("@sha256:", image, name)
 
+    def test_control_plane_toleration_is_enabled(self):
+        values = yaml.safe_load((ROOT / "deploy/values/site/cloudkitty.yaml").read_text())
+        self.assertTrue(values["pod"]["tolerations"]["cloudkitty"]["enabled"])
+
+    def test_reconciler_uses_digest_pinned_patched_chart(self):
+        script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
+        self.assertIn("helm/packages/patched/cloudkitty-2026.1.0.tgz", script)
+        self.assertIn(
+            "37383178b564d1fbccf1cbdc42f40f0f6a774d7156ad73add8ba898d7f2163c4",
+            script,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

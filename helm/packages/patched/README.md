@@ -17,6 +17,8 @@ These packages are the chart-source variants actually used by the PoC:
   control-plane tolerations, and host-networked DNS control traffic
 - `powerdns-2026.1.0.tgz`: PowerDNS 4.9 compatibility, non-root execution,
   tolerations, anti-affinity, and security context
+- `cloudkitty-2026.1.0.tgz`: control-plane tolerations for the API, processor,
+  storage migration, and Helm lifecycle jobs
 
 `SHA256SUMS` is authoritative. Every patch is a dedicated Git commit above the
 clean upstream source and has a component ISSUE/FIX record. All other releases

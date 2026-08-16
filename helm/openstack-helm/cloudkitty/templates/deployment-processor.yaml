@@ -56,6 +56,10 @@ spec:
 {{ tuple $envAll "cloudkitty" "processor" | include "helm-toolkit.snippets.kubernetes_pod_anti_affinity" | indent 8 }}
       nodeSelector:
         {{ .Values.labels.cloudkitty.node_selector_key }}: {{ .Values.labels.cloudkitty.node_selector_value }}
+{{- if .Values.pod.tolerations.cloudkitty.enabled }}
+      tolerations:
+{{ toYaml .Values.pod.tolerations.cloudkitty.tolerations | indent 8 }}
+{{- end }}
       terminationGracePeriodSeconds: {{ .Values.pod.lifecycle.termination_grace_period.cloudkitty_processor.timeout | default "30" }}
       initContainers:
 {{ tuple $envAll "cloudkitty_processor" $mounts_cloudkitty_processor_init | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
