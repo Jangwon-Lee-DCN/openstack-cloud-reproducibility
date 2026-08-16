@@ -1,7 +1,11 @@
 # P1 resilience operations development slice
 
-This service is the independently testable Track C control-plane slice. It is
-not wired to production OpenStack and cannot mutate production resources.
+This service is the independently testable Track C control-plane slice. Its
+fail-closed `integration` and `production` modes authenticate with a dedicated
+Keystone application credential, resolve service endpoints from the scoped
+catalog, and allow bounded read-only discovery. Mutation and compensation stay
+fenced. See `../../docs/track-c-real-integration-acceptance.md` for the live
+platform blockers and acceptance boundary.
 
 ## Implemented safety contracts
 

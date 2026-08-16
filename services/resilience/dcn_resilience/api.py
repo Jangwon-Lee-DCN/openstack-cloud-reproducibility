@@ -20,6 +20,7 @@ from .contracts import FakeEventClient, FakeOperationClient
 from .engine import Engine
 from .store import Journal
 from .workflows import DevelopmentAdapter
+from .integrations import integration_readiness
 
 
 def build_app(database: str | None = None):
@@ -32,7 +33,12 @@ def build_app(database: str | None = None):
         path, method = environ.get("PATH_INFO", ""), environ.get("REQUEST_METHOD", "GET")
         if path == "/healthz":
             return respond(start_response, 200, {"status": "ok", "mode": config.mode,
-                           "track_a": "fake/v1alpha1", "track_b": "fake/v1alpha1"})
+                           "track_a": "fake/v1alpha1" if config.mode == "development" else "real/v1alpha1",
+                           "track_b": "fake/v1alpha1" if config.mode == "development" else "real/v1alpha1"})
+        if path in {"/readyz", "/v1/capabilities"}:
+            value = ({"ready": True, "mode": "development", "destructive_actions": "fenced"}
+                     if config.mode == "development" else integration_readiness(config))
+            return respond(start_response, 200 if value["ready"] else 503, value)
         if path == "/openapi.json":
             return respond(start_response, 200, openapi_document())
         project_id = environ.get("HTTP_X_VERIFIED_PROJECT_ID", "")
@@ -100,6 +106,8 @@ def openapi_document():
     paths = {
         "/healthz": {"get": {"summary": "Health", "security": [], "responses": {"200": {"description": "Healthy"}}}},
         "/openapi.json": {"get": {"summary": "OpenAPI document", "security": [], "responses": {"200": {"description": "OpenAPI 3.1 document"}}}},
+        "/readyz": {"get": {"summary": "Dependency readiness", "security": [], "responses": {"200": {"description": "Ready"}, "503": {"description": "Integration blocked"}}}},
+        "/v1/capabilities": {"get": {"summary": "Read-only integration capabilities", "security": [], "responses": {"200": {"description": "Capabilities"}, "503": {"description": "Integration blocked"}}}},
     }
     for collection in sorted(COLLECTIONS):
         paths[f"/v1/{collection}"] = {

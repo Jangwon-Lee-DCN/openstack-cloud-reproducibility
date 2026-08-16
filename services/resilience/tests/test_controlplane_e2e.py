@@ -162,14 +162,16 @@ class CrudApiE2ETest(unittest.TestCase):
 
 
 class ProductionConfigTest(unittest.TestCase):
-    def test_production_mode_is_unconditionally_fail_closed_without_real_clients(self):
+    def test_production_mode_requires_real_credentials_and_remains_destructive_fenced(self):
         previous = dict(os.environ)
         try:
             os.environ["RESILIENCE_MODE"] = "production"
-            for key in ("KEYSTONE_AUTH_URL", "OPA_URL", "TRACK_A_URL", "TRACK_B_URL", "OPENSTACK_ADAPTER_SET"):
+            for key in ("KEYSTONE_AUTH_URL", "KEYSTONE_APPLICATION_CREDENTIAL_ID",
+                        "KEYSTONE_APPLICATION_CREDENTIAL_SECRET", "OPA_URL", "TRACK_A_URL", "TRACK_B_URL"):
                 os.environ[key] = "configured"
-            with self.assertRaisesRegex(RuntimeError, "real integration clients"):
-                Config.from_env()
+            config = Config.from_env()
+            self.assertEqual("production", config.mode)
+            self.assertEqual("configured", config.integration["KEYSTONE_AUTH_URL"])
         finally:
             os.environ.clear(); os.environ.update(previous)
 
