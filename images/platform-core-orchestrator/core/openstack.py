@@ -70,7 +70,7 @@ class OpenStackSession:
             status, response_headers, response = self.transport(method, endpoint.rstrip("/") + path,
                                                                   request_headers, encoded)
         if status not in expected:
-            raise ProviderError(f"{service.upper()}_HTTP_{status}", retryable=status == 429 or status >= 500)
+            raise ProviderError(f"{service.upper()}_HTTP_{status}", retryable=status == 429 or status >= 500 or (method == "DELETE" and status == 409))
         return response, response_headers
 
     def probe(self, service, path):
@@ -82,7 +82,12 @@ class NovaAdapter(ComputeAdapter):
 
     def create_server(self, operation_id, spec):
         server_spec = spec.get("server", spec)
-        body = {"server": {"name": server_spec.get("name", f"dcn-{operation_id[:12]}"),
+        name = server_spec.get("name", f"dcn-{operation_id[:12]}")
+        existing, _ = self.session.request("nova", "GET", "/servers/detail?" + urllib.parse.urlencode({"name": name}))
+        for server in existing.get("servers", []):
+            if server.get("metadata", {}).get("dcn_operation_id") == operation_id:
+                return server["id"]
+        body = {"server": {"name": name,
                             "imageRef": server_spec["image_id"], "flavorRef": server_spec["flavor_id"],
                             "networks": [{"port": spec["port_id"]}],
                             "metadata": {"dcn_operation_id": operation_id}}}
@@ -102,7 +107,16 @@ class NeutronAdapter(NetworkAdapter):
     def __init__(self, session): self.session = session
 
     def create_port(self, operation_id, spec):
-        port = {"network_id": spec["network_id"], "name": spec.get("name", f"dcn-{operation_id[:12]}"),
+        name = spec.get("name", f"dcn-{operation_id[:12]}")
+        existing, _ = self.session.request("neutron", "GET", "/v2.0/ports?" + urllib.parse.urlencode({"name": name}))
+        for port in existing.get("ports", []):
+            if port.get("description") == f"Track A operation {operation_id}": return port["id"]
+        network_id = spec.get("network_id")
+        if not network_id and spec.get("subnet_id"):
+            subnet, _ = self.session.request("neutron", "GET", f"/v2.0/subnets/{spec['subnet_id']}")
+            network_id = subnet["subnet"]["network_id"]
+        if not network_id: raise ProviderError("NETWORK_REFERENCE_REQUIRED", retryable=False)
+        port = {"network_id": network_id, "name": name,
                 "admin_state_up": True, "description": f"Track A operation {operation_id}"}
         if spec.get("security_group_ids") is not None: port["security_groups"] = spec["security_group_ids"]
         if spec.get("subnet_id"): port["fixed_ips"] = [{"subnet_id": spec["subnet_id"]}]
@@ -117,9 +131,14 @@ class CinderAdapter(VolumeAdapter):
     def __init__(self, session): self.session = session
 
     def create_volume(self, operation_id, spec):
-        volume = {"size": int(spec["size_gib"]), "name": spec.get("name", f"dcn-{operation_id[:12]}"),
+        name = spec.get("name", f"dcn-{operation_id[:12]}")
+        existing, _ = self.session.request("cinder", "GET", f"/v3/{self.session.project_id}/volumes/detail?" + urllib.parse.urlencode({"name": name}))
+        for volume in existing.get("volumes", []):
+            if volume.get("metadata", {}).get("dcn_operation_id") == operation_id: return volume["id"]
+        volume = {"size": int(spec["size_gib"]), "name": name,
                   "metadata": {"dcn_operation_id": operation_id}}
         if spec.get("volume_type"): volume["volume_type"] = spec["volume_type"]
+        if spec.get("image_id"): volume["imageRef"] = spec["image_id"]
         response, _ = self.session.request("cinder", "POST", f"/v3/{self.session.project_id}/volumes", {"volume": volume})
         return response["volume"]["id"]
 

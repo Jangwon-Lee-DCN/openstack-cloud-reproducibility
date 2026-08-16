@@ -13,7 +13,7 @@ class HTTPContractTest(unittest.TestCase):
     def setUpClass(cls):
         fd, cls.db = tempfile.mkstemp(); os.close(fd)
         cls.port = "18089"
-        env = os.environ | {"CORE_DB_PATH": cls.db, "CORE_APPROVAL_SIGNING_KEY": "z" * 32, "CORE_AODH_EVENT_KEY": "e" * 32, "CORE_AUTH_MODE": "development", "PORT": cls.port}
+        env = os.environ | {"CORE_DB_PATH": cls.db, "CORE_RUNTIME_MODE": "development", "CORE_APPROVAL_SIGNING_KEY": "z" * 32, "CORE_AODH_EVENT_KEY": "e" * 32, "CORE_AUTH_MODE": "development", "PORT": cls.port}
         cls.proc = subprocess.Popen(["python3", "-m", "core.http"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         for _ in range(200):
             try:

@@ -204,7 +204,7 @@ class CoreService:
         require(any(x["version"] == version for x in template["versions"]), 404, "TEMPLATE_VERSION_NOT_FOUND", "template version was not found")
         ident, timestamp = str(uuid.uuid4()), now()
         with self.store.tx() as db:
-            db.execute("INSERT INTO auto_scaling_groups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (ident, project_id, body["region_id"], template["id"], version, low, desired, high, canonical(body.get("subnet_ids", [])), body.get("cooldown_seconds", 300), "ACTIVE", bool(body.get("deletion_protected", False)), None, timestamp))
+            db.execute("INSERT INTO auto_scaling_groups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (ident, project_id, body["region_id"], template["id"], version, low, desired, high, canonical(body.get("subnet_ids", [])), body.get("cooldown_seconds", 300), "SCALING" if desired else "ACTIVE", bool(body.get("deletion_protected", False)), None, timestamp))
         return self.get_asg(project_id, ident)
 
     def get_asg(self, project_id, ident):

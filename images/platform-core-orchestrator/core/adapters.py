@@ -49,15 +49,19 @@ class DeterministicProviders(ComputeAdapter, NetworkAdapter, VolumeAdapter):
 class InstanceProvisioner:
     def __init__(self, compute, network, volume): self.compute, self.network, self.volume = compute, network, volume
 
-    def provision(self, operation_id, spec, checkpoint=None):
+    def provision(self, operation_id, spec, checkpoint=None, checkpoint_callback=None):
         checkpoint = dict(checkpoint or {})
+        checkpoint_callback = checkpoint_callback or (lambda _checkpoint: None)
         try:
             if not checkpoint.get("port_id"):
                 checkpoint["port_id"] = self.network.create_port(operation_id, spec["network"])
+                checkpoint_callback(dict(checkpoint))
             if spec.get("volume") and not checkpoint.get("volume_id"):
                 checkpoint["volume_id"] = self.volume.create_volume(operation_id, spec["volume"])
+                checkpoint_callback(dict(checkpoint))
             if not checkpoint.get("server_id"):
                 checkpoint["server_id"] = self.compute.create_server(operation_id, spec | checkpoint)
+                checkpoint_callback(dict(checkpoint))
             return checkpoint
         except ProviderError as exc:
             exc.checkpoint = checkpoint
@@ -66,6 +70,10 @@ class InstanceProvisioner:
             raise
 
     def compensate(self, checkpoint):
-        if checkpoint.get("server_id"): self.compute.delete_server(checkpoint["server_id"])
-        if checkpoint.get("volume_id"): self.volume.delete_volume(checkpoint["volume_id"])
-        if checkpoint.get("port_id"): self.network.delete_port(checkpoint["port_id"])
+        errors = []
+        for key, callback in (("server_id", self.compute.delete_server), ("volume_id", self.volume.delete_volume),
+                              ("port_id", self.network.delete_port)):
+            if checkpoint.get(key):
+                try: callback(checkpoint[key])
+                except ProviderError as exc: errors.append(exc)
+        if errors: raise errors[0]

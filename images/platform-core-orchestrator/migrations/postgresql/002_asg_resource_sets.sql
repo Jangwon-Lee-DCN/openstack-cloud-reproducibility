@@ -1,0 +1,10 @@
+ALTER TABLE asg_members ALTER COLUMN provider_id DROP NOT NULL;
+ALTER TABLE asg_members ADD COLUMN IF NOT EXISTS operation_id uuid;
+ALTER TABLE asg_members ADD COLUMN IF NOT EXISTS resource_set_json jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE asg_members ADD COLUMN IF NOT EXISTS updated_at timestamptz;
+ALTER TABLE asg_members ADD COLUMN IF NOT EXISTS retry_count integer NOT NULL DEFAULT 0;
+ALTER TABLE asg_members ADD COLUMN IF NOT EXISTS next_retry_at timestamptz;
+ALTER TABLE asg_members ADD COLUMN IF NOT EXISTS error_code text;
+UPDATE asg_members SET operation_id=id,updated_at=created_at WHERE operation_id IS NULL OR updated_at IS NULL;
+ALTER TABLE asg_members ALTER COLUMN operation_id SET NOT NULL;
+ALTER TABLE asg_members ALTER COLUMN updated_at SET NOT NULL;

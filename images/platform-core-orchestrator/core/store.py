@@ -54,8 +54,11 @@ CREATE TABLE IF NOT EXISTS dead_letters (
  operation_id TEXT PRIMARY KEY, reason TEXT NOT NULL, checkpoint_json TEXT NOT NULL,
  failed_at TEXT NOT NULL, FOREIGN KEY(operation_id) REFERENCES operations(id));
 CREATE TABLE IF NOT EXISTS asg_members (
- id TEXT PRIMARY KEY, group_id TEXT NOT NULL, provider_id TEXT NOT NULL,
- state TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(group_id,provider_id),
+ id TEXT PRIMARY KEY, group_id TEXT NOT NULL, provider_id TEXT,
+ state TEXT NOT NULL, created_at TEXT NOT NULL, operation_id TEXT NOT NULL,
+ resource_set_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL,
+ retry_count INTEGER NOT NULL DEFAULT 0, next_retry_at TEXT, error_code TEXT,
+ UNIQUE(group_id,provider_id),
  FOREIGN KEY(group_id) REFERENCES auto_scaling_groups(id));
 CREATE TABLE IF NOT EXISTS resource_protection (
  project_id TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT NOT NULL,

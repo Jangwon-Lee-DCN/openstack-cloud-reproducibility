@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from core.adapters import DeterministicProviders, InstanceProvisioner, ProviderError
-from core.reconciler import AutoScalingReconciler
+from core.reconciler import ASGResourceProvider, AutoScalingReconciler
 from core.service import CoreService
 from core.store import Store
 from core.worker import DurableWorker
@@ -52,7 +52,7 @@ class CompleteFakeE2E(unittest.TestCase):
         second = self.service.list_templates(self.project, 2, first["next_marker"])
         self.assertEqual(2, len(first["items"])); self.assertEqual(1, len(second["items"]))
         group = self.service.create_asg(self.project, {"region_id": "r", "launch_template_id": templates[0]["id"], "min_size": 0, "desired_capacity": 2, "max_size": 3, "subnet_ids": ["s"], "cooldown_seconds": 300})
-        reconciler = AutoScalingReconciler(self.store, self.providers)
+        reconciler = AutoScalingReconciler(self.store, ASGResourceProvider(InstanceProvisioner(self.providers, self.providers, self.providers)))
         self.assertEqual(2, reconciler.reconcile_one(group["id"])["actual"])
         self.service.update_asg_capacity(self.project, group["id"], {"desired_capacity": 1})
         self.assertEqual(1, reconciler.reconcile_one(group["id"])["actual"])

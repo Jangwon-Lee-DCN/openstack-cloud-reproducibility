@@ -99,6 +99,10 @@ spec:
             - {name: SCHEDULER_POLL_SECONDS, value: "5"}
             - name: CORE_DATABASE_URL
               valueFrom: {secretKeyRef: {name: p0-core-backends, key: database-url}}
+            - {name: OS_NOVA_ENDPOINT, value: "http://nova-api.openstack.svc.cluster.local:8774/v2.1"}
+            - {name: OS_NEUTRON_ENDPOINT, value: "http://neutron-server.openstack.svc.cluster.local:9696"}
+            - {name: OS_CINDER_ENDPOINT, value: "http://cinder-api.openstack.svc.cluster.local:8776"}
+          envFrom: [{secretRef: {name: p0-openstack-provider}}]
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 150m, memory: 128Mi}

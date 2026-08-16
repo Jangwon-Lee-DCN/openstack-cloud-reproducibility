@@ -55,8 +55,14 @@ The development manifest now uses a dedicated PostgreSQL StatefulSet/PVC and a
 real RabbitMQ vhost `/dcn-p0-track-a-development`. Its unique user is restricted
 to `dcn.track-a.*`; the durable topic exchange and audit queue receive the
 transactional outbox. The runtime refuses SQLite whenever the mode is not
-`development`. The real ASG scheduler deliberately reconciles desired=0 only;
-desired>0 is surfaced as `DEGRADED` without creating fake instances.
+`development`. The real ASG scheduler now pins the requested Launch Template
+version and persists each member's Neutron port, optional Cinder volume and
+Nova server as one PostgreSQL resource-set. Checkpoints are committed after
+every provider step, so a restarted scheduler resumes the same member and the
+provider adapters find resources by their stable operation identity. Scale-in
+compensates server, volume and port in reverse order; protected instances keep
+the group `DEGRADED` until protection is removed. Retryable failures use bounded
+backoff, while terminal exhaustion remains durable for operator inspection.
 
 Track A now targets the central `opa-pilot` decision endpoint directly. Its Pod
 is labelled `dcn.ssu.ac.kr/central-opa-client=allowed`, and development egress

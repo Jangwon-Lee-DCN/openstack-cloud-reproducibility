@@ -1,8 +1,9 @@
 import os
 import time
 
-from .adapters import DeterministicProviders
-from .reconciler import AutoScalingReconciler
+from .adapters import DeterministicProviders, InstanceProvisioner
+from .openstack import CinderAdapter, NeutronAdapter, NovaAdapter, OpenStackSession
+from .reconciler import ASGResourceProvider, AutoScalingReconciler
 from .store import store_from_env
 
 
@@ -10,33 +11,24 @@ def main():
     mode = os.environ.get("CORE_RUNTIME_MODE", "production")
     store = store_from_env(os.environ)
     if mode == "development":
-        reconciler = AutoScalingReconciler(store, DeterministicProviders())
+        providers = DeterministicProviders()
+        reconciler = AutoScalingReconciler(store, ASGResourceProvider(InstanceProvisioner(providers, providers, providers)))
     elif mode == "real-openstack":
-        reconciler = DegradedRealScheduler(store)
+        required = ["OS_AUTH_URL", "OS_USERNAME", "OS_PASSWORD", "OS_PROJECT_NAME",
+                    "OS_NOVA_ENDPOINT", "OS_NEUTRON_ENDPOINT", "OS_CINDER_ENDPOINT"]
+        missing = [name for name in required if not os.environ.get(name)]
+        if missing: raise RuntimeError("real ASG provider configuration is incomplete: " + ",".join(missing))
+        session = OpenStackSession(os.environ["OS_AUTH_URL"], os.environ["OS_USERNAME"], os.environ["OS_PASSWORD"],
+                                   os.environ["OS_PROJECT_NAME"], os.environ.get("OS_USER_DOMAIN_NAME", "Default"),
+                                   os.environ.get("OS_PROJECT_DOMAIN_NAME", "Default"),
+                                   {"nova": os.environ["OS_NOVA_ENDPOINT"], "neutron": os.environ["OS_NEUTRON_ENDPOINT"],
+                                    "cinder": os.environ["OS_CINDER_ENDPOINT"]})
+        provisioner = InstanceProvisioner(NovaAdapter(session), NeutronAdapter(session), CinderAdapter(session))
+        reconciler = AutoScalingReconciler(store, ASGResourceProvider(provisioner))
     else:
         raise RuntimeError("real scheduler adapters are not configured; refusing production scheduler startup")
     poll = float(os.environ.get("SCHEDULER_POLL_SECONDS", "5"))
     while True:
         reconciler.reconcile_all()
         time.sleep(poll)
-
-
-class DegradedRealScheduler:
-    """Fail-safe ASG boundary until member resource-set persistence lands.
-
-    Zero-capacity groups are safely reconciled. Any non-zero request becomes
-    DEGRADED rather than silently using deterministic/fake compute.
-    """
-    def __init__(self, store): self.store = store
-    def reconcile_all(self):
-        with self.store.tx() as db:
-            rows = list(db.execute("SELECT id,desired FROM auto_scaling_groups WHERE state IN ('SCALING','DEGRADED')"))
-            results = []
-            for row in rows:
-                state = "ACTIVE" if row["desired"] == 0 else "DEGRADED"
-                db.execute("UPDATE auto_scaling_groups SET state=? WHERE id=?", (state, row["id"]))
-                results.append({"group_id": str(row["id"]), "desired": row["desired"], "actual": 0, "state": state})
-            return results
-
-
 if __name__ == "__main__": main()

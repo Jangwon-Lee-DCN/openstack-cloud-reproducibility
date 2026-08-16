@@ -66,6 +66,10 @@ signed/replayed Aodh events, and PostgreSQL migration/locking invariants.
 Fake-provider E2E additionally covers API-to-worker success, ordered timeline,
 restart safety, retry scheduling, DLQ compensation, ASG scale-out/scale-in,
 cooldown, pagination and the full protect/recycle/restore/purge lifecycle.
+The ASG resource-set suite additionally injects a crash after port creation,
+proves checkpoint resume without a second member, retries a transient provider
+failure against the same reservation, blocks protected scale-in, and verifies
+reverse compensation leaves no fake-provider resources.
 
 ## Isolated development acceptance
 
