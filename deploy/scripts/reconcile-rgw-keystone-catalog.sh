@@ -30,7 +30,18 @@ test "$(kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
   ceph config get client.rgw.openstack.object.store.a rgw_swift_account_in_url)" = true
 
 kubectl -n rook-ceph apply -f "$root/deploy/manifests/rgw-swift-route.yaml"
+# A monitor config update is persistent but is not pushed into the running RGW
+# process in this deployment. Restart only this gateway, then verify the
+# effective daemon value rather than trusting the config database alone.
+kubectl -n rook-ceph rollout restart deployment/rook-ceph-rgw-$store-a
 kubectl -n rook-ceph rollout status deployment/rook-ceph-rgw-$store-a --timeout=15m
+rgw_pod="$(kubectl -n rook-ceph get pod -l app=rook-ceph-rgw,rgw=$store -o jsonpath='{.items[0].metadata.name}')"
+test -n "$rgw_pod"
+test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
+  socket=$(find /run/ceph -maxdepth 1 -name "*client.rgw.openstack.object.store.a*.asok" -print -quit)
+  test -n "$socket"
+  ceph daemon "$socket" config get rgw_swift_account_in_url
+' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_swift_account_in_url"])')" = true
 
 # The catalog is reconciled only inside this Job, after a real Keystone token
 # has listed its Swift account through RGW. A dead endpoint can never be
