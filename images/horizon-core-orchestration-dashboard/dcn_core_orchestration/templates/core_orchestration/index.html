@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% load i18n static %}
+{% block title %}{% trans "Templates & Auto Scaling" %}{% endblock %}
+{% block main %}
+<div class="page-header"><h1>{% trans "Templates & Auto Scaling" %}</h1></div>
+<div id="dcn-core" data-api="{{ core_api_base }}">
+  <ul class="nav nav-tabs" role="tablist">
+    <li class="active"><a href="#operations" data-toggle="tab">{% trans "Operations" %}</a></li>
+    <li><a href="#templates" data-toggle="tab">{% trans "Launch Templates" %}</a></li>
+    <li><a href="#scaling" data-toggle="tab">{% trans "Auto Scaling" %}</a></li>
+    <li><a href="#recycle" data-toggle="tab">{% trans "Recycle Bin" %}</a></li>
+  </ul>
+  <div class="alert alert-info" id="core-status">{% trans "Loading project resources…" %}</div>
+  <div class="tab-content"><div id="operations" class="tab-pane active"></div><div id="templates" class="tab-pane"></div><div id="scaling" class="tab-pane"></div><div id="recycle" class="tab-pane"></div></div>
+</div>
+<script src="{% static 'dcn_core_orchestration/catalog.js' %}"></script>
+{% endblock %}

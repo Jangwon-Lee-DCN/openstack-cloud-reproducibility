@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info: {title: DCN Core Orchestrator API, version: 0.1.0}
+servers: [{url: /v1}]
+security: [{proxyAssertion: []}]
+components:
+  securitySchemes:
+    proxyAssertion: {type: apiKey, in: header, name: X-DCN-Identity-Assertion}
+  parameters:
+    id: {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties: {error: {type: object, required: [code, message], properties: {code: {type: string}, message: {type: string}}}}
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [contract_version, id, project_id, region_id, action, target_type, target_id, fingerprint, idempotency_key, state, progress, current_step, error, correlation_id, created_at, updated_at, lease_owner, lease_expires_at, attempt, next_attempt_at, checkpoint, request, revision]
+      properties:
+        contract_version: {const: track-a.operation.v1alpha1}
+        id: {type: string, format: uuid, description: Platform Operation UUID.}
+        project_id: {type: string, format: uuid, description: Keystone project UUID that owns the Operation.}
+        region_id: {type: string, minLength: 1}
+        action: {type: string, minLength: 1, description: "Actions prefixed with producer. are externally transitioned and are never claimed by the Track A worker."}
+        target_type: {type: string, minLength: 1}
+        target_id: {type: [string, "null"], format: uuid}
+        fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
+        idempotency_key: {type: string, minLength: 1, maxLength: 255}
+        state: {type: string, enum: [REQUESTED, VALIDATING, SCHEDULED, RUNNING, ROLLING_BACK, SUCCEEDED, FAILED, CANCELLED]}
+        progress: {type: integer, minimum: 0, maximum: 100}
+        current_step: {type: [string, "null"]}
+        error: {type: [object, "null"]}
+        correlation_id: {type: string, format: uuid, description: "Stable UUID used to correlate API, worker and provider logs."}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        lease_owner: {type: [string, "null"]}
+        lease_expires_at: {type: [string, "null"], format: date-time}
+        attempt: {type: integer, minimum: 0}
+        next_attempt_at: {type: [string, "null"], format: date-time}
+        checkpoint: {type: [object, "null"]}
+        request: {type: object}
+        revision: {type: integer, minimum: 0, description: Optimistic concurrency revision.}
+    Page:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {type: object}}, next_marker: {type: [string, "null"]}}
+paths:
+  /operations:
+    get: {operationId: listOperations, responses: {'200': {description: Operation list}}}
+    post:
+      operationId: createOperation
+      parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string, maxLength: 255}}]
+      responses: {'202': {description: Durable operation accepted}, '409': {description: Idempotency conflict}}
+  /operations/{id}:
+    get: {operationId: getOperation, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: Operation}}}
+  /operations/{id}/events:
+    get: {operationId: operationTimeline, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: Ordered timeline}}}
+  /operations/{id}/transition:
+    post:
+      operationId: transitionOperation
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string, maxLength: 255}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_revision, state, progress]
+              properties:
+                expected_revision: {type: integer, minimum: 0}
+                state: {$ref: '#/components/schemas/Operation/properties/state'}
+                progress: {type: integer, minimum: 0, maximum: 100}
+                current_step: {type: [string, "null"]}
+                error: {type: [object, "null"]}
+                checkpoint: {type: [object, "null"]}
+      responses:
+        '200': {description: Idempotent replay}
+        '202': {description: Transition committed}
+        '409': {description: Revision, idempotency, or state conflict}
+  /operations/{id}/cancel:
+    post: {operationId: cancelOperation, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Cancelled}}}
+  /operations/{id}/retry:
+    post: {operationId: retryOperation, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Retry operation}}}
+  /preflight:
+    get: {operationId: listPreflights, responses: {'200': {description: Preflight page}}}
+  /preflight/instances:
+    post: {operationId: preflightInstance, responses: {'200': {description: Signed decision}}}
+  /launch-templates:
+    get: {operationId: listLaunchTemplates, responses: {'200': {description: Template page}}}
+    post: {operationId: createLaunchTemplate, responses: {'201': {description: Template}}}
+  /launch-templates/{id}:
+    get: {operationId: getLaunchTemplate, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: Template and versions}}}
+    delete: {operationId: deleteLaunchTemplate, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Recycle entry}}}
+  /launch-templates/{id}/versions:
+    post: {operationId: createLaunchTemplateVersion, parameters: [{$ref: '#/components/parameters/id'}], responses: {'201': {description: Immutable version}}}
+  /launch-templates/{id}/default-version:
+    put: {operationId: setDefaultLaunchTemplateVersion, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: Template}}}
+  /auto-scaling-groups:
+    get: {operationId: listAutoScalingGroups, responses: {'200': {description: ASG page}}}
+    post: {operationId: createAutoScalingGroup, responses: {'201': {description: ASG}}}
+  /auto-scaling-groups/{id}:
+    get: {operationId: getAutoScalingGroup, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: ASG}}}
+    put: {operationId: updateAutoScalingGroupCapacity, parameters: [{$ref: '#/components/parameters/id'}], responses: {'200': {description: ASG}}}
+    delete: {operationId: deleteAutoScalingGroup, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Recycle entry}}}
+  /auto-scaling-groups/{id}/events:
+    post: {operationId: acceptSignedScalingEvent, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Scaling accepted}, '401': {description: Invalid signature}}}
+  /resources/deletion-protection:
+    get: {operationId: listDeletionProtections, responses: {'200': {description: Protection page}}}
+  /resources/{type}/{id}/deletion-protection:
+    parameters: [{$ref: '#/components/parameters/id'}, {in: path, name: type, required: true, schema: {type: string}}]
+    get: {operationId: getDeletionProtection, responses: {'200': {description: Protection}}}
+    put: {operationId: setDeletionProtection, responses: {'200': {description: Protection}}}
+  /recycle-bin:
+    get: {operationId: listRecycleBin, responses: {'200': {description: Recycle entries}}}
+  /recycle-bin/{id}:
+    delete: {operationId: purgeRecycleEntry, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Purged}, '403': {description: platform_admin required}}}
+  /recycle-bin/{id}/restore:
+    post: {operationId: restoreRecycleEntry, parameters: [{$ref: '#/components/parameters/id'}], responses: {'202': {description: Restored}}}
