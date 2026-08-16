@@ -22,7 +22,7 @@ class CrossTrackClientTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.tmp.name, "journal.db")
         self.session = KeystoneSession("http://keystone", "id", "secret", token="token",
-                                       project_id="11111111-1111-4111-8111-111111111111",
+                                       project_id="11111111111141118111111111111111",
                                        domain_id="22222222-2222-4222-8222-222222222222",
                                        user_id="33333333-3333-4333-8333-333333333333")
 
@@ -31,7 +31,7 @@ class CrossTrackClientTest(unittest.TestCase):
     def test_track_a_transition_walks_canonical_states_and_replays(self):
         operation = fixture("track-a-operation-v1alpha1.json")
         operation.update({"id": "44444444-4444-4444-8444-444444444444",
-                          "project_id": self.session.project_id, "state": "REQUESTED",
+                          "project_id": "11111111-1111-4111-8111-111111111111", "state": "REQUESTED",
                           "revision": 0, "progress": 0})
         calls = []
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -15,6 +16,13 @@ from .store import Journal
 
 class DeliveryError(IntegrationError):
     pass
+
+
+def _same_identifier(left: str, right: str) -> bool:
+    try:
+        return uuid.UUID(left) == uuid.UUID(right)
+    except (ValueError, TypeError, AttributeError):
+        return left == right
 
 
 @dataclass
@@ -101,7 +109,7 @@ class TrackAHttpClient:
         if required - value.keys() or value.get("contract_version") != OPERATION_CONTRACT \
                 or value.get("state") not in OPERATION_STATES:
             raise DeliveryError("Track A response violates canonical operation contract")
-        if value["project_id"] != self.session.project_id:
+        if not _same_identifier(value["project_id"], self.session.project_id):
             raise DeliveryError("Track A operation escaped application credential project scope")
         return value
 
