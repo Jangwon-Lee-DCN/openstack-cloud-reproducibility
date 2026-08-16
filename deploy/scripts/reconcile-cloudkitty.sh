@@ -52,12 +52,12 @@ fi
 if [[ "$mode" == apply ]]; then
   : "${DCN_SITE_ROOT:?apply requires the canonical site repository path}"
   python3 "$root/deploy/scripts/verify-cloudkitty-source-lock.py" "$root" "$DCN_SITE_ROOT" >/dev/null
-  if helm status "$release" -n "$namespace" >/dev/null 2>&1; then
-    kubectl delete job -n "$namespace" --ignore-not-found --wait=true \
-      cloudkitty-db-init cloudkitty-db-sync cloudkitty-rabbit-init \
-      cloudkitty-storage-init cloudkitty-ks-service cloudkitty-ks-endpoints \
-      cloudkitty-ks-user
-  fi
+  # Hook failures from an interrupted older chart may leave the same ephemeral
+  # names without Helm ownership. Always reconcile this exact bounded set.
+  kubectl delete job -n "$namespace" --ignore-not-found --wait=true \
+    cloudkitty-db-init cloudkitty-db-sync cloudkitty-rabbit-init \
+    cloudkitty-storage-init cloudkitty-ks-service cloudkitty-ks-endpoints \
+    cloudkitty-ks-user
   helm upgrade --install "$release" "$package" -n "$namespace" \
     -f "$values" -f "$work_dir/secrets.yaml" --atomic --timeout 20m --wait
   kubectl apply -f "$route"
