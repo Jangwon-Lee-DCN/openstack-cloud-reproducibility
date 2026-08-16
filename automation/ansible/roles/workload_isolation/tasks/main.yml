@@ -46,6 +46,14 @@
   register: isolation_apply
   changed_when: >-
     ' created' in isolation_apply.stdout or ' configured' in isolation_apply.stdout
+  when: not ansible_check_mode
+
+- name: Diff workload-isolation resources during dry-run
+  ansible.builtin.command: kubectl diff -f /tmp/dcn-workload-isolation.yaml
+  register: isolation_diff
+  changed_when: isolation_diff.rc == 1
+  failed_when: isolation_diff.rc not in [0, 1]
+  when: ansible_check_mode
 
 - name: Taint the development worker after policies exist
   ansible.builtin.command: >-
@@ -53,11 +61,13 @@
     dcn.ssu.ac.kr/workload-class=development:NoSchedule --overwrite
   register: development_taint
   changed_when: "'tainted' in development_taint.stdout"
+  when: not ansible_check_mode
 
 - name: Wait for the development acceptance workload
   ansible.builtin.command: >-
     kubectl -n {{ development_namespace }} rollout status deployment/development-smoke --timeout=5m
   changed_when: false
+  when: not ansible_check_mode
 
 - name: Verify the complete isolation contract
   ansible.builtin.command: "{{ role_path }}/files/verify-workload-isolation.sh"
@@ -67,6 +77,7 @@
     DEVELOPMENT_GATEWAY_IP: "{{ development_gateway_ip }}"
     DEVELOPMENT_GATEWAY_DOMAIN: "{{ development_gateway_domain }}"
   changed_when: false
+  when: not ansible_check_mode
 
 - name: Remove rendered workload-isolation resources
   ansible.builtin.file:
