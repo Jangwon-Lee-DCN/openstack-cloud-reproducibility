@@ -161,7 +161,7 @@ class CoreService:
         ident, timestamp, checksum = str(uuid.uuid4()), now(), fingerprint(spec)
         with self.store.tx() as db:
             try:
-                db.execute("INSERT INTO launch_templates VALUES(?,?,?,?,?,?,?)", (ident, project_id, body["name"], body.get("description", ""), 1, int(body.get("deletion_protected", False)), timestamp))
+                db.execute("INSERT INTO launch_templates VALUES(?,?,?,?,?,?,?)", (ident, project_id, body["name"], body.get("description", ""), 1, bool(body.get("deletion_protected", False)), timestamp))
             except Exception as exc:
                 raise CoreError(409, "TEMPLATE_NAME_CONFLICT", "template name already exists") from exc
             db.execute("INSERT INTO launch_template_versions VALUES(?,?,?,?,?,?)", (ident, 1, canonical(spec), checksum, user_id, timestamp))
@@ -204,7 +204,7 @@ class CoreService:
         require(any(x["version"] == version for x in template["versions"]), 404, "TEMPLATE_VERSION_NOT_FOUND", "template version was not found")
         ident, timestamp = str(uuid.uuid4()), now()
         with self.store.tx() as db:
-            db.execute("INSERT INTO auto_scaling_groups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (ident, project_id, body["region_id"], template["id"], version, low, desired, high, canonical(body.get("subnet_ids", [])), body.get("cooldown_seconds", 300), "ACTIVE", int(body.get("deletion_protected", False)), None, timestamp))
+            db.execute("INSERT INTO auto_scaling_groups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (ident, project_id, body["region_id"], template["id"], version, low, desired, high, canonical(body.get("subnet_ids", [])), body.get("cooldown_seconds", 300), "ACTIVE", bool(body.get("deletion_protected", False)), None, timestamp))
         return self.get_asg(project_id, ident)
 
     def get_asg(self, project_id, ident):
@@ -243,7 +243,7 @@ class CoreService:
             desired = max(group["min_size"], min(group["max_size"], group["desired"] + adjustment))
             accepted, reason = desired != group["desired"], "accepted" if desired != group["desired"] else "capacity-bound"
             timestamp = now()
-            db.execute("INSERT INTO scaling_events VALUES(?,?,?,?,?,?)", (event_id, ident, adjustment, int(accepted), reason, timestamp))
+            db.execute("INSERT INTO scaling_events VALUES(?,?,?,?,?,?)", (event_id, ident, adjustment, bool(accepted), reason, timestamp))
             if accepted:
                 db.execute("UPDATE auto_scaling_groups SET desired=?,state='SCALING',last_scaled_at=? WHERE id=?", (desired, timestamp, ident))
         return {"event_id": event_id, "group_id": ident, "accepted": accepted, "reason": reason, "desired_capacity": desired}
@@ -251,7 +251,7 @@ class CoreService:
     def set_protection(self, project_id, user_id, resource_type, resource_id, protected, reason=None):
         timestamp = now()
         with self.store.tx() as db:
-            db.execute("INSERT INTO resource_protection VALUES(?,?,?,?,?,?,?) ON CONFLICT(project_id,resource_type,resource_id) DO UPDATE SET protected=excluded.protected,reason=excluded.reason,updated_by=excluded.updated_by,updated_at=excluded.updated_at", (project_id, resource_type, resource_id, int(protected), reason, user_id, timestamp))
+            db.execute("INSERT INTO resource_protection VALUES(?,?,?,?,?,?,?) ON CONFLICT(project_id,resource_type,resource_id) DO UPDATE SET protected=excluded.protected,reason=excluded.reason,updated_by=excluded.updated_by,updated_at=excluded.updated_at", (project_id, resource_type, resource_id, bool(protected), reason, user_id, timestamp))
             db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("resource.protection.changed.v1", resource_id, canonical({"resource_type": resource_type, "protected": protected}), timestamp))
         return {"resource_type": resource_type, "resource_id": resource_id, "deletion_protected": protected, "reason": reason}
 
