@@ -43,6 +43,40 @@ spec:
             readOnlyRootFilesystem: true
             runAsUser: 10001
           volumeMounts: [{name: data, mountPath: /data}]
+        - name: worker
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, core.worker_main]
+          env:
+            - {name: CORE_DB_PATH, value: /data/core.db}
+            - {name: CORE_RUNTIME_MODE, value: development}
+            - {name: WORKER_POLL_SECONDS, value: "1"}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 150m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+            runAsUser: 10001
+          volumeMounts: [{name: data, mountPath: /data}]
+        - name: scheduler
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, core.scheduler_main]
+          env:
+            - {name: CORE_DB_PATH, value: /data/core.db}
+            - {name: CORE_RUNTIME_MODE, value: development}
+            - {name: SCHEDULER_POLL_SECONDS, value: "5"}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 150m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+            runAsUser: 10001
+          volumeMounts: [{name: data, mountPath: /data}]
       volumes: [{name: data, emptyDir: {}}]
 ---
 apiVersion: v1

@@ -26,7 +26,7 @@ class IdentityVerifier:
         if self.mode == "development":
             project, user = headers.get("X-Project-Id"), headers.get("X-User-Id")
             require(project and user, 401, "IDENTITY_REQUIRED", "development identity headers are required")
-            return {"project_id": project, "user_id": user, "roles": []}
+            return {"project_id": project, "user_id": user, "roles": [x.strip() for x in headers.get("X-Roles", "").split(",") if x.strip()]}
         token = headers.get("X-DCN-Identity-Assertion")
         require(token, 401, "SIGNED_IDENTITY_REQUIRED", "signed proxy identity assertion is required")
         try:

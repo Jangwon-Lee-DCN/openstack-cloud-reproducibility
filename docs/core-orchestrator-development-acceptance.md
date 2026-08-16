@@ -33,6 +33,21 @@ define UUID, JSONB, timestamptz, uniqueness, runnable-index and
 `FOR UPDATE SKIP LOCKED` semantics. They are a repository contract, not proof
 that a live PostgreSQL failover test has passed.
 
+The final pre-integration slice makes the fake system executable end to end:
+the API persists normalized requests, the worker claims and executes them,
+retryable failures use exponential bounded backoff, exhaustion enters a durable
+dead-letter queue after compensation, and the scheduler reconciles ASG
+desired/actual membership while honoring cooldown and protected instances.
+All list APIs use bounded marker pagination. Template/ASG capacity lifecycle,
+protection, recycle restore and privileged purge, preflight inventory and the
+ordered Operation timeline are exposed by the HTTP contract and documented in
+`openapi.yaml`.
+
+An independent `images/horizon-core-orchestration-dashboard/` package consumes
+only that contract. It is deliberately not composed into the shared Horizon
+image. The development Pod contains API, worker and scheduler containers using
+the same immutable image and disposable SQLite volume.
+
 ## Local acceptance
 
 ```bash
@@ -48,6 +63,9 @@ identity enforcement and the `202 + Location` operation contract.
 They also cover lease takeover/fencing, delayed retry/checkpoint resume,
 provider compensation and restart idempotency, signed Keystone/OPA assertions,
 signed/replayed Aodh events, and PostgreSQL migration/locking invariants.
+Fake-provider E2E additionally covers API-to-worker success, ordered timeline,
+restart safety, retry scheduling, DLQ compensation, ASG scale-out/scale-in,
+cooldown, pagination and the full protect/recycle/restore/purge lifecycle.
 
 ## Isolated development acceptance
 
@@ -80,14 +98,19 @@ approved Phase.
 
 ## Promotion blockers
 
-- live PostgreSQL migration, repository adapter and HA/failover acceptance
-- worker execution loop, bounded retry exhaustion and dead-letter processing
-- real Keystone token validation and OPA decision integration
-- Nova/Neutron/Cinder/Placement quota and mutation adapters
-- Aodh credential rotation, cooldown clock and LB drain adapter
-- native Nova soft-delete capability validation against deployed microversions
-- three API replicas, multiple workers, metrics/SLO and 24-hour failure canary
-- Horizon overlay after API semantics are accepted
+All remaining blockers require real integration or an integration environment:
+
+- run the committed schema through a real PostgreSQL repository adapter and
+  test HA/failover, migrations, backup and restore;
+- connect Keystone token validation and live OPA decisions at the signed proxy;
+- replace deterministic Nova/Neutron/Cinder/Placement/LB adapters and run quota,
+  rollback, drain and orphan-resource acceptance;
+- connect a real Aodh webhook, rotate its credential and verify clock skew;
+- validate native Nova soft-delete against the deployed microversion;
+- run three API replicas, multiple workers and schedulers with RabbitMQ/outbox
+  delivery, metrics/SLO and a 24-hour fault-injection canary;
+- compose and browser-test the independent Horizon package in the accepted
+  shared Horizon image.
 
 Until every blocker is closed, `deploy/values/features/core-orchestrator.yaml`
 remains disabled and no production Phase may reference it.

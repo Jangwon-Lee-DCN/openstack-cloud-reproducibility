@@ -50,9 +50,9 @@ class CoreService:
                 existing = Store.row(existing)
                 require(existing["fingerprint"] == fp, 409, "IDEMPOTENCY_KEY_REUSED", "the key was already used with another request")
                 return existing, created
-            db.execute("INSERT INTO operations(id,project_id,region_id,action,target_type,target_id,fingerprint,idempotency_key,state,progress,current_step,error_json,correlation_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            db.execute("INSERT INTO operations(id,project_id,region_id,action,target_type,target_id,fingerprint,idempotency_key,state,progress,current_step,error_json,correlation_id,created_at,updated_at,request_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 operation_id, project_id, region_id, action, target_type, target_id, fp, key,
-                "REQUESTED", 0, None, None, correlation_id, timestamp, timestamp))
+                "REQUESTED", 0, None, None, correlation_id, timestamp, timestamp, canonical(payload)))
             event = {"state": "REQUESTED", "correlation_id": correlation_id}
             db.execute("INSERT INTO operation_events(operation_id,event_type,payload_json,created_at) VALUES(?,?,?,?)", (operation_id, "operation.requested", canonical(event), timestamp))
             db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("operation.requested.v1", operation_id, canonical(event), timestamp))
@@ -69,6 +69,27 @@ class CoreService:
             query += " AND state=?"; args.append(state)
         with self.store.tx() as db:
             return [Store.row(x) for x in db.execute(query + " ORDER BY created_at DESC", args)]
+
+    def page_operations(self, project_id, state=None, limit=50, marker=None):
+        limit = max(1, min(int(limit), 200)); query, args = "SELECT * FROM operations WHERE project_id=?", [project_id]
+        if state: query += " AND state=?"; args.append(state)
+        if marker: query += " AND id>?"; args.append(marker)
+        with self.store.tx() as db: rows = [Store.row(row) for row in db.execute(query + " ORDER BY id LIMIT ?", args + [limit + 1])]
+        return {"items": rows[:limit], "next_marker": rows[limit - 1]["id"] if len(rows) > limit else None}
+
+    def _page(self, db, table, project_id, limit=50, marker=None):
+        limit = max(1, min(int(limit), 200))
+        query, args = f"SELECT * FROM {table} WHERE project_id=?", [project_id]
+        if marker:
+            query += " AND id>?"; args.append(marker)
+        rows = [Store.row(row) for row in db.execute(query + " ORDER BY id LIMIT ?", args + [limit + 1])]
+        return {"items": rows[:limit], "next_marker": rows[limit - 1]["id"] if len(rows) > limit else None}
+
+    def list_preflights(self, project_id, limit=50, marker=None):
+        with self.store.tx() as db: return self._page(db, "preflights", project_id, limit, marker)
+
+    def get_preflight(self, project_id, ident):
+        with self.store.tx() as db: return self._owned(db, "preflights", ident, project_id)
 
     def operation_events(self, project_id, operation_id):
         self.get_operation(project_id, operation_id)
@@ -147,6 +168,14 @@ class CoreService:
             template["versions"] = [Store.row(x) for x in db.execute("SELECT * FROM launch_template_versions WHERE template_id=? ORDER BY version", (ident,))]
             return template
 
+    def list_templates(self, project_id, limit=50, marker=None):
+        with self.store.tx() as db: return self._page(db, "launch_templates", project_id, limit, marker)
+
+    def delete_template(self, project_id, user_id, ident):
+        template = self.get_template(project_id, ident)
+        require(not template["deletion_protected"], 409, "RESOURCE_PROTECTED", "template deletion protection is enabled")
+        return self.recycle(project_id, user_id, "launch_template", ident)
+
     def add_template_version(self, project_id, user_id, ident, spec):
         self.get_template(project_id, ident)
         require(not spec.get("user_data"), 400, "PLAINTEXT_SECRET_FORBIDDEN", "use user_data_ref instead")
@@ -177,6 +206,22 @@ class CoreService:
         with self.store.tx() as db:
             return self._owned(db, "auto_scaling_groups", ident, project_id)
 
+    def list_asgs(self, project_id, limit=50, marker=None):
+        with self.store.tx() as db: return self._page(db, "auto_scaling_groups", project_id, limit, marker)
+
+    def delete_asg(self, project_id, user_id, ident):
+        group = self.get_asg(project_id, ident)
+        require(not group["deletion_protected"], 409, "RESOURCE_PROTECTED", "auto scaling group deletion protection is enabled")
+        return self.recycle(project_id, user_id, "auto_scaling_group", ident)
+
+    def update_asg_capacity(self, project_id, ident, body):
+        with self.store.tx() as db:
+            group = self._owned(db, "auto_scaling_groups", ident, project_id)
+            low, desired, high = body.get("min_size", group["min_size"]), body.get("desired_capacity", group["desired"]), body.get("max_size", group["max_size"])
+            require(all(isinstance(x, int) for x in (low, desired, high)) and 0 <= low <= desired <= high, 400, "CAPACITY_BOUNDS_INVALID", "require 0 <= min <= desired <= max")
+            db.execute("UPDATE auto_scaling_groups SET min_size=?,desired=?,max_size=?,state='SCALING' WHERE id=?", (low, desired, high, ident))
+        return self.get_asg(project_id, ident)
+
     def scaling_event(self, project_id, ident, event_id, adjustment):
         require(isinstance(event_id, str) and event_id, 400, "SCALING_EVENT_ID_REQUIRED", "event_id is required")
         require(isinstance(adjustment, int) and adjustment != 0, 400, "SCALING_ADJUSTMENT_INVALID", "adjustment must be a non-zero integer")
@@ -186,6 +231,10 @@ class CoreService:
             if existing:
                 event = Store.row(existing)
                 return {**event, "accepted": bool(event["accepted"]), "desired_capacity": group["desired"]}
+            if group["last_scaled_at"] and datetime.fromisoformat(group["last_scaled_at"]) + timedelta(seconds=group["cooldown_seconds"]) > datetime.now(timezone.utc):
+                timestamp = now()
+                db.execute("INSERT INTO scaling_events VALUES(?,?,?,?,?,?)", (event_id, ident, adjustment, 0, "cooldown", timestamp))
+                return {"event_id": event_id, "group_id": ident, "accepted": False, "reason": "cooldown", "desired_capacity": group["desired"]}
             desired = max(group["min_size"], min(group["max_size"], group["desired"] + adjustment))
             accepted, reason = desired != group["desired"], "accepted" if desired != group["desired"] else "capacity-bound"
             timestamp = now()
@@ -201,6 +250,17 @@ class CoreService:
             db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("resource.protection.changed.v1", resource_id, canonical({"resource_type": resource_type, "protected": protected}), timestamp))
         return {"resource_type": resource_type, "resource_id": resource_id, "deletion_protected": protected, "reason": reason}
 
+    def get_protection(self, project_id, resource_type, resource_id):
+        with self.store.tx() as db:
+            row = db.execute("SELECT * FROM resource_protection WHERE project_id=? AND resource_type=? AND resource_id=?", (project_id, resource_type, resource_id)).fetchone()
+            return Store.row(row) if row else {"resource_type": resource_type, "resource_id": resource_id, "protected": 0}
+
+    def list_protections(self, project_id, limit=50, marker=None):
+        limit = max(1, min(int(limit), 200)); query, args = "SELECT * FROM resource_protection WHERE project_id=?", [project_id]
+        if marker: query += " AND resource_id>?"; args.append(marker)
+        with self.store.tx() as db: rows = [Store.row(row) for row in db.execute(query + " ORDER BY resource_id LIMIT ?", args + [limit + 1])]
+        return {"items": rows[:limit], "next_marker": rows[limit - 1]["resource_id"] if len(rows) > limit else None}
+
     def recycle(self, project_id, user_id, resource_type, resource_id, retention_days=7):
         with self.store.tx() as db:
             protected = db.execute("SELECT protected FROM resource_protection WHERE project_id=? AND resource_type=? AND resource_id=?", (project_id, resource_type, resource_id)).fetchone()
@@ -215,9 +275,8 @@ class CoreService:
         with self.store.tx() as db:
             return self._owned(db, "recycle_bin", ident, project_id)
 
-    def list_recycle(self, project_id):
-        with self.store.tx() as db:
-            return [Store.row(x) for x in db.execute("SELECT * FROM recycle_bin WHERE project_id=? ORDER BY deleted_at DESC", (project_id,))]
+    def list_recycle(self, project_id, limit=50, marker=None):
+        with self.store.tx() as db: return self._page(db, "recycle_bin", project_id, limit, marker)
 
     def restore(self, project_id, ident):
         with self.store.tx() as db:
@@ -226,4 +285,13 @@ class CoreService:
             require(entry["restore_capability"] != "NONE", 409, "RESTORE_NOT_SUPPORTED", "resource cannot be restored")
             require(datetime.fromisoformat(entry["purge_after"]) > datetime.now(timezone.utc), 409, "RETENTION_EXPIRED", "retention period expired")
             db.execute("UPDATE recycle_bin SET state='RESTORED' WHERE id=?", (ident,))
+        return self.get_recycle(project_id, ident)
+
+    def purge(self, project_id, ident, privileged=False):
+        require(privileged, 403, "PURGE_PRIVILEGE_REQUIRED", "platform_admin role is required")
+        with self.store.tx() as db:
+            entry = self._owned(db, "recycle_bin", ident, project_id)
+            require(entry["state"] in {"RETAINED", "ERROR"}, 409, "RECYCLE_STATE_INVALID", "entry cannot be purged")
+            db.execute("UPDATE recycle_bin SET state='PURGED' WHERE id=?", (ident,))
+            db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("recycle-bin.purged.v1", ident, "{}", now()))
         return self.get_recycle(project_id, ident)

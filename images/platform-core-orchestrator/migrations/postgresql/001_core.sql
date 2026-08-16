@@ -7,13 +7,14 @@ CREATE TABLE operations (
  current_step text, error_json jsonb, correlation_id uuid NOT NULL,
  created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
  lease_owner text, lease_expires_at timestamptz, attempt integer NOT NULL DEFAULT 0,
- next_attempt_at timestamptz, checkpoint_json jsonb,
+ next_attempt_at timestamptz, checkpoint_json jsonb, request_json jsonb NOT NULL DEFAULT '{}'::jsonb,
  UNIQUE(project_id,idempotency_key));
 CREATE INDEX operations_runnable_idx ON operations(state,next_attempt_at,lease_expires_at,created_at);
 CREATE TABLE operation_events (id bigserial PRIMARY KEY, operation_id uuid NOT NULL REFERENCES operations(id), event_type text NOT NULL, payload_json jsonb NOT NULL, created_at timestamptz NOT NULL);
 CREATE TABLE outbox (id bigserial PRIMARY KEY, topic text NOT NULL, aggregate_id uuid NOT NULL, payload_json jsonb NOT NULL, created_at timestamptz NOT NULL, published_at timestamptz);
 CREATE INDEX outbox_unpublished_idx ON outbox(id) WHERE published_at IS NULL;
 CREATE TABLE inbound_events (event_id text PRIMARY KEY, source text NOT NULL, received_at timestamptz NOT NULL);
+CREATE TABLE dead_letters (operation_id uuid PRIMARY KEY REFERENCES operations(id), reason text NOT NULL, checkpoint_json jsonb NOT NULL, failed_at timestamptz NOT NULL);
 CREATE TABLE preflights (
  id uuid PRIMARY KEY, project_id uuid NOT NULL, kind text NOT NULL,
  fingerprint char(64) NOT NULL, decision text NOT NULL, result_json jsonb NOT NULL,
@@ -40,6 +41,10 @@ CREATE TABLE scaling_events (
  event_id text PRIMARY KEY, group_id uuid NOT NULL REFERENCES auto_scaling_groups(id),
  adjustment integer NOT NULL, accepted boolean NOT NULL, reason text NOT NULL,
  created_at timestamptz NOT NULL);
+CREATE TABLE asg_members (
+ id uuid PRIMARY KEY, group_id uuid NOT NULL REFERENCES auto_scaling_groups(id),
+ provider_id text NOT NULL, state text NOT NULL, created_at timestamptz NOT NULL,
+ UNIQUE(group_id,provider_id));
 CREATE TABLE resource_protection (
  project_id uuid NOT NULL, resource_type text NOT NULL, resource_id uuid NOT NULL,
  protected boolean NOT NULL, reason text, updated_by uuid NOT NULL,

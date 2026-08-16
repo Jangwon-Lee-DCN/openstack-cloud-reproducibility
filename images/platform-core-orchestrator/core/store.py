@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS operations (
  progress INTEGER NOT NULL DEFAULT 0, current_step TEXT, error_json TEXT,
  correlation_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  lease_owner TEXT, lease_expires_at TEXT, attempt INTEGER NOT NULL DEFAULT 0,
- next_attempt_at TEXT, checkpoint_json TEXT,
+ next_attempt_at TEXT, checkpoint_json TEXT, request_json TEXT NOT NULL DEFAULT '{}',
  UNIQUE(project_id,idempotency_key));
 CREATE TABLE IF NOT EXISTS operation_events (
  id INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL,
@@ -48,6 +48,13 @@ CREATE TABLE IF NOT EXISTS scaling_events (
   accepted INTEGER NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS inbound_events (
  event_id TEXT PRIMARY KEY, source TEXT NOT NULL, received_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS dead_letters (
+ operation_id TEXT PRIMARY KEY, reason TEXT NOT NULL, checkpoint_json TEXT NOT NULL,
+ failed_at TEXT NOT NULL, FOREIGN KEY(operation_id) REFERENCES operations(id));
+CREATE TABLE IF NOT EXISTS asg_members (
+ id TEXT PRIMARY KEY, group_id TEXT NOT NULL, provider_id TEXT NOT NULL,
+ state TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(group_id,provider_id),
+ FOREIGN KEY(group_id) REFERENCES auto_scaling_groups(id));
 CREATE TABLE IF NOT EXISTS resource_protection (
  project_id TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT NOT NULL,
  protected INTEGER NOT NULL, reason TEXT, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -70,7 +77,7 @@ class Store:
             additions = {
                 "lease_owner": "TEXT", "lease_expires_at": "TEXT",
                 "attempt": "INTEGER NOT NULL DEFAULT 0", "next_attempt_at": "TEXT",
-                "checkpoint_json": "TEXT",
+                "checkpoint_json": "TEXT", "request_json": "TEXT NOT NULL DEFAULT '{}'",
             }
             for name, definition in additions.items():
                 if name not in columns:
@@ -127,6 +134,9 @@ class Store:
                 "WHERE id=? AND lease_owner=?",
                 (state, step, json.dumps(checkpoint, sort_keys=True), current_time, next_attempt_at, owner, expiry, operation_id, worker_id),
             ).rowcount
+            if changed:
+                event = json.dumps({"state": state, "step": step, "checkpoint": checkpoint}, sort_keys=True)
+                db.execute("INSERT INTO operation_events(operation_id,event_type,payload_json,created_at) VALUES(?,?,?,?)", (operation_id, "operation.transition", event, current_time))
             return changed == 1
 
     def accept_inbound_event(self, event_id, source, received_at):
@@ -136,6 +146,16 @@ class Store:
                 return True
             except sqlite3.IntegrityError:
                 return False
+
+    def dead_letter(self, operation_id, reason, checkpoint, failed_at):
+        with self.tx() as db:
+            db.execute("INSERT OR REPLACE INTO dead_letters VALUES(?,?,?,?)", (operation_id, reason, json.dumps(checkpoint, sort_keys=True), failed_at))
+            db.execute("UPDATE operations SET state='FAILED',lease_owner=NULL,lease_expires_at=NULL,updated_at=? WHERE id=?", (failed_at, operation_id))
+            db.execute("INSERT INTO outbox(topic,aggregate_id,payload_json,created_at) VALUES(?,?,?,?)", ("operation.dead-lettered.v1", operation_id, json.dumps({"reason": reason}, sort_keys=True), failed_at))
+
+    def list_dead_letters(self):
+        with self.tx() as db:
+            return [self.row(row) for row in db.execute("SELECT * FROM dead_letters ORDER BY failed_at")]
 
     @staticmethod
     def row(row):

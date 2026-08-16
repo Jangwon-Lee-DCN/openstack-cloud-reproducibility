@@ -37,8 +37,7 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def identity(self):
-        identity = self.identity_verifier.verify(self.headers)
-        return identity["project_id"], identity["user_id"]
+        return self.identity_verifier.verify(self.headers)
 
     def send_json(self, status, payload, headers=None):
         raw = json.dumps(payload, sort_keys=True).encode()
@@ -54,11 +53,11 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path)
         if path.path == "/healthz":
             return 200, {"status": "ok"}, {}
-        project, user = self.identity()
+        identity = self.identity(); project, user = identity["project_id"], identity["user_id"]
         body = self.body() if self.command in {"POST", "PUT", "DELETE"} else {}
         query = parse_qs(path.query)
         if self.command == "GET" and path.path == "/v1/operations":
-            return 200, {"items": self.service.list_operations(project, (query.get("state") or [None])[0])}, {}
+            return 200, self.service.page_operations(project, (query.get("state") or [None])[0], (query.get("limit") or [50])[0], (query.get("marker") or [None])[0]), {}
         match = re.fullmatch(r"/v1/operations/([^/]+)(?:/(events|cancel|retry))?", path.path)
         if match:
             ident, action = match.groups()
@@ -71,20 +70,31 @@ class Handler(BaseHTTPRequestHandler):
         match = re.fullmatch(r"/v1/preflight/(instances|auto-scaling-groups|deletions)", path.path)
         if self.command == "POST" and match:
             return 200, self.service.preflight(project, match.group(1).rstrip("s"), body), {}
+        if self.command == "GET" and path.path == "/v1/preflight":
+            return 200, self.service.list_preflights(project, (query.get("limit") or [50])[0], (query.get("marker") or [None])[0]), {}
+        match = re.fullmatch(r"/v1/preflight/([^/]+)", path.path)
+        if self.command == "GET" and match: return 200, self.service.get_preflight(project, match.group(1)), {}
         if self.command == "POST" and path.path == "/v1/launch-templates":
             return 201, self.service.create_template(project, user, body), {}
+        if self.command == "GET" and path.path == "/v1/launch-templates":
+            return 200, self.service.list_templates(project, (query.get("limit") or [50])[0], (query.get("marker") or [None])[0]), {}
         match = re.fullmatch(r"/v1/launch-templates/([^/]+)(?:/(versions|default-version))?", path.path)
         if match:
             ident, action = match.groups()
             if self.command == "GET": return 200, self.service.get_template(project, ident), {}
             if self.command == "POST" and action == "versions": return 201, self.service.add_template_version(project, user, ident, body), {}
             if self.command == "PUT" and action == "default-version": return 200, self.service.set_default_version(project, ident, body.get("version")), {}
+            if self.command == "DELETE" and not action: return 202, self.service.delete_template(project, user, ident), {}
         if self.command == "POST" and path.path == "/v1/auto-scaling-groups":
             return 201, self.service.create_asg(project, body), {}
+        if self.command == "GET" and path.path == "/v1/auto-scaling-groups":
+            return 200, self.service.list_asgs(project, (query.get("limit") or [50])[0], (query.get("marker") or [None])[0]), {}
         match = re.fullmatch(r"/v1/auto-scaling-groups/([^/]+)(?:/events)?", path.path)
         if match:
             ident = match.group(1)
             if self.command == "GET": return 200, self.service.get_asg(project, ident), {}
+            if self.command == "PUT": return 200, self.service.update_asg_capacity(project, ident, body), {}
+            if self.command == "DELETE": return 202, self.service.delete_asg(project, user, ident), {}
             if self.command == "POST":
                 raw = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
                 self.event_verifier.verify(raw, self.headers.get("X-DCN-Event-Timestamp"), self.headers.get("X-DCN-Event-Signature"))
@@ -92,15 +102,22 @@ class Handler(BaseHTTPRequestHandler):
                     current = self.service.get_asg(project, ident)
                     return 200, {"event_id": body.get("event_id"), "accepted": False, "reason": "duplicate", "desired_capacity": current["desired"]}, {}
                 return 202, self.service.scaling_event(project, ident, body.get("event_id"), body.get("adjustment")), {}
+        if self.command == "GET" and path.path == "/v1/resources/deletion-protection":
+            return 200, self.service.list_protections(project, (query.get("limit") or [50])[0], (query.get("marker") or [None])[0]), {}
         match = re.fullmatch(r"/v1/resources/([^/]+)/([^/]+)/deletion-protection", path.path)
         if self.command == "PUT" and match:
             return 200, self.service.set_protection(project, user, *match.groups(), body.get("deletion_protected", False), body.get("reason")), {}
+        if self.command == "GET" and match:
+            return 200, self.service.get_protection(project, *match.groups()), {}
         match = re.fullmatch(r"/v1/resources/([^/]+)/([^/]+)", path.path)
         if self.command == "DELETE" and match:
             return 202, self.service.recycle(project, user, *match.groups(), body.get("retention_days", 7)), {}
-        if self.command == "GET" and path.path == "/v1/recycle-bin": return 200, {"items": self.service.list_recycle(project)}, {}
+        if self.command == "GET" and path.path == "/v1/recycle-bin": return 200, self.service.list_recycle(project, (query.get("limit") or [50])[0], (query.get("marker") or [None])[0]), {}
         match = re.fullmatch(r"/v1/recycle-bin/([^/]+)/restore", path.path)
         if self.command == "POST" and match: return 202, self.service.restore(project, match.group(1)), {}
+        match = re.fullmatch(r"/v1/recycle-bin/([^/]+)", path.path)
+        if self.command == "GET" and match: return 200, self.service.get_recycle(project, match.group(1)), {}
+        if self.command == "DELETE" and match: return 202, self.service.purge(project, match.group(1), "platform_admin" in identity.get("roles", [])), {}
         if self.command == "POST" and path.path == "/v1/operations":
             op, created = self.service.create_operation(project, body["region_id"], body["action"], body["target_type"], body.get("payload", {}), self.headers.get("Idempotency-Key"), body.get("target_id"))
             return 202, op, {"Location": f"/v1/operations/{op['id']}", "X-Idempotent-Replay": str(not created).lower()}

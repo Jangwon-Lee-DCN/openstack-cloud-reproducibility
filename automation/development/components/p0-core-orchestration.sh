@@ -28,6 +28,10 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" rollout status deployment/p0-core-orchestration --timeout=5m
     image=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deploy p0-core-orchestration -o jsonpath='{.spec.template.spec.containers[0].image}')
     [[ $image =~ @sha256:[0-9a-f]{64}$ ]]
+    worker_image=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deploy p0-core-orchestration -o jsonpath='{.spec.template.spec.containers[1].image}')
+    [[ $worker_image == "$image" ]]
+    scheduler_image=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deploy p0-core-orchestration -o jsonpath='{.spec.template.spec.containers[2].image}')
+    [[ $scheduler_image == "$image" ]]
     node=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get pod -l app.kubernetes.io/name=p0-core-orchestration -o jsonpath='{.items[0].spec.nodeName}')
     [[ $node == "${DEVELOPMENT_NODE:?}" ]]
     curl --fail --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
