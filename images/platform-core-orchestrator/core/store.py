@@ -165,5 +165,15 @@ class Store:
         for key in tuple(value):
             if key.endswith("_json"):
                 raw = value.pop(key)
-                value[key[:-5]] = json.loads(raw) if raw is not None else None
+                value[key[:-5]] = (json.loads(raw) if isinstance(raw, str) else raw) if raw is not None else None
         return value
+
+
+def store_from_env(environ):
+    database_url = environ.get("CORE_DATABASE_URL")
+    if database_url:
+        from .postgres_store import PostgresStore
+        return PostgresStore(database_url)
+    if environ.get("CORE_RUNTIME_MODE", "production") != "development":
+        raise RuntimeError("CORE_DATABASE_URL is required outside development mode")
+    return Store(environ.get("CORE_DB_PATH", "/data/core.db"))

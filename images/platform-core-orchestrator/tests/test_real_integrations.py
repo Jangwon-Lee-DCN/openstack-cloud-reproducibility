@@ -4,6 +4,10 @@ import unittest
 from core.adapters import InstanceProvisioner, ProviderError
 from core.auth import IdentityVerifier
 from core.openstack import CinderAdapter, NeutronAdapter, NovaAdapter, OpenStackSession
+from core.scheduler_main import DegradedRealScheduler
+from core.store import Store
+import os
+import tempfile
 
 
 class KeystoneOPAContractTests(unittest.TestCase):
@@ -63,6 +67,21 @@ class RealProviderContractTests(unittest.TestCase):
                                   "server": {"image_id": "image", "flavor_id": "flavor"}})
         deletes = [url for method, url in calls if method == "DELETE"]
         self.assertIn("cinder", deletes[0]); self.assertIn("neutron", deletes[1])
+
+    def test_real_scheduler_never_falls_back_to_fake_compute(self):
+        fd, path = tempfile.mkstemp(); os.close(fd)
+        try:
+            store = Store(path)
+            with store.tx() as db:
+                db.execute("INSERT INTO launch_templates VALUES(?,?,?,?,?,?,?)", ("t", "p", "name", "", 1, 0, "2026-01-01"))
+                db.execute("INSERT INTO launch_template_versions VALUES(?,?,?,?,?,?)", ("t", 1, "{}", "x", "u", "2026-01-01"))
+                db.execute("INSERT INTO auto_scaling_groups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                           ("g", "p", "r", "t", 1, 0, 1, 1, "[]", 300, "SCALING", 0, None, "2026-01-01"))
+            result = DegradedRealScheduler(store).reconcile_all()
+            self.assertEqual("DEGRADED", result[0]["state"])
+            with store.tx() as db: self.assertEqual(0, db.execute("SELECT COUNT(*) FROM asg_members").fetchone()[0])
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__": unittest.main()

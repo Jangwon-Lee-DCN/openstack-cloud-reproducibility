@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from .auth import IdentityVerifier, SignedEventVerifier
 from .errors import CoreError
 from .service import CoreService
-from .store import Store
+from .store import store_from_env
 
 
 def now_iso():
@@ -20,7 +20,7 @@ def build_service():
     key = os.environ.get("CORE_APPROVAL_SIGNING_KEY", "")
     if not key:
         raise RuntimeError("CORE_APPROVAL_SIGNING_KEY is required")
-    return CoreService(Store(os.environ.get("CORE_DB_PATH", "/data/core.db")), key.encode())
+    return CoreService(store_from_env(os.environ), key.encode())
 
 
 class Handler(BaseHTTPRequestHandler):

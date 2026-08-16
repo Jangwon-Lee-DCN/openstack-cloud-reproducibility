@@ -47,3 +47,10 @@ remaining development Secret is project-scoped and must not be promoted.
 Neutron and Cinder with retry classification and reverse compensation.
 `core.provider_probe` performs non-mutating checks against all six provider
 APIs. No provider resource was created during this evidence collection.
+
+The development manifest now uses a dedicated PostgreSQL StatefulSet/PVC and a
+real RabbitMQ vhost `/dcn-p0-track-a-development`. Its unique user is restricted
+to `dcn.track-a.*`; the durable topic exchange and audit queue receive the
+transactional outbox. The runtime refuses SQLite whenever the mode is not
+`development`. The real ASG scheduler deliberately reconciles desired=0 only;
+desired>0 is surfaced as `DEGRADED` without creating fake instances.
