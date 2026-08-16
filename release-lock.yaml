@@ -44,7 +44,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: 21.0.0
     package: helm/packages/patched/masakari-2026.1.0.tgz
-    sha256: 2084ef760b8c1c03b70ef30d24da438d51227b1d502af52f512a471cf7ae402c
+    sha256: 9927c13a52362a35749e4d81901083a003e11af1a507b31c80b4242e27e08e8c
     valuesFile: deploy/values/site/masakari.yaml
     secretsFile: deploy/secrets/masakari.values.sops.yaml
   - name: designate

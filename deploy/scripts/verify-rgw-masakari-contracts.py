@@ -2,6 +2,9 @@
 """Static safety checks for RGW catalog ordering and Masakari read-only policy."""
 
 from pathlib import Path
+import hashlib
+import tarfile
+import yaml
 
 root = Path(__file__).resolve().parents[2]
 script = (root / "deploy/scripts/reconcile-rgw-keystone-catalog.sh").read_text()
@@ -33,3 +36,13 @@ for mutation in ("create", "update", "delete"):
 
 route = (root / "deploy/manifests/rgw-swift-route.yaml").read_text()
 assert "s3.cloud.dcn.ssu.ac.kr" in route and "PathPrefix, value: /swift" in route
+
+lock = yaml.safe_load((root / "release-lock.yaml").read_text())
+release = next(item for item in lock["spec"]["releases"] if item["name"] == "masakari")
+package = root / release["package"]
+assert hashlib.sha256(package.read_bytes()).hexdigest() == release["sha256"]
+with tarfile.open(package) as chart:
+    config = chart.extractfile("masakari/templates/configmap-etc.yaml").read().decode()
+    deployment = chart.extractfile("masakari/templates/deployment-api.yaml").read().decode()
+assert "policy.yaml: {{ toYaml .Values.conf.policy | b64enc }}" in config
+assert "mountPath: /etc/masakari/policy.yaml" in deployment
