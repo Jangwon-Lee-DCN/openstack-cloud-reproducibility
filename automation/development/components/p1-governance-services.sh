@@ -98,8 +98,9 @@ case "$operation" in
     deny=$(kubectl -n "$DEVELOPMENT_NAMESPACE" exec deployment/governance-api -c api -- \
       python3 -c 'import json,sys,urllib.request; body=json.dumps({"input":{"subject":{"roles":["reader"]},"context":{"authorization_class":"project-write"}}}).encode(); print(json.load(urllib.request.urlopen(urllib.request.Request(sys.argv[1],data=body,headers={"Content-Type":"application/json"}),timeout=5))["result"]["allow"])' "$opa_url")
     [[ $allow == True && $deny == False ]]
-    kubectl -n "$DEVELOPMENT_NAMESPACE" auth can-i create deployments \
-      --as=system:serviceaccount:"$DEVELOPMENT_NAMESPACE":default | grep -qx no
+    rbac_answer=$(kubectl -n "$DEVELOPMENT_NAMESPACE" auth can-i create deployments \
+      --as=system:serviceaccount:"$DEVELOPMENT_NAMESPACE":default 2>/dev/null || true)
+    [[ $rbac_answer == no ]]
     ;;
   *) echo 'expected deploy or verify' >&2; exit 2 ;;
 esac
