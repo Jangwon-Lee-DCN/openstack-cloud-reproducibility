@@ -6,8 +6,6 @@ providerMode: real
 providers:
   keystone: http://keystone-api.openstack.svc.cluster.local:5000
   opa: http://opa-pilot.vpc-control-plane-system.svc.cluster.local:8181
-localOpa:
-  enabled: false
   gnocchi: http://gnocchi-api.openstack.svc.cluster.local:8041
   barbican: http://barbican-api.openstack.svc.cluster.local:9311
   designate: http://designate-api.openstack.svc.cluster.local:9001
@@ -18,3 +16,5 @@ localOpa:
   glance: http://glance-api.openstack.svc.cluster.local:9292
   postgresqlHost: governance-postgresql
   rabbitmqHost: rabbitmq.openstack.svc.cluster.local
+localOpa:
+  enabled: false
