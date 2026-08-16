@@ -52,8 +52,8 @@ replica:
   podAntiAffinityPreset: soft
   topologySpreadConstraints:
     - maxSkew: 1
-      topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: ScheduleAnyway
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
           app.kubernetes.io/instance: octavia-valkey
