@@ -182,3 +182,19 @@ Remaining work is now real integration only: Keystone/OPA, PostgreSQL/RabbitMQ,
 SMTP/webhook, Gnocchi/Ceilometer/CloudKitty, CA/ACME/Designate,
 Barbican/Octavia, OpenStack native tag clients, asymmetric audit export/index,
 the real Track A client and shared Horizon composition.
+
+## Machine-readable cross-track contracts
+
+Track B consumes the canonical Track A schema published from Track A commit
+`7225b63` through the repository-local fixture
+`deploy/tests/governance/track-a-operation-v1alpha1.json`. The fixture is a
+semantic copy, not a runtime cross-worktree dependency. Its 22 required fields,
+`additionalProperties: false`, UUID/date-time formats and uppercase state enum
+are validated against the Track B fake consumer.
+
+Track B publishes
+`services/governance-api/contracts/track-b/track-b.event.v1alpha1.schema.json`.
+The top-level event contract is closed with `additionalProperties: false`; its
+explicitly versioned `payload` object is the only open extension point. Tests
+validate a real transactional-outbox producer result and reject undeclared
+top-level fields, lowercase Track A states and missing required fields.

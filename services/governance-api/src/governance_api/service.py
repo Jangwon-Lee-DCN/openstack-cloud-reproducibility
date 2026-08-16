@@ -9,6 +9,7 @@ from decimal import Decimal, ROUND_HALF_EVEN
 from uuid import uuid4
 
 from .errors import Conflict, Forbidden, GovernanceError, NotFound
+from .events import resource_changed_event
 from .operation import FakeOperationClient
 from .security import RequestContext, safe_projection, validate_webhook_url
 from .store import Store
@@ -45,7 +46,8 @@ class GovernanceService:
             ).fetchone()
             if cached:
                 return self.store.decode(cached[0])
-            operation = self.operations.create(action=action, idempotency_key=key, request_id=request_id)
+            operation = self.operations.create(action=action, idempotency_key=key, request_id=request_id,
+                                               project_id=ctx.project_id, target_type=kind)
             record["operation_id"] = operation.id
             db.execute("INSERT INTO resources VALUES(?,?,?,?,?,?,?,?)", (
                 kind, record["id"], ctx.domain_id, ctx.project_id, 1,
@@ -54,13 +56,12 @@ class GovernanceService:
             db.execute("INSERT INTO idempotency VALUES(?,?,?,?)", (
                 ctx.project_id, action, key, self.store.encode(record),
             ))
-            event_id = str(uuid4())
+            event = resource_changed_event(ctx, operation, kind, record["id"], request_id, action)
             db.execute(
                 "INSERT INTO outbox(id,project_id,event_type,dedup_key,payload,status,available_at,created_at) "
                 "VALUES(?,?,?,?,?,'pending',?,?)",
-                (event_id, ctx.project_id, "resource.changed", f"{action}:{key}",
-                 self.store.encode({"resource_id": record["id"], "resource_type": kind,
-                                    "operation_id": operation.id, "request_id": request_id}),
+                (event["event_id"], ctx.project_id, event["event_type"], f"{action}:{key}",
+                 self.store.encode(event),
                  created, created),
             )
         self.append_audit(ctx, action=action, target={"type": kind, "id": record["id"]},
@@ -116,7 +117,9 @@ class GovernanceService:
         if protected.intersection(changes):
             raise GovernanceError("immutable resource fields cannot be changed")
         updated = {**current, **safe_projection(changes), "revision": current["revision"] + 1, "updated_at": now()}
-        operation = self.operations.create(action=action, idempotency_key=key, request_id=request_id)
+        operation = self.operations.create(action=action, idempotency_key=key, request_id=request_id,
+                                           project_id=ctx.project_id, target_type=kind,
+                                           target_id=resource_id)
         updated["operation_id"] = operation.id
         with self.store.transaction() as db:
             cursor = db.execute(

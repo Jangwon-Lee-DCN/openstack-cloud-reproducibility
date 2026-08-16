@@ -622,6 +622,8 @@ Track C와 다른 UI consumer는 Track B DB나 내부 worker endpoint를 직접 
 - [x] Track B 독립 Horizon panel package와 fake API client contract
 - [x] fake-provider E2E, restart/retry/DLQ/security 회귀 suite
 - [ ] 실제 provider/identity/database/message bus 및 shared Horizon 통합
+- [x] Track A canonical Operation consumer schema 및 대문자 state 정합성
+- [x] `track-b.event.v1alpha1` closed canonical schema와 producer drift test
 
 세부 경계, 인수 방법과 rollback은 `docs/governance-development-slice.md`에 기록한다.
 위 미완료 항목을 통과하기 전에는 이 슬라이스를 운영 기능으로 표현하거나 운영에
