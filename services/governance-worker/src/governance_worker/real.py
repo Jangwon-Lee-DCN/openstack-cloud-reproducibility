@@ -101,7 +101,10 @@ class GovernanceProviders:
             try:
                 result[name] = client.request(paths[name])[0]
             except ProviderError as exc:
-                raise IntegrationError(f"{name}: {exc}") from exc
+                # Keep the durable worker alive for independent providers. The
+                # corresponding mutation adapter remains fail-closed and the
+                # provider-specific blocker is retained in the startup result.
+                result[name] = f"blocked:{exc}"
         return result
 
 
@@ -122,5 +125,6 @@ def initialize_real_integrations():
         raise IntegrationError("governance application credential is required")
     token = application_credential_token(os.environ["GOVERNANCE_KEYSTONE_URL"],
                                          credential_id, credential_secret)
-    GovernanceProviders(token, os.environ["GOVERNANCE_TEST_RESOURCE_PREFIX"]).probe()
+    probes = GovernanceProviders(token, os.environ["GOVERNANCE_TEST_RESOURCE_PREFIX"]).probe()
+    print(json.dumps({"provider_probe": probes}, sort_keys=True), flush=True)
     return bus

@@ -27,7 +27,7 @@ are listed as blockers and never replaced by deterministic fakes.
 | PostgreSQL | dedicated ephemeral development instance, immutable image digest |
 | RabbitMQ | real platform broker; least-privilege Ceilometer vhost credential copied without decoding into the development namespace |
 | Gnocchi | real API adapter and authenticated probe implemented |
-| Barbican / Designate / Octavia | real API adapters and authenticated probes implemented |
+| Barbican / Designate / Octavia | real API adapters implemented; Designate/Octavia authenticated probes pass, while Barbican closes authenticated in-cluster connections and remains a provider-specific fail-closed blocker |
 | Nova / Cinder / Neutron / Glance native tags | real metadata/tag adapters and authenticated list probes; writes are limited to explicit `governance-dev-*` acceptance resources |
 | CloudKitty | **blocked: no service/endpoints discovered** |
 | SMTP | **blocked: no platform SMTP relay or approved test-sink endpoint discovered** |
