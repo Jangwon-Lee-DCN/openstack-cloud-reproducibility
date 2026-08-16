@@ -91,7 +91,7 @@ class GovernanceProviders:
         self.project_id = os.environ["GOVERNANCE_KEYSTONE_PROJECT_ID"]
 
     def probe(self):
-        paths = {"gnocchi": "/v1/status", "barbican": "/v1/secrets?limit=1",
+        paths = {"gnocchi": "/v1/resource/generic?limit=1", "barbican": "/v1/secrets?limit=1",
                  "designate": "/v2/zones?limit=1", "octavia": "/v2.0/lbaas/loadbalancers?limit=1",
                  "nova": f"/v2.1/{self.project_id}/servers?limit=1",
                  "cinder": f"/v3/{self.project_id}/volumes?limit=1",

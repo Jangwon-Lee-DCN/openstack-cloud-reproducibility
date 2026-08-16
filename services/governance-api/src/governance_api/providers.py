@@ -42,7 +42,12 @@ class OpenStackClient:
         try:
             with urlopen(request, timeout=self.timeout, context=ssl.create_default_context()) as response:
                 payload = response.read()
-                return response.status, json.loads(payload) if payload else {}
+                if not payload:
+                    return response.status, {}
+                try:
+                    return response.status, json.loads(payload)
+                except json.JSONDecodeError:
+                    return response.status, {}
         except HTTPError as exc:
             # Status is useful; response bodies can contain deployment detail and are not exposed.
             raise ProviderError(f"provider returned HTTP {exc.code}") from exc
