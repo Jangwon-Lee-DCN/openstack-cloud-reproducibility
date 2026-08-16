@@ -48,6 +48,14 @@
     ' created' in isolation_apply.stdout or ' configured' in isolation_apply.stdout
   when: not ansible_check_mode
 
+- name: Remove the superseded namespace-only Gateway ingress policy
+  ansible.builtin.command: >-
+    kubectl -n {{ development_namespace }} delete networkpolicy
+    allow-development-gateway --ignore-not-found
+  register: stale_gateway_policy
+  changed_when: "'deleted' in stale_gateway_policy.stdout"
+  when: not ansible_check_mode
+
 - name: Diff workload-isolation resources during dry-run
   ansible.builtin.command: kubectl diff -f /tmp/dcn-workload-isolation.yaml
   register: isolation_diff

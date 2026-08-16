@@ -7,6 +7,13 @@ metadata:
     development-gateway-access: allowed
     pod-security.kubernetes.io/enforce: restricted
 ---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: {name: dcn-development-interruptible}
+value: -1000
+globalDefault: false
+description: Interruptible development work; platform and backup work takes precedence.
+---
 apiVersion: v1
 kind: ResourceQuota
 metadata: {name: development-quota, namespace: {{ development_namespace }}}
@@ -52,19 +59,14 @@ spec:
             cidr: 0.0.0.0/0
             except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata: {name: allow-development-gateway, namespace: {{ development_namespace }}}
 spec:
-  podSelector:
+  endpointSelector:
     matchLabels: {dcn.ssu.ac.kr/development-ingress: allowed}
-  policyTypes: [Ingress]
   ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: development-gateway-system}
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: kube-system}
+    - fromEntities: [ingress]
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
@@ -163,9 +165,11 @@ spec:
         app: development-smoke
         dcn.ssu.ac.kr/development-ingress: allowed
     spec:
+      priorityClassName: dcn-development-interruptible
       nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
       tolerations:
         - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
       containers:
         - name: web
           image: registry.k8s.io/e2e-test-images/agnhost:2.53
@@ -178,6 +182,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
             runAsNonRoot: true
+            runAsUser: 1000
             seccompProfile: {type: RuntimeDefault}
 ---
 apiVersion: v1
