@@ -38,6 +38,10 @@ spec:
       restartPolicy: OnFailure
       nodeSelector:
         {{ .Values.labels.job.node_selector_key }}: {{ .Values.labels.job.node_selector_value }}
+{{- if .Values.pod.tolerations.cloudkitty.enabled }}
+      tolerations:
+{{ toYaml .Values.pod.tolerations.cloudkitty.tolerations | indent 8 }}
+{{- end }}
       initContainers:
 {{ tuple $envAll "storage_init" list | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
       containers:

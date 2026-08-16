@@ -164,6 +164,9 @@ bootstrap:
     ensure_rate radosgw.objects.size 0.000500
 
 pod:
+  tolerations:
+    cloudkitty:
+      enabled: true
   affinity:
     anti:
       type:
