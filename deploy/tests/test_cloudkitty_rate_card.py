@@ -36,7 +36,7 @@ class CloudKittyRateCardContract(unittest.TestCase):
         script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
         self.assertIn("helm/packages/patched/cloudkitty-2026.1.0.tgz", script)
         self.assertIn(
-            "84b4f8d1e3cb3383534bd79a3057e3f5e8580a88879faad1fc1de367f7c1f089",
+            "d2d26ef7dc3c6e5579beb08ce5a6fdf28f091788ebfa2f45d30101cfb9746a0f",
             script,
         )
 
@@ -47,6 +47,21 @@ class CloudKittyRateCardContract(unittest.TestCase):
         self.assertIn("helm.sh/hook: post-install,post-upgrade", template)
         self.assertIn('helm.sh/hook-weight: "0"', template)
         self.assertIn('set $bootstrapJob "jobAnnotations"', template)
+
+    def test_dependency_jobs_run_before_atomic_workload_wait(self):
+        names = (
+            "job-db-init.yaml",
+            "job-db-sync.yaml",
+            "job-rabbitmq-init.yaml",
+            "job-storage-init.yaml",
+            "job-ks-service.yaml",
+            "job-ks-endpoints.yaml",
+            "job-ks-user.yaml",
+        )
+        for name in names:
+            template = (ROOT / "helm/openstack-helm/cloudkitty/templates" / name).read_text()
+            self.assertIn("pre-install,pre-upgrade", template, name)
+            self.assertNotIn("post-install,post-upgrade", template, name)
 
 
 if __name__ == "__main__":
