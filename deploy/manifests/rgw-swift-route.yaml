@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rgw-swift
+  namespace: rook-ceph
+spec:
+  hostnames: [s3.cloud.dcn.ssu.ac.kr]
+  parentRefs:
+    - name: openstack-public-gateway
+      namespace: openstack-gateway-system
+      sectionName: s3-https
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /swift}
+      backendRefs:
+        - name: rook-ceph-rgw-openstack-object-store
+          port: 80
