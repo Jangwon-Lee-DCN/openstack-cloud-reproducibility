@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: DCN Governance API
+  version: 0.1.0
+  description: Tenant-scoped development contract. Identity headers are injected by authenticated ingress.
+servers:
+  - url: https://p1-governance-services.dev.dcn.ssu.ac.kr
+paths:
+  /healthz:
+    get:
+      security: []
+      responses: {"200": {description: healthy}}
+  /v1/notifications:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/notifications/{id}: {$ref: "#/components/x-item"}
+  /v1/subscriptions:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/subscriptions/{id}: {$ref: "#/components/x-item"}
+  /v1/usage:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/usage/{id}: {$ref: "#/components/x-item"}
+  /v1/rate-cards:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/rate-cards/{id}: {$ref: "#/components/x-item"}
+  /v1/budgets:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/budgets/{id}: {$ref: "#/components/x-item"}
+  /v1/certificate-policies:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/certificate-policies/{id}: {$ref: "#/components/x-item"}
+  /v1/rotation-policies:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/rotation-policies/{id}: {$ref: "#/components/x-item"}
+  /v1/audit-events:
+    get: {$ref: "#/components/x-list"}
+  /v1/tag-policies:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/tag-policies/{id}: {$ref: "#/components/x-item"}
+components:
+  securitySchemes:
+    keystoneToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 8, maxLength: 255}
+  schemas:
+    Resource:
+      type: object
+      required: [id, domain_id, project_id, operation_id, revision]
+      properties:
+        id: {type: string, format: uuid}
+        domain_id: {type: string}
+        project_id: {type: string}
+        operation_id: {type: string}
+        revision: {type: integer, minimum: 1}
+      additionalProperties: true
+    List:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/Resource"}}
+        next: {type: [string, "null"]}
+  x-list:
+    security: [{keystoneToken: []}]
+    parameters:
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      - {name: cursor, in: query, schema: {type: string}}
+    responses:
+      "200": {description: project-scoped list, content: {application/json: {schema: {$ref: "#/components/schemas/List"}}}}
+      "403": {description: scope violation}
+  x-create:
+    security: [{keystoneToken: []}]
+    parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+    requestBody:
+      required: true
+      content: {application/json: {schema: {type: object}}}
+    responses:
+      "201": {description: accepted desired state, content: {application/json: {schema: {$ref: "#/components/schemas/Resource"}}}}
+      "400": {description: validation failure}
+      "403": {description: scope or policy violation}
+      "409": {description: revision conflict}
+  x-item:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      security: [{keystoneToken: []}]
+      responses: {"200": {description: resource}, "404": {description: not found}}
+    patch:
+      security: [{keystoneToken: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: If-Match, in: header, required: true, schema: {type: integer, minimum: 1}}
+      requestBody: {required: true, content: {application/json: {schema: {type: object}}}}
+      responses: {"200": {description: updated}, "409": {description: revision conflict}}
+    delete:
+      security: [{keystoneToken: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: If-Match, in: header, required: true, schema: {type: integer, minimum: 1}}
+      responses: {"204": {description: deleted}, "409": {description: revision conflict}}
+security: [{keystoneToken: []}]

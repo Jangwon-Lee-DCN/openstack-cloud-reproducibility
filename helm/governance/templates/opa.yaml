@@ -1,0 +1,60 @@
+{{- if .Values.localOpa.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: governance-opa-policy
+  annotations:
+    dcn.ssu.ac.kr/source: vpc-control-plane-system/opa-vpc-policy-v4
+    dcn.ssu.ac.kr/source-sha256: 25774f220e1f6f301948aa7ebd0a681a0bf6bb012d132c0e0da619d93f4dad2c
+immutable: true
+data:
+  policy.rego: |
+{{ .Files.Get "policies/vpc-authz-v4.rego" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: governance-opa}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: governance-opa}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: governance-opa}
+      annotations: {checksum/policy: 25774f220e1f6f301948aa7ebd0a681a0bf6bb012d132c0e0da619d93f4dad2c}
+    spec:
+      priorityClassName: {{ .Values.priorityClassName }}
+      automountServiceAccountToken: false
+      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+      tolerations:
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: opa
+          image: openpolicyagent/opa:0.68.0-static@sha256:6a95ee2152d4006732916a8b63106a6e822827952234cc0e783d348ae1ead2cc
+          args: [run, --server, --addr=0.0.0.0:8181, /policies/policy.rego]
+          ports: [{name: http, containerPort: 8181}]
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+          volumeMounts: [{name: policy, mountPath: /policies, readOnly: true}]
+      volumes: [{name: policy, configMap: {name: governance-opa-policy}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: governance-opa}
+spec:
+  selector: {app.kubernetes.io/name: governance-opa}
+  ports: [{name: http, port: 8181}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: governance-opa}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: governance-opa}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app.kubernetes.io/name: governance-api}}
+      ports: [{port: 8181, protocol: TCP}]
+{{- end }}

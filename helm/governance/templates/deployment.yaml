@@ -1,0 +1,115 @@
+{{- $apiDigest := required "image.digest must pin an immutable sha256 digest" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.image.digest) -}}
+{{- fail "image.digest must be sha256:<64 lowercase hex>" -}}
+{{- end -}}
+{{- $workerDigest := required "workerImage.digest must pin an immutable sha256 digest" .Values.workerImage.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.workerImage.digest) -}}
+{{- fail "workerImage.digest must be sha256:<64 lowercase hex>" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: governance-api
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app.kubernetes.io/name: governance-api}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: governance-api
+        dcn.ssu.ac.kr/development-ingress: allowed
+        dcn.ssu.ac.kr/central-opa-client: allowed
+      annotations:
+        dcn.ssu.ac.kr/credential-revision: {{ .Values.credentialRevision | quote }}
+    spec:
+      priorityClassName: {{ .Values.priorityClassName }}
+      automountServiceAccountToken: false
+      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+      tolerations:
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
+            - {name: GOVERNANCE_WEBHOOK_ALLOWED_HOSTS, value: {{ .Values.webhookAllowedHosts | quote }}}
+            - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
+            - {name: GOVERNANCE_PROVIDER_MODE, value: {{ .Values.providerMode | quote }}}
+            - {name: GOVERNANCE_KEYSTONE_URL, value: {{ .Values.providers.keystone | quote }}}
+            - {name: GOVERNANCE_OPA_URL, value: {{ .Values.providers.opa | quote }}}
+            - {name: GOVERNANCE_GNOCCHI_URL, value: {{ .Values.providers.gnocchi | quote }}}
+            - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
+            - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
+            - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
+            - {name: GOVERNANCE_NOVA_URL, value: {{ .Values.providers.nova | quote }}}
+            - {name: GOVERNANCE_CINDER_URL, value: {{ .Values.providers.cinder | quote }}}
+            - {name: GOVERNANCE_NEUTRON_URL, value: {{ .Values.providers.neutron | quote }}}
+            - {name: GOVERNANCE_GLANCE_URL, value: {{ .Values.providers.glance | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_PORT, value: "5432"}
+            - {name: GOVERNANCE_RABBITMQ_HOST, value: {{ .Values.providers.rabbitmqHost | quote }}}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts: [{name: data, mountPath: /var/lib/governance}]
+        - name: worker
+          image: "{{ .Values.workerImage.repository }}@{{ .Values.workerImage.digest }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
+            - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
+            - {name: GOVERNANCE_PROVIDER_MODE, value: {{ .Values.providerMode | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_PORT, value: "5432"}
+            - {name: GOVERNANCE_POSTGRES_USER, value: governance}
+            - {name: GOVERNANCE_POSTGRES_DB, value: governance}
+            - name: GOVERNANCE_POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: governance-postgresql, key: password}}
+            - name: GOVERNANCE_RABBITMQ_URL
+              valueFrom: {secretKeyRef: {name: governance-real-integrations, key: rabbitmq-url}}
+            - {name: GOVERNANCE_KEYSTONE_URL, value: {{ .Values.providers.keystone | quote }}}
+            - {name: GOVERNANCE_GNOCCHI_URL, value: {{ .Values.providers.gnocchi | quote }}}
+            - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
+            - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
+            - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
+            - {name: GOVERNANCE_NOVA_URL, value: {{ .Values.providers.nova | quote }}}
+            - {name: GOVERNANCE_CINDER_URL, value: {{ .Values.providers.cinder | quote }}}
+            - {name: GOVERNANCE_NEUTRON_URL, value: {{ .Values.providers.neutron | quote }}}
+            - {name: GOVERNANCE_GLANCE_URL, value: {{ .Values.providers.glance | quote }}}
+            - {name: GOVERNANCE_TEST_RESOURCE_PREFIX, value: governance-dev-}
+            - name: GOVERNANCE_APPLICATION_CREDENTIAL_ID
+              valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: application-credential-id}}
+            - name: GOVERNANCE_APPLICATION_CREDENTIAL_SECRET
+              valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: application-credential-secret}}
+            - name: GOVERNANCE_KEYSTONE_PROJECT_ID
+              valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: project-id}}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts: [{name: data, mountPath: /var/lib/governance}]
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: governance-api}
+spec:
+  selector: {app.kubernetes.io/name: governance-api}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: governance-api}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/name: governance-api}}

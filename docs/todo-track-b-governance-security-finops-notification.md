@@ -588,3 +588,43 @@ Track C와 다른 UI consumer는 Track B DB나 내부 worker endpoint를 직접 
   시나리오를 통과했다.
 - [ ] 기존 `Project Health`, Alertmanager, Keystone/Keycloak/OPA, Barbican,
   Ceilometer/Gnocchi 동작을 회귀시키지 않는다.
+
+## 17. 개발 구현 기록
+
+### Slice 0.1.0 — API/control model
+
+- [x] tenant-scoped repository, idempotency, canonical audit/redaction 기반
+- [x] 알림·구독, usage/rating/budget, 인증서·rotation policy, audit, tag API 모델
+- [x] `track-a.operation.v1alpha1` fake adapter 및 versioned contract fixture
+- [x] immutable-image-only Helm 차트와 독립 development component
+- [x] 단위·HTTP·tenant-negative·secret-redaction·audit-integrity 테스트
+- [ ] Keystone/OPA, PostgreSQL HA 및 실제 Track A Operation 연동
+- [ ] notification/telemetry/certificate/rotation/audit/tag worker adapter
+- [ ] Track B 전용 Horizon panel 및 development end-to-end acceptance
+
+### Slice 0.2.0 — durable workflow contracts
+
+- [x] transactional outbox, expiring lease, retry/backoff 및 DLQ 상태 계약
+- [x] SMTP/webhook development fixture, SSRF·DNS rebinding·HMAC·replay 방어
+- [x] telemetry checkpoint, immutable raw aggregate 및 Decimal cost ledger
+- [x] certificate/secret rotation partial-failure compensation plan
+- [x] signed audit ingestion/export와 tamper 검증 fixture
+- [x] native tag adapter interface, dry-run 및 drift reconciliation fake
+- [x] PostgreSQL transaction/RLS migration과 parameterized repository 계약
+- [ ] 실제 PostgreSQL·RabbitMQ 및 외부 서비스 adapter development 통합
+
+### Slice 0.3.0 — complete fake boundary
+
+- [x] 전체 mutable resource CRUD, optimistic revision, idempotency 및 pagination
+- [x] API/worker runnable entrypoint와 production-mode fail-closed 설정
+- [x] outbox restart recovery 및 deterministic budget/cert/rotation/tag loops
+- [x] API·worker container build context 및 immutable digest Helm 입력
+- [x] Track B 독립 Horizon panel package와 fake API client contract
+- [x] fake-provider E2E, restart/retry/DLQ/security 회귀 suite
+- [ ] 실제 provider/identity/database/message bus 및 shared Horizon 통합
+- [x] Track A canonical Operation consumer schema 및 대문자 state 정합성
+- [x] `track-b.event.v1alpha1` closed canonical schema와 producer drift test
+
+세부 경계, 인수 방법과 rollback은 `docs/governance-development-slice.md`에 기록한다.
+위 미완료 항목을 통과하기 전에는 이 슬라이스를 운영 기능으로 표현하거나 운영에
+승격하지 않는다.

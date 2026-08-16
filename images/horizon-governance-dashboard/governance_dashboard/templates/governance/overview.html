@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Governance" %}{% endblock %}
+{% block main %}
+  <div class="page-header"><h1>{% trans "Governance" %}</h1></div>
+  {% for label, items in sections %}
+    <section><h2>{{ label }}</h2><p>{{ items|length }} {% trans "items" %}</p></section>
+  {% empty %}<p>{% trans "No governance data is available." %}</p>{% endfor %}
+{% endblock %}
