@@ -8,6 +8,9 @@ script = (root / "deploy/scripts/reconcile-rgw-keystone-catalog.sh").read_text()
 accept = script.index("urllib.request.urlopen")
 catalog = script.index("openstack service create")
 assert accept < catalog, "catalog must be created only after Swift token acceptance"
+account_setting = script.index("ceph config set client.rgw.openstack.object.store.a rgw_swift_account_in_url true")
+account_check = script.index("ceph config get client.rgw.openstack.object.store.a rgw_swift_account_in_url")
+assert account_setting < account_check < accept, "AUTH_<project_id> handling must be enabled and verified before acceptance"
 for interface in ("public", "internal", "admin"):
     assert f"endpoint create --region $region \"\\$service_id\" {interface}" in script
 
