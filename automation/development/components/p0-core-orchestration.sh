@@ -18,7 +18,8 @@ case "$operation" in
     }
     if ! kubectl -n "$DEVELOPMENT_NAMESPACE" get secret p0-core-orchestration >/dev/null 2>&1; then
       kubectl -n "$DEVELOPMENT_NAMESPACE" create secret generic p0-core-orchestration \
-        --from-literal=signing-key="$(openssl rand -hex 32)"
+        --from-literal=signing-key="$(openssl rand -hex 32)" \
+        --from-literal=event-key="$(openssl rand -hex 32)"
     fi
     sed -e "s|__NAMESPACE__|$DEVELOPMENT_NAMESPACE|g" \
         -e "s|__IMAGE__|$CORE_ORCHESTRATOR_IMAGE|g" "$manifest" | kubectl apply -f -

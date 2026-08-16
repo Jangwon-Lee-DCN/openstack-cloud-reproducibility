@@ -10,9 +10,12 @@ later make the following reviewed changes after development acceptance:
    site delivery repository if components are not collected from locked child
    repositories.
 3. Add PostgreSQL credentials through SOPS and a migration Job; never reuse the
-   development SQLite volume.
+   development SQLite volume. Implement the repository adapter using the
+   committed `FOR UPDATE SKIP LOCKED` claim/outbox statements and test failover.
 4. Put the API behind Keystone auth middleware and an OPA policy decision point,
    stripping externally supplied identity headers at the proxy boundary.
+   Configure `CORE_AUTH_MODE=signed-proxy` and inject separate identity, approval
+   and Aodh signing keys; development header mode is forbidden in production.
 5. Add a numeric production Phase that defaults all three feature flags off,
    performs check/diff, deploys three API replicas and multiple workers, and
    runs acceptance before any flag is enabled.

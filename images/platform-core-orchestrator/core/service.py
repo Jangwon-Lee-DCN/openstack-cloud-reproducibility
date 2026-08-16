@@ -50,7 +50,7 @@ class CoreService:
                 existing = Store.row(existing)
                 require(existing["fingerprint"] == fp, 409, "IDEMPOTENCY_KEY_REUSED", "the key was already used with another request")
                 return existing, created
-            db.execute("INSERT INTO operations VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            db.execute("INSERT INTO operations(id,project_id,region_id,action,target_type,target_id,fingerprint,idempotency_key,state,progress,current_step,error_json,correlation_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 operation_id, project_id, region_id, action, target_type, target_id, fp, key,
                 "REQUESTED", 0, None, None, correlation_id, timestamp, timestamp))
             event = {"state": "REQUESTED", "correlation_id": correlation_id}
@@ -178,6 +178,7 @@ class CoreService:
             return self._owned(db, "auto_scaling_groups", ident, project_id)
 
     def scaling_event(self, project_id, ident, event_id, adjustment):
+        require(isinstance(event_id, str) and event_id, 400, "SCALING_EVENT_ID_REQUIRED", "event_id is required")
         require(isinstance(adjustment, int) and adjustment != 0, 400, "SCALING_ADJUSTMENT_INVALID", "adjustment must be a non-zero integer")
         with self.store.tx() as db:
             group = self._owned(db, "auto_scaling_groups", ident, project_id)

@@ -15,6 +15,24 @@ The development deployment deliberately uses one replica and an `emptyDir`
 SQLite database. It is non-authoritative and validates API/runtime packaging
 only. It must not be promoted as HA or durable production state.
 
+The second source-tested slice adds lease expiry recovery, stale-worker
+fencing, retry timestamps and persisted checkpoints. Provider boundaries are
+explicit Nova/Neutron/Cinder-style interfaces; deterministic fakes prove
+idempotent resume and reverse-order compensation without touching OpenStack.
+Production authentication defaults to a short-lived HMAC assertion from a
+trusted Keystone/OPA proxy and refuses raw identity headers. Raw headers are
+available only when `CORE_AUTH_MODE=development`. Aodh events require a
+timestamped signature and have a durable inbound replay ledger.
+The event signature input is
+`<unix-timestamp>.<canonical-JSON-body>` where canonical JSON uses sorted keys
+and compact separators. The timestamp and signature travel in
+`X-DCN-Event-Timestamp` and `X-DCN-Event-Signature`.
+
+`migrations/postgresql/001_core.sql` and the PostgreSQL claim/outbox statements
+define UUID, JSONB, timestamptz, uniqueness, runnable-index and
+`FOR UPDATE SKIP LOCKED` semantics. They are a repository contract, not proof
+that a live PostgreSQL failover test has passed.
+
 ## Local acceptance
 
 ```bash
@@ -27,6 +45,9 @@ guards, transactionally committed outbox events, preflight token binding,
 immutable template versions, ASG version pinning and capacity bounds, alarm
 deduplication, plaintext secret rejection, protection, restore capability, HTTP
 identity enforcement and the `202 + Location` operation contract.
+They also cover lease takeover/fencing, delayed retry/checkpoint resume,
+provider compensation and restart idempotency, signed Keystone/OPA assertions,
+signed/replayed Aodh events, and PostgreSQL migration/locking invariants.
 
 ## Isolated development acceptance
 
@@ -59,11 +80,11 @@ approved Phase.
 
 ## Promotion blockers
 
-- PostgreSQL migration and HA/failover acceptance
-- worker lease, heartbeat, bounded retry, compensation and dead-letter worker
+- live PostgreSQL migration, repository adapter and HA/failover acceptance
+- worker execution loop, bounded retry exhaustion and dead-letter processing
 - real Keystone token validation and OPA decision integration
 - Nova/Neutron/Cinder/Placement quota and mutation adapters
-- Aodh webhook signature, cooldown clock and LB drain adapter
+- Aodh credential rotation, cooldown clock and LB drain adapter
 - native Nova soft-delete capability validation against deployed microversions
 - three API replicas, multiple workers, metrics/SLO and 24-hour failure canary
 - Horizon overlay after API semantics are accepted

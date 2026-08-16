@@ -26,8 +26,11 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - {name: CORE_DB_PATH, value: /data/core.db}
+            - {name: CORE_AUTH_MODE, value: development}
             - name: CORE_APPROVAL_SIGNING_KEY
               valueFrom: {secretKeyRef: {name: p0-core-orchestration, key: signing-key}}
+            - name: CORE_AODH_EVENT_KEY
+              valueFrom: {secretKeyRef: {name: p0-core-orchestration, key: event-key}}
           ports: [{name: http, containerPort: 8080}]
           readinessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10}

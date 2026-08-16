@@ -5,9 +5,15 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .auth import IdentityVerifier, SignedEventVerifier
 from .errors import CoreError
 from .service import CoreService
 from .store import Store
+
+
+def now_iso():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 def build_service():
@@ -19,6 +25,8 @@ def build_service():
 
 class Handler(BaseHTTPRequestHandler):
     service = None
+    identity_verifier = None
+    event_verifier = None
     server_version = "dcn-core-orchestrator/0.1"
 
     def log_message(self, fmt, *args):
@@ -29,11 +37,8 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def identity(self):
-        project = self.headers.get("X-Project-Id")
-        user = self.headers.get("X-User-Id")
-        if not project or not user:
-            raise CoreError(401, "IDENTITY_REQUIRED", "validated project and user identity headers are required")
-        return project, user
+        identity = self.identity_verifier.verify(self.headers)
+        return identity["project_id"], identity["user_id"]
 
     def send_json(self, status, payload, headers=None):
         raw = json.dumps(payload, sort_keys=True).encode()
@@ -80,7 +85,13 @@ class Handler(BaseHTTPRequestHandler):
         if match:
             ident = match.group(1)
             if self.command == "GET": return 200, self.service.get_asg(project, ident), {}
-            if self.command == "POST": return 202, self.service.scaling_event(project, ident, body.get("event_id"), body.get("adjustment")), {}
+            if self.command == "POST":
+                raw = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+                self.event_verifier.verify(raw, self.headers.get("X-DCN-Event-Timestamp"), self.headers.get("X-DCN-Event-Signature"))
+                if not self.service.store.accept_inbound_event(body.get("event_id"), "aodh", now_iso()):
+                    current = self.service.get_asg(project, ident)
+                    return 200, {"event_id": body.get("event_id"), "accepted": False, "reason": "duplicate", "desired_capacity": current["desired"]}, {}
+                return 202, self.service.scaling_event(project, ident, body.get("event_id"), body.get("adjustment")), {}
         match = re.fullmatch(r"/v1/resources/([^/]+)/([^/]+)/deletion-protection", path.path)
         if self.command == "PUT" and match:
             return 200, self.service.set_protection(project, user, *match.groups(), body.get("deletion_protected", False), body.get("reason")), {}
@@ -112,6 +123,11 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     Handler.service = build_service()
+    mode = os.environ.get("CORE_AUTH_MODE", "signed-proxy")
+    assertion_key = os.environ.get("CORE_IDENTITY_ASSERTION_KEY", "").encode()
+    Handler.identity_verifier = IdentityVerifier(mode, assertion_key)
+    event_key = os.environ.get("CORE_AODH_EVENT_KEY", "").encode()
+    Handler.event_verifier = SignedEventVerifier(event_key)
     server = ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", "8080"))), Handler)
     server.serve_forever()
 

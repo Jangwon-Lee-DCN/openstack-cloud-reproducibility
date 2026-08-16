@@ -12,3 +12,7 @@ coreOrchestrator:
   database:
     backend: postgresql
     secretRef: core-orchestrator-database
+  auth:
+    mode: signed-proxy
+    identityAssertionSecretRef: core-orchestrator-identity-assertion
+    aodhEventSecretRef: core-orchestrator-aodh-event

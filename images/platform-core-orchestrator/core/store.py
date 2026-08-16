@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS operations (
  fingerprint TEXT NOT NULL, idempotency_key TEXT NOT NULL, state TEXT NOT NULL,
  progress INTEGER NOT NULL DEFAULT 0, current_step TEXT, error_json TEXT,
  correlation_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ lease_owner TEXT, lease_expires_at TEXT, attempt INTEGER NOT NULL DEFAULT 0,
+ next_attempt_at TEXT, checkpoint_json TEXT,
  UNIQUE(project_id,idempotency_key));
 CREATE TABLE IF NOT EXISTS operation_events (
  id INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL,
@@ -42,8 +44,10 @@ CREATE TABLE IF NOT EXISTS auto_scaling_groups (
  state TEXT NOT NULL, deletion_protected INTEGER NOT NULL DEFAULT 0,
  last_scaled_at TEXT, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS scaling_events (
- event_id TEXT PRIMARY KEY, group_id TEXT NOT NULL, adjustment INTEGER NOT NULL,
- accepted INTEGER NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL);
+  event_id TEXT PRIMARY KEY, group_id TEXT NOT NULL, adjustment INTEGER NOT NULL,
+  accepted INTEGER NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS inbound_events (
+ event_id TEXT PRIMARY KEY, source TEXT NOT NULL, received_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS resource_protection (
  project_id TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT NOT NULL,
  protected INTEGER NOT NULL, reason TEXT, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -62,6 +66,15 @@ class Store:
         self._lock = threading.RLock()
         with self.tx() as db:
             db.executescript(SCHEMA)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(operations)")}
+            additions = {
+                "lease_owner": "TEXT", "lease_expires_at": "TEXT",
+                "attempt": "INTEGER NOT NULL DEFAULT 0", "next_attempt_at": "TEXT",
+                "checkpoint_json": "TEXT",
+            }
+            for name, definition in additions.items():
+                if name not in columns:
+                    db.execute(f"ALTER TABLE operations ADD COLUMN {name} {definition}")
 
     @contextmanager
     def tx(self):
@@ -77,6 +90,52 @@ class Store:
                 raise
             finally:
                 db.close()
+
+    def claim_operation(self, worker_id, lease_seconds, current_time, lease_until):
+        """Atomically claim one runnable operation; expired leases are recoverable."""
+        with self.tx() as db:
+            row = db.execute(
+                "SELECT id FROM operations WHERE state IN ('REQUESTED','VALIDATING','SCHEDULED','RUNNING','ROLLING_BACK') "
+                "AND (next_attempt_at IS NULL OR next_attempt_at<=?) "
+                "AND (lease_expires_at IS NULL OR lease_expires_at<=?) ORDER BY created_at LIMIT 1",
+                (current_time, current_time),
+            ).fetchone()
+            if not row:
+                return None
+            changed = db.execute(
+                "UPDATE operations SET lease_owner=?,lease_expires_at=?,attempt=attempt+1,updated_at=? "
+                "WHERE id=? AND (lease_expires_at IS NULL OR lease_expires_at<=?)",
+                (worker_id, lease_until, current_time, row[0], current_time),
+            ).rowcount
+            if changed != 1:
+                return None
+            return self.row(db.execute("SELECT * FROM operations WHERE id=?", (row[0],)).fetchone())
+
+    def heartbeat(self, operation_id, worker_id, current_time, lease_until):
+        with self.tx() as db:
+            changed = db.execute(
+                "UPDATE operations SET lease_expires_at=?,updated_at=? WHERE id=? AND lease_owner=? AND lease_expires_at>?",
+                (lease_until, current_time, operation_id, worker_id, current_time),
+            ).rowcount
+            return changed == 1
+
+    def checkpoint(self, operation_id, worker_id, state, step, checkpoint, current_time, next_attempt_at=None, release=False):
+        with self.tx() as db:
+            owner, expiry = (None, None) if release else (worker_id, db.execute("SELECT lease_expires_at FROM operations WHERE id=?", (operation_id,)).fetchone()[0])
+            changed = db.execute(
+                "UPDATE operations SET state=?,current_step=?,checkpoint_json=?,updated_at=?,next_attempt_at=?,lease_owner=?,lease_expires_at=? "
+                "WHERE id=? AND lease_owner=?",
+                (state, step, json.dumps(checkpoint, sort_keys=True), current_time, next_attempt_at, owner, expiry, operation_id, worker_id),
+            ).rowcount
+            return changed == 1
+
+    def accept_inbound_event(self, event_id, source, received_at):
+        with self.tx() as db:
+            try:
+                db.execute("INSERT INTO inbound_events VALUES(?,?,?)", (event_id, source, received_at))
+                return True
+            except sqlite3.IntegrityError:
+                return False
 
     @staticmethod
     def row(row):

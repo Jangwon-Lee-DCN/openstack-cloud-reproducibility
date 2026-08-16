@@ -13,7 +13,7 @@ class HTTPContractTest(unittest.TestCase):
     def setUpClass(cls):
         fd, cls.db = tempfile.mkstemp(); os.close(fd)
         cls.port = "18089"
-        env = os.environ | {"CORE_DB_PATH": cls.db, "CORE_APPROVAL_SIGNING_KEY": "z" * 32, "PORT": cls.port}
+        env = os.environ | {"CORE_DB_PATH": cls.db, "CORE_APPROVAL_SIGNING_KEY": "z" * 32, "CORE_AODH_EVENT_KEY": "e" * 32, "CORE_AUTH_MODE": "development", "PORT": cls.port}
         cls.proc = subprocess.Popen(["python3", "-m", "core.http"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         for _ in range(200):
             try:
@@ -24,7 +24,7 @@ class HTTPContractTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.proc.terminate(); cls.proc.wait(timeout=3); os.unlink(cls.db)
+        cls.proc.terminate(); cls.proc.wait(timeout=3); cls.proc.stderr.close(); os.unlink(cls.db)
 
     def call(self, method, path, body=None, headers=None):
         request = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", data=json.dumps(body or {}).encode() if method != "GET" else None, method=method, headers={"Content-Type": "application/json", "X-Project-Id": "p", "X-User-Id": "u"} | (headers or {}))
