@@ -20,7 +20,9 @@ spec:
   selector: {matchLabels: {app: p1-resilience-operations}}
   template:
     metadata:
-      labels: {app: p1-resilience-operations}
+      labels:
+        app: p1-resilience-operations
+        dcn.ssu.ac.kr/central-opa-client: allowed
     spec:
       priorityClassName: dcn-development-interruptible
       nodeSelector: {dcn.ssu.ac.kr/workload-class: development}

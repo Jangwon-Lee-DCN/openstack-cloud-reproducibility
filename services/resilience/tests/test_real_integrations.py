@@ -39,7 +39,17 @@ class RealIntegrationTests(unittest.TestCase):
     def test_opa_requires_explicit_allow(self, request):
         request.return_value = (200, {"result": {"allow": False}}, {})
         with self.assertRaisesRegex(IntegrationError, "denied"):
-            OPAClient("http://opa").decide({}, "backup.read", {})
+            OPAClient("http://opa").decide({"roles": ["member"]}, "network-sharing", {})
+
+    @patch("dcn_resilience.integrations._request")
+    def test_opa_uses_central_policy_input_and_accepts_only_explicit_allow(self, request):
+        request.return_value = (200, {"result": {"allow": True, "policy": "vpc.authz",
+                                                 "policy_version": "vpc-authz-v4"}}, {})
+        result = OPAClient("http://opa").decide({"roles": ["member"]}, "read", {"type": "backup-policy"})
+        body = request.call_args.kwargs["body"]
+        self.assertEqual("read", body["input"]["context"]["authorization_class"])
+        self.assertEqual(["member"], body["input"]["subject"]["roles"])
+        self.assertEqual("vpc-authz-v4", result["policy_version"])
 
     @patch("dcn_resilience.integrations._request")
     def test_readiness_reports_missing_service_and_contract_write_blockers(self, request):

@@ -110,13 +110,17 @@ def real_catalog(session: KeystoneSession) -> dict[str, ReadOnlyOpenStackAdapter
 class OPAClient:
     url: str
 
-    def decide(self, identity: dict[str, Any], action: str, resource: dict[str, Any]) -> dict[str, Any]:
+    def decide(self, identity: dict[str, Any], authorization_class: str,
+               resource: dict[str, Any]) -> dict[str, Any]:
         _, payload, _ = _request(self.url.rstrip("/") + "/v1/data/vpc/authz/decision", "POST",
-                                 body={"input": {"identity": identity, "action": action, "resource": resource}})
+                                 body={"input": {"subject": identity, "context": {
+                                     "authorization_class": authorization_class,
+                                     "resource": resource}}})
         result = payload.get("result")
         if not isinstance(result, dict) or result.get("allow") is not True:
             raise IntegrationError("OPA denied or omitted an explicit allow decision")
-        return {"allow": True, "decision_id": result.get("decision_id", "not-returned")}
+        return {"allow": True, "policy": result.get("policy"),
+                "policy_version": result.get("policy_version")}
 
 
 def integration_readiness(config) -> dict[str, Any]:

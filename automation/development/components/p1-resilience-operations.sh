@@ -20,6 +20,7 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" rollout status deployment/p1-resilience-operations --timeout=5m
     kubectl -n "$DEVELOPMENT_NAMESPACE" get pod -l app=p1-resilience-operations -o jsonpath='{range .items[*]}{.spec.nodeSelector.dcn\.ssu\.ac\.kr/workload-class}{"\n"}{end}' | grep -qx development
     kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment p1-resilience-operations -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -Eq '@sha256:[0-9a-f]{64}$'
+    kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment p1-resilience-operations -o jsonpath='{.spec.template.metadata.labels.dcn\.ssu\.ac\.kr/central-opa-client}' | grep -qx allowed
     pod=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get pod -l app=p1-resilience-operations -o jsonpath='{.items[0].metadata.name}')
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8080/healthz", timeout=3)); assert d["mode"] == "integration" and d["track_a"] == "real/v1alpha1"'
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8080/openapi.json", timeout=3)); assert d["openapi"] == "3.1.0" and "/v1/backup-policies" in d["paths"]'
@@ -29,6 +30,9 @@ case "$operation" in
     # publish canonical consumer write endpoints. Seven tenant-visible adapters
     # pass scoped discovery; Masakari remains operator-only (HTTP 403).
     kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import json,urllib.error,urllib.request; exec("try:\n urllib.request.urlopen(\"http://127.0.0.1:8080/v1/capabilities\",timeout=15)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code==503\n d=json.load(e)\n assert d[\"destructive_actions\"]==\"fenced\"\n assert sum(1 for v in d[\"services\"].values() if v.get(\"installed\"))==7\n assert {\"rgw\",\"masakari\"}.issubset(d[\"blockers\"])")'
+    # Central OPA must allow the shared read class, deny a privileged class for
+    # an ordinary member, and the client must turn denial into a hard failure.
+    kubectl -n "$DEVELOPMENT_NAMESPACE" exec "$pod" -- python -c 'import os; from dcn_resilience.integrations import OPAClient,IntegrationError; c=OPAClient(os.environ["OPA_URL"]); assert c.decide({"roles":["member"]},"read",{"type":"resilience-capability"})["allow"]; exec("try:\n c.decide({\"roles\":[\"member\"]},\"network-sharing\",{\"type\":\"resilience-capability\"})\n raise SystemExit(1)\nexcept IntegrationError:\n pass")'
     ;;
   *) exit 2 ;;
 esac
