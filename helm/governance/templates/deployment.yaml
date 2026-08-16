@@ -1,8 +1,8 @@
-{{- required "image.digest must pin an immutable sha256 digest" .Values.image.digest -}}
+{{- $apiDigest := required "image.digest must pin an immutable sha256 digest" .Values.image.digest -}}
 {{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.image.digest) -}}
 {{- fail "image.digest must be sha256:<64 lowercase hex>" -}}
 {{- end -}}
-{{- required "workerImage.digest must pin an immutable sha256 digest" .Values.workerImage.digest -}}
+{{- $workerDigest := required "workerImage.digest must pin an immutable sha256 digest" .Values.workerImage.digest -}}
 {{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.workerImage.digest) -}}
 {{- fail "workerImage.digest must be sha256:<64 lowercase hex>" -}}
 {{- end -}}
