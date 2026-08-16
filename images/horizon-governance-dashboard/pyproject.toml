@@ -3,12 +3,10 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dcn-governance-worker"
+name = "dcn-horizon-governance-dashboard"
 version = "0.1.0"
 requires-python = ">=3.12"
 
-[project.scripts]
-dcn-governance-worker = "governance_worker.runner:main"
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["governance_dashboard*"]

@@ -1,6 +1,9 @@
 image:
   repository: registry.dcn.ssu.ac.kr/openstack/governance-api
   digest: ""
+workerImage:
+  repository: registry.dcn.ssu.ac.kr/openstack/governance-worker
+  digest: ""
 replicaCount: 1
 host: p1-governance-services.dev.dcn.ssu.ac.kr
 gateway:
@@ -8,6 +11,8 @@ gateway:
   namespace: development-gateway-system
 priorityClassName: dcn-development-interruptible
 webhookAllowedHosts: ""
+mode: development
+providerMode: fake
 resources:
   requests: {cpu: 50m, memory: 64Mi}
   limits: {cpu: 500m, memory: 256Mi}

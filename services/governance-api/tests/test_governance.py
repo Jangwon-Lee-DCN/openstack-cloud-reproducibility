@@ -85,6 +85,25 @@ class GovernanceTest(unittest.TestCase):
         self.assertNotIn('"P"', serialized)
         self.assertNotIn('"C"', serialized)
 
+    def test_crud_revision_and_cursor_pagination(self):
+        first = self.service.create_budget(self.a, {"amount": "10"}, key="budget-one", request_id="r1")
+        self.service.create_budget(self.a, {"amount": "20"}, key="budget-two", request_id="r2")
+        page = self.service.page_resources(self.a, "budget", limit=1)
+        self.assertEqual(len(page["items"]), 1)
+        self.assertIsNotNone(page["next"])
+        self.assertEqual(len(self.service.page_resources(self.a, "budget", limit=1, cursor=page["next"])["items"]), 1)
+        updated = self.service.update_resource(
+            self.a, "budget", first["id"], {"amount": "15"}, expected_revision=1,
+            key="budget-update", request_id="r3")
+        self.assertEqual(updated["revision"], 2)
+        with self.assertRaises(Exception):
+            self.service.update_resource(self.a, "budget", first["id"], {}, expected_revision=1,
+                                         key="stale", request_id="r4")
+        self.service.delete_resource(self.a, "budget", first["id"], expected_revision=2,
+                                     key="budget-delete", request_id="r5")
+        with self.assertRaises(Exception):
+            self.service.get_resource(self.a, "budget", first["id"])
+
 
 if __name__ == "__main__":
     unittest.main()

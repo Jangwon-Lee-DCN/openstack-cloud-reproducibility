@@ -17,21 +17,30 @@ host=p1-governance-services.dev.dcn.ssu.ac.kr
 case "$operation" in
   deploy)
     : "${GOVERNANCE_IMAGE_DIGEST:?set the development-tested sha256 image digest}"
+    : "${GOVERNANCE_WORKER_IMAGE_DIGEST:?set the development-tested worker sha256 image digest}"
     [[ $GOVERNANCE_IMAGE_DIGEST =~ ^sha256:[a-f0-9]{64}$ ]] || {
       echo 'GOVERNANCE_IMAGE_DIGEST must be sha256:<64 lowercase hex>' >&2
+      exit 2
+    }
+    [[ $GOVERNANCE_WORKER_IMAGE_DIGEST =~ ^sha256:[a-f0-9]{64}$ ]] || {
+      echo 'GOVERNANCE_WORKER_IMAGE_DIGEST must be sha256:<64 lowercase hex>' >&2
       exit 2
     }
     helm upgrade --install governance "$chart" \
       --namespace "$DEVELOPMENT_NAMESPACE" \
       --values "$values" \
       --set-string "image.digest=$GOVERNANCE_IMAGE_DIGEST" \
+      --set-string "workerImage.digest=$GOVERNANCE_WORKER_IMAGE_DIGEST" \
       --wait --timeout 5m --atomic
     ;;
   verify)
     kubectl -n "$DEVELOPMENT_NAMESPACE" rollout status deployment/governance-api --timeout=5m
-    actual_image=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment governance-api \
-      -o jsonpath='{.spec.template.spec.containers[0].image}')
-    [[ $actual_image == *@sha256:* ]] || { echo "mutable image deployed: $actual_image" >&2; exit 1; }
+    actual_images=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment governance-api \
+      -o jsonpath='{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}')
+    [[ $(grep -c '@sha256:' <<<"$actual_images") == 2 ]] || {
+      echo "mutable or missing image deployed: $actual_images" >&2
+      exit 1
+    }
     nodes=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get pods -l app.kubernetes.io/name=governance-api \
       -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}')
     [[ -n $nodes ]] && [[ $(sort -u <<<"$nodes") == dcn-1b-utility-0 ]] || {

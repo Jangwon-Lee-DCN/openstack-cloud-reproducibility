@@ -74,6 +74,7 @@ the development boundary:
 
 ```bash
 export GOVERNANCE_IMAGE_DIGEST=sha256:<registry-digest>
+export GOVERNANCE_WORKER_IMAGE_DIGEST=sha256:<registry-digest>
 ./deploy.sh development p1-governance-services
 ```
 
@@ -116,8 +117,8 @@ blocked until a PostgreSQL forward/restore procedure is implemented and tested.
    clients and run event/poll drift loops.
 9. Replace the fake Operation adapter after Track A publishes the accepted
    real contract and run cross-track contract tests.
-10. Add the Track B Horizon panel only in its independently owned image path;
-    common Horizon navigation remains an integration change.
+10. Integrate the independently packaged Track B Horizon panel into shared
+    Horizon only through a later reviewed integration change.
 
 ## Slice 0.2.0 — durable workflow contracts
 
@@ -159,3 +160,25 @@ database apply/restore test and capture its exact image/dump versions. Rollback
 of an accepted persistent schema is restore/forward-fix; never run ad-hoc `DROP`
 or `TRUNCATE`. The current development Helm release still runs only the
 non-authoritative SQLite API from slice 0.1 and remains undeployed.
+
+## Slice 0.3.0 — complete fake boundary
+
+The final pre-integration slice adds CRUD with optimistic revisions,
+idempotent update/delete, bounded cursor pagination and matching OpenAPI paths.
+The API and worker are independently buildable images, and the development
+chart requires immutable digests for both.
+
+`FakeScheduler` persists outbox progress across process restarts. Deterministic
+budget, certificate, rotation and tag loops cover convergence, threshold
+deduplication, DNS cleanup, consumer promotion and native-tag drift. API and
+worker both refuse production mode; the worker also requires explicit fake
+provider mode.
+
+The independent Horizon package contains a development-endpoint-only client
+and Notifications, Usage & Cost, Budgets, Certificates, Secret Rotation,
+Audit and Tag Policy sections. It is not added to shared Horizon navigation.
+
+Remaining work is now real integration only: Keystone/OPA, PostgreSQL/RabbitMQ,
+SMTP/webhook, Gnocchi/Ceilometer/CloudKitty, CA/ACME/Designate,
+Barbican/Octavia, OpenStack native tag clients, asymmetric audit export/index,
+the real Track A client and shared Horizon composition.

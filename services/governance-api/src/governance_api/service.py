@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import re
+import base64
 from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_EVEN
 from uuid import uuid4
@@ -74,6 +75,83 @@ class GovernanceService:
             (kind, project_id),
         )
         return [self.store.decode(row[0]) for row in rows]
+
+    def page_resources(self, ctx: RequestContext, kind: str, *, limit=50, cursor=None):
+        if limit < 1 or limit > 200:
+            raise GovernanceError("limit must be between 1 and 200")
+        offset = 0
+        if cursor:
+            try:
+                offset = int(base64.urlsafe_b64decode(cursor + "===").decode())
+            except (ValueError, UnicodeError):
+                raise GovernanceError("invalid cursor", code="invalid_cursor")
+        items = self.list_resources(ctx, kind)
+        page = items[offset:offset + limit]
+        next_cursor = None
+        if offset + len(page) < len(items):
+            next_cursor = base64.urlsafe_b64encode(str(offset + len(page)).encode()).decode().rstrip("=")
+        return {"items": page, "next": next_cursor}
+
+    def get_resource(self, ctx, kind, resource_id):
+        row = self.store.connection.execute(
+            "SELECT project_id,body FROM resources WHERE kind=? AND id=?", (kind, resource_id)).fetchone()
+        if not row:
+            raise NotFound("resource not found")
+        ctx.require_project(row[0])
+        return self.store.decode(row[1])
+
+    def update_resource(self, ctx, kind, resource_id, changes, *, expected_revision, key, request_id):
+        if not key:
+            raise GovernanceError("Idempotency-Key is required", code="idempotency_key_required")
+        action = f"{kind}.update"
+        cached = self.store.connection.execute(
+            "SELECT response FROM idempotency WHERE project_id=? AND action=? AND key=?",
+            (ctx.project_id, action, key)).fetchone()
+        if cached:
+            return self.store.decode(cached[0])
+        current = self.get_resource(ctx, kind, resource_id)
+        if expected_revision != current["revision"]:
+            raise Conflict("resource revision conflict")
+        protected = {"id", "domain_id", "project_id", "created_by", "created_at", "operation_id"}
+        if protected.intersection(changes):
+            raise GovernanceError("immutable resource fields cannot be changed")
+        updated = {**current, **safe_projection(changes), "revision": current["revision"] + 1, "updated_at": now()}
+        operation = self.operations.create(action=action, idempotency_key=key, request_id=request_id)
+        updated["operation_id"] = operation.id
+        with self.store.transaction() as db:
+            cursor = db.execute(
+                "UPDATE resources SET revision=?,body=?,updated_at=? WHERE kind=? AND id=? AND project_id=? AND revision=?",
+                (updated["revision"], self.store.encode(updated), updated["updated_at"], kind, resource_id,
+                 ctx.project_id, expected_revision))
+            if cursor.rowcount != 1:
+                raise Conflict("resource revision conflict")
+            db.execute("INSERT INTO idempotency VALUES(?,?,?,?)",
+                       (ctx.project_id, action, key, self.store.encode(updated)))
+        self.append_audit(ctx, action=action, target={"type": kind, "id": resource_id},
+                          outcome="success", request_id=request_id, operation_id=operation.id, changes=changes)
+        return updated
+
+    def delete_resource(self, ctx, kind, resource_id, *, expected_revision, key, request_id):
+        if not key:
+            raise GovernanceError("Idempotency-Key is required", code="idempotency_key_required")
+        action = f"{kind}.delete"
+        cached = self.store.connection.execute(
+            "SELECT response FROM idempotency WHERE project_id=? AND action=? AND key=?",
+            (ctx.project_id, action, key)).fetchone()
+        if cached:
+            return self.store.decode(cached[0])
+        current = self.get_resource(ctx, kind, resource_id)
+        if expected_revision != current["revision"]:
+            raise Conflict("resource revision conflict")
+        with self.store.transaction() as db:
+            db.execute("DELETE FROM resources WHERE kind=? AND id=? AND project_id=? AND revision=?",
+                       (kind, resource_id, ctx.project_id, expected_revision))
+            response = {"id": resource_id, "deleted": True}
+            db.execute("INSERT INTO idempotency VALUES(?,?,?,?)",
+                       (ctx.project_id, action, key, self.store.encode(response)))
+        self.append_audit(ctx, action=action, target={"type": kind, "id": resource_id},
+                          outcome="success", request_id=request_id)
+        return response
 
     # Notifications
     def create_subscription(self, ctx, body, *, key, request_id):

@@ -2,6 +2,10 @@
 {{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.image.digest) -}}
 {{- fail "image.digest must be sha256:<64 lowercase hex>" -}}
 {{- end -}}
+{{- required "workerImage.digest must pin an immutable sha256 digest" .Values.workerImage.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.workerImage.digest) -}}
+{{- fail "workerImage.digest must be sha256:<64 lowercase hex>" -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,9 +34,23 @@ spec:
           env:
             - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
             - {name: GOVERNANCE_WEBHOOK_ALLOWED_HOSTS, value: {{ .Values.webhookAllowedHosts | quote }}}
+            - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
           ports: [{name: http, containerPort: 8080}]
           readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts: [{name: data, mountPath: /var/lib/governance}]
+        - name: worker
+          image: "{{ .Values.workerImage.repository }}@{{ .Values.workerImage.digest }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
+            - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
+            - {name: GOVERNANCE_PROVIDER_MODE, value: {{ .Values.providerMode | quote }}}
           resources: {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
