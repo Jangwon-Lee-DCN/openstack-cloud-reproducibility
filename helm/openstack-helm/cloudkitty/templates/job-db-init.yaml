@@ -12,14 +12,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{- define "metadata.annotations.job.db_init" }}
-helm.sh/hook: pre-install,pre-upgrade
-helm.sh/hook-weight: "-5"
-{{- end }}
-
 {{- if .Values.manifests.job_db_init }}
 {{- $dbInitJob := dict "envAll" . "serviceName" "cloudkitty" -}}
-{{- $_ := set $dbInitJob "jobAnnotations" (include "metadata.annotations.job.db_init" . | fromYaml ) }}
 {{- if .Values.pod.tolerations.cloudkitty.enabled -}}
 {{- $_ := set $dbInitJob "tolerationsEnabled" true -}}
 {{- end -}}
