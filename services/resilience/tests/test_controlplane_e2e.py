@@ -2,9 +2,10 @@ import io
 import json
 import os
 import tempfile
+import threading
 import unittest
 
-from dcn_resilience.api import build_app, openapi_document
+from dcn_resilience.api import _scheduler_controller, build_app, openapi_document
 from dcn_resilience.config import Config
 from dcn_resilience.contracts import FakeEventClient, FakeOperationClient
 from dcn_resilience.controlplane import COLLECTIONS, make_controller
@@ -171,3 +172,20 @@ class ProductionConfigTest(unittest.TestCase):
                 Config.from_env()
         finally:
             os.environ.clear(); os.environ.update(previous)
+
+
+class SchedulerThreadTest(unittest.TestCase):
+    def test_scheduler_connection_is_created_inside_owning_thread(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = os.path.join(directory, "scheduler.db")
+            errors = []
+            def run():
+                try:
+                    controller = _scheduler_controller(database)
+                    controller.tick(now=1)
+                except Exception as exc:
+                    errors.append(exc)
+            worker = threading.Thread(target=run)
+            worker.start(); worker.join(timeout=5)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual([], errors)

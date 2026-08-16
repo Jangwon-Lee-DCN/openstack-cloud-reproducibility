@@ -82,6 +82,7 @@ def build_app(database: str | None = None):
         except Exception:
             return respond(start_response, 500, {"error": "operation failed; use the correlation id"})
     app.controller = controller
+    app.database = database or config.database
     return app
 
 
@@ -136,13 +137,20 @@ def respond(start_response, status, body):
 def main():
     app = build_app()
     if os.environ.get("RESILIENCE_SCHEDULER", "true").lower() == "true":
-        controller = getattr(app, "controller", None)
-        if controller:
-            threading.Thread(target=_scheduler_loop, args=(controller,), daemon=True).start()
+        threading.Thread(target=_scheduler_loop, args=(app.database,), daemon=True).start()
     make_server("0.0.0.0", int(os.environ.get("PORT", "8080")), app).serve_forever()
 
 
-def _scheduler_loop(controller):
+def _scheduler_controller(database):
+    engine = Engine(Journal(database), FakeOperationClient(), FakeEventClient(), DevelopmentAdapter())
+    return make_controller(engine)
+
+
+def _scheduler_loop(database):
+    # SQLite connections are created and owned inside this thread. Sharing the
+    # WSGI connection would violate sqlite3 thread affinity and silently stop
+    # scheduled backup/DR reconciliation while health checks stayed green.
+    controller = _scheduler_controller(database)
     while True:
         controller.tick()
         time.sleep(int(os.environ.get("RESILIENCE_SCHEDULER_INTERVAL", "30")))
