@@ -22,7 +22,10 @@ def main():
     session.authenticate()
     probes = {"nova": "/servers/detail?limit=1", "neutron": "/v2.0/networks?limit=1",
               "cinder": f"/v3/{session.project_id}/volumes/detail?limit=1",
-              "placement": "/resource_providers?limit=1", "octavia": "/v2/lbaas/loadbalancers?limit=1",
+              # Placement inventory is service-admin scoped on this cloud. The
+              # project principal verifies the version endpoint only; mutation
+              # stays explicitly unsupported/DEGRADED.
+              "placement": "/", "octavia": "/v2/lbaas/loadbalancers?limit=1",
               "aodh": "/v2/alarms?limit=1"}
     for service, path in probes.items(): session.probe(service, path)
     print("OPENSTACK_PROVIDER_READ_ONLY_PROBE_OK")

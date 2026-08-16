@@ -47,6 +47,9 @@ remaining development Secret is project-scoped and must not be promoted.
 Neutron and Cinder with retry classification and reverse compensation.
 `core.provider_probe` performs non-mutating checks against all six provider
 APIs. No provider resource was created during this evidence collection.
+Placement correctly returned 403 for project-level resource-provider inventory;
+the acceptance probe therefore checks its version endpoint only and does not
+grant the development principal a service-admin role.
 
 The development manifest now uses a dedicated PostgreSQL StatefulSet/PVC and a
 real RabbitMQ vhost `/dcn-p0-track-a-development`. Its unique user is restricted
