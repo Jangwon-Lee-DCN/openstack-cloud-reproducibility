@@ -37,6 +37,7 @@ ansible-playbook -i inventory/local/hosts.yml playbooks/35-provider-uplinks.yml
 export SOPS_AGE_KEY_FILE=/media/offline/dcn-cloud.agekey
 ansible-playbook -i inventory/local/hosts.yml playbooks/40-platform.yml
 ansible-playbook -i inventory/local/hosts.yml playbooks/50-openstack.yml
+ansible-playbook -i inventory/local/hosts.yml playbooks/58-workload-isolation.yml
 ansible-playbook -i inventory/local/hosts.yml playbooks/60-verify.yml
 ```
 

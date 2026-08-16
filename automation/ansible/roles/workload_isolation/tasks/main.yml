@@ -1,0 +1,74 @@
+---
+- name: Verify every declared isolation node exists
+  ansible.builtin.command: "kubectl get node {{ item }}"
+  loop: "{{ platform_preferred_nodes + [development_node] }}"
+  changed_when: false
+
+- name: Label the preferred platform application nodes
+  ansible.builtin.command: >-
+    kubectl label node {{ item }}
+    dcn.ssu.ac.kr/workload-class=platform
+    dcn.ssu.ac.kr/platform-preferred=true --overwrite
+  loop: "{{ platform_preferred_nodes }}"
+  changed_when: false
+
+- name: Label the development worker
+  ansible.builtin.command: >-
+    kubectl label node {{ development_node }}
+    dcn.ssu.ac.kr/workload-class=development
+    dcn.ssu.ac.kr/platform-preferred- --overwrite
+  changed_when: false
+
+- name: Classify existing namespaces as platform or system
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for namespace in $(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+      case "$namespace" in
+        {{ development_namespace }}|development-gateway-system) continue ;;
+        kube-system|kube-public|kube-node-lease|default|cilium-secrets)
+          class=system ;;
+        *) class=platform ;;
+      esac
+      kubectl label namespace "$namespace" dcn.ssu.ac.kr/workload-class="$class" --overwrite
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Render workload-isolation resources
+  ansible.builtin.template:
+    src: workload-isolation.yaml.j2
+    dest: /tmp/dcn-workload-isolation.yaml
+    mode: "0600"
+
+- name: Apply workload-isolation resources
+  ansible.builtin.command: kubectl apply -f /tmp/dcn-workload-isolation.yaml
+  register: isolation_apply
+  changed_when: >-
+    ' created' in isolation_apply.stdout or ' configured' in isolation_apply.stdout
+
+- name: Taint the development worker after policies exist
+  ansible.builtin.command: >-
+    kubectl taint node {{ development_node }}
+    dcn.ssu.ac.kr/workload-class=development:NoSchedule --overwrite
+  register: development_taint
+  changed_when: "'tainted' in development_taint.stdout"
+
+- name: Wait for the development acceptance workload
+  ansible.builtin.command: >-
+    kubectl -n {{ development_namespace }} rollout status deployment/development-smoke --timeout=5m
+  changed_when: false
+
+- name: Verify the complete isolation contract
+  ansible.builtin.command: "{{ role_path }}/files/verify-workload-isolation.sh"
+  environment:
+    DEVELOPMENT_NODE: "{{ development_node }}"
+    DEVELOPMENT_NAMESPACE: "{{ development_namespace }}"
+    DEVELOPMENT_GATEWAY_IP: "{{ development_gateway_ip }}"
+    DEVELOPMENT_GATEWAY_DOMAIN: "{{ development_gateway_domain }}"
+  changed_when: false
+
+- name: Remove rendered workload-isolation resources
+  ansible.builtin.file:
+    path: /tmp/dcn-workload-isolation.yaml
+    state: absent

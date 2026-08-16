@@ -15,5 +15,7 @@
   import_playbook: 40-platform.yml
 - name: Install OpenStack
   import_playbook: 50-openstack.yml
+- name: Separate platform and development workloads
+  import_playbook: 58-workload-isolation.yml
 - name: Verify the rebuilt cloud
   import_playbook: 60-verify.yml

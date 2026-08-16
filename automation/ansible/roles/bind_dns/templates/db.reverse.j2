@@ -11,3 +11,6 @@ $TTL 300
 {{ openstack_internal_gateway_ip.split('.')[-1] }} IN PTR {{ openstack_internal_fqdn }}.
 {{ platform_gateway_ip.split('.')[-1] }} IN PTR {{ platform_gateway_fqdn }}.
 {{ registry_gateway_ip.split('.')[-1] }} IN PTR {{ registry_fqdn }}.
+{% if development_gateway_fqdn is defined and development_gateway_ip is defined %}
+{{ development_gateway_ip.split('.')[-1] }} IN PTR {{ development_gateway_fqdn }}.
+{% endif %}

@@ -13,6 +13,9 @@ s3.{{ openstack_public_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A
 {{ openstack_internal_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ openstack_internal_gateway_ip }}
 {{ platform_gateway_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ platform_gateway_ip }}
 {{ registry_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ registry_gateway_ip }}
+{% if development_gateway_fqdn is defined and development_gateway_ip is defined %}
+*.{{ development_gateway_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ development_gateway_ip }}
+{% endif %}
 {% for node in (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique %}
 {{ node }} IN A {{ hostvars[node].node_ip | default(hostvars[node].ansible_host) }}
 {% endfor %}

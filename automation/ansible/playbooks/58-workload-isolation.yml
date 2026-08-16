@@ -1,0 +1,19 @@
+---
+- name: Reconcile Kubernetes platform and development workload isolation
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
+  pre_tasks:
+    - name: Require the administrative kubeconfig
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../artifacts/admin.conf"
+      register: isolation_kubeconfig
+    - name: Refuse isolation without a kubeconfig
+      ansible.builtin.assert:
+        that: isolation_kubeconfig.stat.isreg | default(false)
+        fail_msg: Run playbooks/20-kubernetes.yml before workload isolation.
+  roles:
+    - workload_isolation

@@ -1,0 +1,198 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ development_namespace }}
+  labels:
+    dcn.ssu.ac.kr/workload-class: development
+    development-gateway-access: allowed
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata: {name: development-quota, namespace: {{ development_namespace }}}
+spec:
+  hard:
+    requests.cpu: "{{ development_cpu_quota }}"
+    requests.memory: {{ development_memory_quota }}
+    limits.cpu: "{{ development_cpu_quota }}"
+    limits.memory: {{ development_memory_quota }}
+    pods: "{{ development_pod_quota }}"
+---
+apiVersion: v1
+kind: LimitRange
+metadata: {name: development-defaults, namespace: {{ development_namespace }}}
+spec:
+  limits:
+    - type: Container
+      default: {cpu: "1", memory: 1Gi}
+      defaultRequest: {cpu: 100m, memory: 128Mi}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: {{ development_namespace }}}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-dns-and-internet, namespace: {{ development_namespace }}}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-development-gateway, namespace: {{ development_namespace }}}
+spec:
+  podSelector:
+    matchLabels: {dcn.ssu.ac.kr/development-ingress: allowed}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: development-gateway-system}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: development-placement.dcn.ssu.ac.kr}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: >-
+        namespaceObject == null || namespaceObject.metadata.labels['dcn.ssu.ac.kr/workload-class'] != 'development' ||
+        (has(object.spec.nodeSelector) && object.spec.nodeSelector['dcn.ssu.ac.kr/workload-class'] == 'development')
+      message: Development Pods require the development workload-class nodeSelector.
+    - expression: >-
+        namespaceObject == null || namespaceObject.metadata.labels['dcn.ssu.ac.kr/workload-class'] != 'development' ||
+        object.spec.tolerations.exists(t, t.key == 'dcn.ssu.ac.kr/workload-class' && t.value == 'development' && t.effect == 'NoSchedule')
+      message: Development Pods require the development NoSchedule toleration.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: development-placement.dcn.ssu.ac.kr}
+spec:
+  policyName: development-placement.dcn.ssu.ac.kr
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels: {dcn.ssu.ac.kr/workload-class: development}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development-gateway-system
+  labels: {dcn.ssu.ac.kr/workload-class: platform}
+---
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata: {name: development-gateway}
+spec:
+  blocks: [{cidr: {{ development_gateway_ip }}/32}]
+  serviceSelector:
+    matchLabels:
+      io.cilium.gateway/owning-gateway: development-gateway
+      io.kubernetes.service.namespace: development-gateway-system
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: development-gateway-tls, namespace: development-gateway-system}
+spec:
+  secretName: development-gateway-tls
+  dnsNames: ["*.{{ development_gateway_domain }}"]
+  issuerRef: {name: selfsigned-temporary, kind: ClusterIssuer}
+  duration: 2160h
+  renewBefore: 360h
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: development-gateway
+  namespace: development-gateway-system
+  annotations: {lbipam.cilium.io/ips: "{{ development_gateway_ip }}"}
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector: {matchLabels: {development-gateway-access: allowed}}
+    - name: https
+      hostname: "*.{{ development_gateway_domain }}"
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs: [{kind: Secret, name: development-gateway-tls}]
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector: {matchLabels: {development-gateway-access: allowed}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: development-smoke, namespace: {{ development_namespace }}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: development-smoke}}
+  template:
+    metadata:
+      labels:
+        app: development-smoke
+        dcn.ssu.ac.kr/development-ingress: allowed
+    spec:
+      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+      tolerations:
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+      containers:
+        - name: web
+          image: registry.k8s.io/e2e-test-images/agnhost:2.53
+          args: [netexec, --http-port=8080]
+          ports: [{containerPort: 8080}]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            runAsNonRoot: true
+            seccompProfile: {type: RuntimeDefault}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: development-smoke, namespace: {{ development_namespace }}}
+spec:
+  selector: {app: development-smoke}
+  ports: [{port: 80, targetPort: 8080}]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: {name: development-smoke, namespace: {{ development_namespace }}}
+spec:
+  parentRefs:
+    - {name: development-gateway, namespace: development-gateway-system, sectionName: https}
+  hostnames: ["smoke.{{ development_gateway_domain }}"]
+  rules:
+    - backendRefs: [{name: development-smoke, port: 80}]

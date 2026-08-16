@@ -169,7 +169,8 @@ Dependency order is:
 
 1. SOPS/age tooling and cert-manager;
 2. reviewed Rook-Ceph profile and CSI;
-3. Gateway API/Cilium VIP resources and public/internal Gateways;
+3. Gateway API/Cilium VIP resources, public/internal Gateways, and the isolated
+   `*.dev.dcn.ssu.ac.kr` development Gateway;
 4. BIND primary/secondary records and authoritative resolution;
 5. Harbor backed by retained RGW storage;
 6. Prometheus, Alertmanager, Grafana, Loki/Alloy, Hubble integration;

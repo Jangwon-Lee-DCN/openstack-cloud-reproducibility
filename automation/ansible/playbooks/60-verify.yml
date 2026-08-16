@@ -24,6 +24,15 @@
     - name: Check Kubernetes nodes
       ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=10m
       changed_when: false
+    - name: Verify platform and development workload isolation
+      ansible.builtin.command: >-
+        {{ playbook_dir }}/../roles/workload_isolation/files/verify-workload-isolation.sh
+      environment:
+        DEVELOPMENT_NODE: "{{ development_node | default('dcn-1b-utility-0') }}"
+        DEVELOPMENT_NAMESPACE: "{{ development_namespace | default('development-system') }}"
+        DEVELOPMENT_GATEWAY_IP: "{{ development_gateway_ip | default('10.67.10.9') }}"
+        DEVELOPMENT_GATEWAY_DOMAIN: "{{ development_gateway_domain | default('dev.dcn.ssu.ac.kr') }}"
+      changed_when: false
     - name: Verify the pinned OpenStack deployment
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-full-stack.sh"
       args:

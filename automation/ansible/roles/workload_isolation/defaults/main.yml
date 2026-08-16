@@ -1,0 +1,12 @@
+---
+development_node: dcn-1b-utility-0
+development_gateway_ip: 10.67.10.9
+development_gateway_domain: dev.dcn.ssu.ac.kr
+development_namespace: development-system
+development_cpu_quota: "32"
+development_memory_quota: 96Gi
+development_pod_quota: "100"
+platform_preferred_nodes:
+  - dcn-1a-controller-1
+  - dcn-1b-controller-1
+  - dcn-1c-controller-1
