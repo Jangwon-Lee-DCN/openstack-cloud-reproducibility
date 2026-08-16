@@ -53,6 +53,22 @@ def b64(value):
     return base64.b64encode(value.encode()).decode()
 
 
+def rotate_application_credential(base, admin_token, user, password, project, domain):
+    _, existing = call(f"{base}/users/{user['id']}/application_credentials", admin_token)
+    for credential in existing.get("application_credentials", []):
+        if credential.get("name") == "governance-development":
+            call(f"{base}/users/{user['id']}/application_credentials/{credential['id']}",
+                 admin_token, "DELETE")
+    # Deleting an application credential records a user revocation event. Get
+    # the password-scoped token only after the old credential is gone so the
+    # token used for replacement creation cannot be invalidated mid-rotation.
+    user_token, _ = password_token(base, user["name"], password, project["name"], domain)
+    _, created = call(f"{base}/users/{user['id']}/application_credentials", user_token, "POST",
+                      {"application_credential": {"name": "governance-development",
+                       "description": "Track B development-only provider probes", "unrestricted": False}})
+    return created["application_credential"]
+
+
 def main():
     source = json.load(sys.stdin)["data"]
     base = os.environ["GOVERNANCE_KEYSTONE_BOOTSTRAP_URL"].rstrip("/") + "/v3"
@@ -82,16 +98,7 @@ def main():
             call(f"{base}/projects/{project['id']}/users/{user['id']}/roles/{roles[name]}",
                  admin_token, "PUT")
             assigned.append(name)
-    user_token, _ = password_token(base, user["name"], password, project["name"], domain)
-    _, existing = call(f"{base}/users/{user['id']}/application_credentials", admin_token)
-    for credential in existing.get("application_credentials", []):
-        if credential.get("name") == "governance-development":
-            call(f"{base}/users/{user['id']}/application_credentials/{credential['id']}",
-                 admin_token, "DELETE")
-    _, created = call(f"{base}/users/{user['id']}/application_credentials", user_token, "POST",
-                      {"application_credential": {"name": "governance-development",
-                       "description": "Track B development-only provider probes", "unrestricted": False}})
-    credential = created["application_credential"]
+    credential = rotate_application_credential(base, admin_token, user, password, project, domain)
     output = {"apiVersion": "v1", "kind": "Secret",
               "metadata": {"name": "governance-keystone-application-credential",
                            "namespace": os.environ["DEVELOPMENT_NAMESPACE"]},
