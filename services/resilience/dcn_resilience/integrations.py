@@ -16,7 +16,7 @@ class IntegrationError(RuntimeError):
 
 
 def _request(url: str, method: str = "GET", headers: dict[str, str] | None = None,
-             body: dict[str, Any] | None = None, timeout: int = 5) -> tuple[int, dict[str, Any], dict[str, str]]:
+             body: dict[str, Any] | None = None, timeout: int = 3) -> tuple[int, dict[str, Any], dict[str, str]]:
     raw = None if body is None else json.dumps(body, separators=(",", ":")).encode()
     request = Request(url, data=raw, method=method, headers={"Accept": "application/json", **(headers or {})})
     if raw is not None:
@@ -73,7 +73,8 @@ class ReadOnlyOpenStackAdapter:
         if project_id != self.session.project_id:
             raise IntegrationError("requested project does not match application credential scope")
         endpoint = self.session.endpoint(self.service_type)
-        status, _, _ = _request(endpoint.rstrip("/") + self.probe_path, headers={"X-Auth-Token": self.session.token})
+        path = self.probe_path.format(project_id=self.session.project_id)
+        status, _, _ = _request(endpoint.rstrip("/") + path, headers={"X-Auth-Token": self.session.token})
         return {"service": self.service, "service_type": self.service_type, "installed": True,
                 "read_only": True, "http_status": status, "project_id": project_id}
 
@@ -88,15 +89,15 @@ class ReadOnlyOpenStackAdapter:
 
 
 SERVICE_PROBES = {
-    "cinder": ("volumev3", "/volumes/detail?limit=1"),
+    "cinder": ("volumev3", "/{project_id}/volumes/detail?limit=1"),
     "glance": ("image", "/v2/images?limit=1"),
-    "manila": ("sharev2", "/shares/detail?limit=1"),
+    "manila": ("sharev2", "/{project_id}/shares/detail?limit=1"),
     "rgw": ("object-store", "/"),
     "nova": ("compute", "/servers/detail?limit=1"),
     "neutron": ("network", "/v2.0/networks?limit=1"),
     "octavia": ("load-balancer", "/v2/lbaas/loadbalancers?limit=1"),
     "designate": ("dns", "/v2/zones?limit=1"),
-    "masakari": ("instance-ha", "/v1/segments?limit=1"),
+    "masakari": ("instance-ha", "/segments?limit=1"),
 }
 
 
@@ -137,10 +138,13 @@ def integration_readiness(config) -> dict[str, Any]:
                 result[key.lower()] = {"reachable": status == 200, "contract_write": "blocked-no-canonical-consumer-endpoint"}
             except IntegrationError as exc:
                 result[key.lower()] = {"reachable": False, "reason": str(exc)}
+    except IntegrationError as exc:
+        result["keystone"] = {"reachable": False, "reason": str(exc)}
+    try:
         status, _, _ = _request(config.integration["OPA_URL"].rstrip("/") + "/health")
         result["opa"] = {"reachable": status == 200, "authorization": "fail-closed"}
     except IntegrationError as exc:
-        result["keystone"] = {"reachable": False, "reason": str(exc)}
+        result["opa"] = {"reachable": False, "reason": str(exc), "authorization": "fail-closed"}
     blockers = [name for name, value in result["services"].items() if not value.get("installed")]
     blockers += [name for name in ("track_a_url", "track_b_url")
                  if not result.get(name, {}).get("reachable") or result.get(name, {}).get("contract_write")]
