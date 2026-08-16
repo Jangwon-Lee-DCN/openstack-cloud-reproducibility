@@ -18,6 +18,7 @@ COPY openstack_vpc_dashboard.whl /tmp/openstack_vpc_dashboard.whl
 COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
+COPY enhance_images_ui.py /tmp/enhance_images_ui.py
 COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/platform_navigation.py
 COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
 COPY settings/0001_production_region.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py
@@ -69,6 +70,11 @@ RUN python3 /tmp/enhance_magnum_ui.py \
     && grep -q 'Provisioning timeline' ${MAGNUM_UI_STATIC}/clusters/details/overview.html \
     && grep -q 'Rolling Kubernetes Upgrade' ${MAGNUM_UI_STATIC}/clusters/details/overview.html \
     && grep -q 'Download Kubeconfig' ${MAGNUM_UI_STATIC}/clusters/actions.module.js
+
+RUN python3 /tmp/enhance_images_ui.py \
+    && rm -f /tmp/enhance_images_ui.py \
+    && grep -q "Platform Images" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py \
+    && grep -q "dcn_image_class" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py
 
 # Local Octavia workflow patches and self-service Identity integration are
 # copied from this repository; the VPC wheel is built from its separately

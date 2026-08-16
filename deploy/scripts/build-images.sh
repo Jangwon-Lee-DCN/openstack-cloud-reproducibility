@@ -149,6 +149,7 @@ build_horizon_complete() {
   horizon_context="$WORK_DIR/horizon-complete"
   mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings"
   cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
+  cp "$REPO_ROOT/images/horizon-complete/enhance_images_ui.py" "$horizon_context/enhance_images_ui.py"
   cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
   cp "$REPO_ROOT/images/horizon-complete/region_selector.html" "$horizon_context/region_selector.html"
   cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
