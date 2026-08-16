@@ -17,6 +17,18 @@ kubectl -n rook-ceph patch cephobjectstore "$store" --type=merge -p "$(cat <<EOF
 {"spec":{"auth":{"keystone":{"url":"http://keystone-api.openstack.svc.cluster.local:5000/v3","serviceUserSecretName":"$rgw_secret","acceptedRoles":["reader","member","admin","service"],"implicitTenants":"swift","tokenCacheSize":500,"revocationInterval":300}}}}
 EOF
 )"
+
+# The OpenStack Swift catalog contract below includes AUTH_<project_id> in the
+# account URL. Ceph defaults rgw_swift_account_in_url to false, which rejects
+# that otherwise valid Keystone-scoped request before token authorization.
+# Scope the setting to this RGW daemon instead of changing every object store.
+ceph_tools_pod="$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}')"
+test -n "$ceph_tools_pod"
+kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config set client.rgw.openstack.object.store.a rgw_swift_account_in_url true
+test "$(kubectl -n rook-ceph exec "$ceph_tools_pod" -- \
+  ceph config get client.rgw.openstack.object.store.a rgw_swift_account_in_url)" = true
+
 kubectl -n rook-ceph apply -f "$root/deploy/manifests/rgw-swift-route.yaml"
 kubectl -n rook-ceph rollout status deployment/rook-ceph-rgw-$store-a --timeout=15m
 
