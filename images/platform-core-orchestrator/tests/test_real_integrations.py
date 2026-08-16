@@ -8,6 +8,8 @@ from core.scheduler_main import DegradedRealScheduler
 from core.store import Store
 import os
 import tempfile
+import uuid
+from datetime import datetime, timezone
 
 
 class KeystoneOPAContractTests(unittest.TestCase):
@@ -34,6 +36,12 @@ class KeystoneOPAContractTests(unittest.TestCase):
 
 
 class RealProviderContractTests(unittest.TestCase):
+    def test_postgres_uuid_and_timestamp_rows_are_api_serializable(self):
+        ident = uuid.uuid4()
+        row = Store.row({"id": ident, "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc), "payload_json": {}})
+        self.assertEqual(str(ident), row["id"])
+        self.assertEqual("2026-01-01T00:00:00+00:00", row["created_at"])
+        json.dumps(row)
     def session(self, fail_service=None):
         resources, calls = {}, []
         def transport(method, url, headers, body):

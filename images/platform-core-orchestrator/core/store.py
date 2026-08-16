@@ -1,6 +1,8 @@
 import json
 import sqlite3
 import threading
+import uuid
+from datetime import date, datetime
 from contextlib import contextmanager
 
 
@@ -162,6 +164,9 @@ class Store:
         if row is None:
             return None
         value = dict(row)
+        for key, raw in tuple(value.items()):
+            if isinstance(raw, uuid.UUID): value[key] = str(raw)
+            elif isinstance(raw, (datetime, date)): value[key] = raw.isoformat()
         for key in tuple(value):
             if key.endswith("_json"):
                 raw = value.pop(key)
