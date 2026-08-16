@@ -28,6 +28,7 @@ spec:
         - {port: 5000, protocol: TCP}
         - {port: 5672, protocol: TCP}
         - {port: 8041, protocol: TCP}
+        - {port: 8089, protocol: TCP}
         - {port: 9001, protocol: TCP}
         - {port: 9311, protocol: TCP}
         - {port: 9876, protocol: TCP}

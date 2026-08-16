@@ -88,7 +88,7 @@ case "$operation" in
       python3 -c 'import json,sys; assert json.load(sys.stdin) == {"status":"ok"}'
     readiness=$(curl --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
       --resolve "$host:443:$DEVELOPMENT_GATEWAY_IP" "https://$host/readyz")
-    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","opa","gnocchi","barbican","designate","octavia","nova","cinder","neutron","glance","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required)' "$readiness"
+    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","opa","gnocchi","cloudkitty","barbican","designate","octavia","nova","cinder","neutron","glance","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required)' "$readiness"
     policy_sha=$(kubectl -n vpc-control-plane-system get configmap opa-vpc-policy-v4 \
       -o jsonpath='{.data.policy\.rego}' | sha256sum | awk '{print $1}')
     [[ $policy_sha == 25774f220e1f6f301948aa7ebd0a681a0bf6bb012d132c0e0da619d93f4dad2c ]]

@@ -6,6 +6,7 @@ LABEL org.opencontainers.image.source="openstack-production-datacenter" \
 
 RUN groupadd --gid 65532 governance && useradd --uid 65532 --gid 65532 --no-create-home governance
 COPY services/governance-api /src
+COPY services/governance-api/migrations /app/migrations
 RUN pip install --no-cache-dir /src && rm -rf /src
 USER 65532:65532
 WORKDIR /var/lib/governance

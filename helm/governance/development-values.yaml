@@ -7,6 +7,7 @@ providers:
   keystone: http://keystone-api.openstack.svc.cluster.local:5000
   opa: http://opa-pilot.vpc-control-plane-system.svc.cluster.local:8181
   gnocchi: http://gnocchi-api.openstack.svc.cluster.local:8041
+  cloudkitty: http://cloudkitty-api.openstack.svc.cluster.local:8089
   barbican: http://barbican-api.openstack.svc.cluster.local:9311
   designate: http://designate-api.openstack.svc.cluster.local:9001
   octavia: http://octavia-api.openstack.svc.cluster.local:9876

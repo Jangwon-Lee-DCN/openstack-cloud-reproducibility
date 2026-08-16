@@ -65,6 +65,12 @@ class Store:
           unit_price TEXT NOT NULL, cost TEXT NOT NULL, rate_version TEXT NOT NULL,
           created_at TEXT NOT NULL, UNIQUE(project_id,sample_id)
         );
+        CREATE TABLE IF NOT EXISTS budget_events(
+          budget_id TEXT NOT NULL, project_id TEXT NOT NULL, period TEXT NOT NULL,
+          threshold INTEGER NOT NULL, spend TEXT NOT NULL, amount TEXT NOT NULL,
+          outbox_id TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(budget_id,period,threshold)
+        );
         CREATE TABLE IF NOT EXISTS replay_nonces(
           consumer_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at TEXT NOT NULL,
           PRIMARY KEY(consumer_id,nonce)

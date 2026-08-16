@@ -279,6 +279,36 @@ class GovernanceService:
         return self._write(ctx, "usage", rated, action="usage.record", key=key,
                            request_id=request_id)
 
+    def page_usage_ledger(self, ctx, *, limit=50, cursor=None, period=None, meter=None):
+        if limit < 1 or limit > 200:
+            raise GovernanceError("limit must be between 1 and 200")
+        offset = decode_cursor(cursor)
+        query = ("SELECT sample_id,period,meter,quantity,unit_price,cost,rate_version,created_at "
+                 "FROM cost_ledger WHERE project_id=?")
+        params = [ctx.project_id]
+        if period:
+            query += " AND period LIKE ?"
+            params.append(f"{period}%")
+        if meter:
+            query += " AND meter=?"
+            params.append(meter)
+        query += " ORDER BY period,sample_id LIMIT ? OFFSET ?"
+        params.extend([limit + 1, offset])
+        rows = list(self.store.connection.execute(query, params))
+        missing = [row[0] for row in self.store.connection.execute(
+            "SELECT DISTINCT r.meter FROM usage_raw r LEFT JOIN cost_ledger l "
+            "ON l.project_id=r.project_id AND l.sample_id=r.sample_id "
+            "WHERE r.project_id=? AND l.sample_id IS NULL ORDER BY r.meter", (ctx.project_id,))]
+        checkpoint = self.store.connection.execute(
+            "SELECT watermark,updated_at FROM telemetry_checkpoints "
+            "WHERE source='cloudkitty-v2' AND project_id=?", (ctx.project_id,)).fetchone()
+        return {"items": [dict(row) for row in rows[:limit]],
+                "next": encode_cursor(offset + limit) if len(rows) > limit else None,
+                "coverage": "incomplete" if missing else "complete", "missing_meters": missing,
+                "watermark": checkpoint[0] if checkpoint else None,
+                "watermark_updated_at": checkpoint[1] if checkpoint else None,
+                "currency": "DCN-CREDIT", "billing": False}
+
     def create_budget(self, ctx, body, *, key, request_id):
         amount = Decimal(str(body["amount"]))
         if amount <= 0:

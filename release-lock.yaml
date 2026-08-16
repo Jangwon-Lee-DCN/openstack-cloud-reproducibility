@@ -23,6 +23,14 @@ spec:
     package: helm/packages/upstream/ceilometer-2026.1.0.tgz
     sha256: af7d7c710347ff2389b057dc18c9b504043e6c8a65d1d9114deff3bf0aff86f0
     valuesSnapshot: deploy/releases/ceilometer.values.sops.yaml
+  - name: cloudkitty
+    chart: cloudkitty
+    chartVersion: 2026.1.0
+    appVersion: 24.0.0
+    package: helm/packages/upstream/cloudkitty-2026.1.0.tgz
+    sha256: 35b1db4df2f91b73637465f953535b8189e8fb8ba93bb561e2c965d3771ceb90
+    valuesFile: deploy/values/site/cloudkitty.yaml
+    secretsFile: deploy/secrets/cloudkitty.values.sops.yaml
   - name: cinder
     chart: cinder
     chartVersion: 2026.1.0
