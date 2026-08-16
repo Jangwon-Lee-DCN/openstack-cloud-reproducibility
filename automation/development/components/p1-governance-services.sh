@@ -36,6 +36,28 @@ case "$operation" in
          type:"Opaque",data:{"rabbitmq-url":((.data.RABBITMQ_CONNECTION|@base64d|
            sub("^rabbit://";"amqp://")|sub(":15672/";":5672/"))|@base64)}}' |
       kubectl apply -f - >/dev/null
+    if ! kubectl -n "$DEVELOPMENT_NAMESPACE" get secret \
+      governance-keystone-application-credential >/dev/null 2>&1; then
+      bootstrap_port=15001
+      kubectl -n openstack port-forward svc/keystone-api "$bootstrap_port:5000" \
+        >"${TMPDIR:-/tmp}/governance-keystone-port-forward.log" 2>&1 &
+      port_forward_pid=$!
+      trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+      ready=false
+      for _ in 1 2 3 4 5; do
+        if curl --fail --silent "http://127.0.0.1:$bootstrap_port/v3" >/dev/null; then ready=true; break; fi
+        sleep 1
+      done
+      [[ $ready == true ]] || { echo 'Keystone bootstrap port-forward failed' >&2; exit 1; }
+      kubectl -n openstack get secret keystone-keystone-admin -o json |
+        DEVELOPMENT_NAMESPACE="$DEVELOPMENT_NAMESPACE" \
+        GOVERNANCE_KEYSTONE_BOOTSTRAP_URL="http://127.0.0.1:$bootstrap_port" \
+        GOVERNANCE_KEYSTONE_SERVICE_URL="http://keystone-api.openstack.svc.cluster.local:5000" \
+        python3 "$root/services/governance-api/tools/provision_development_identity.py" |
+        kubectl apply -f - >/dev/null
+      kill "$port_forward_pid" 2>/dev/null || true
+      trap - EXIT
+    fi
     helm upgrade --install governance "$chart" \
       --namespace "$DEVELOPMENT_NAMESPACE" \
       --values "$values" \
@@ -63,7 +85,16 @@ case "$operation" in
       python3 -c 'import json,sys; assert json.load(sys.stdin) == {"status":"ok"}'
     readiness=$(curl --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
       --resolve "$host:443:$DEVELOPMENT_GATEWAY_IP" "https://$host/readyz")
-    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","gnocchi","barbican","designate","octavia","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required); assert states["opa"]["configured"]' "$readiness"
+    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","opa","gnocchi","barbican","designate","octavia","nova","cinder","neutron","glance","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required)' "$readiness"
+    policy_sha=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get configmap governance-opa-policy \
+      -o jsonpath='{.metadata.annotations.dcn\.ssu\.ac\.kr/source-sha256}')
+    [[ $policy_sha == 25774f220e1f6f301948aa7ebd0a681a0bf6bb012d132c0e0da619d93f4dad2c ]]
+    opa_url="http://governance-opa.$DEVELOPMENT_NAMESPACE.svc.cluster.local:8181/v1/data/vpc/authz/decision"
+    allow=$(kubectl -n "$DEVELOPMENT_NAMESPACE" exec deployment/governance-api -c api -- \
+      python3 -c 'import json,sys,urllib.request; body=json.dumps({"input":{"subject":{"roles":["member"]},"context":{"authorization_class":"project-write"}}}).encode(); print(json.load(urllib.request.urlopen(urllib.request.Request(sys.argv[1],data=body,headers={"Content-Type":"application/json"}),timeout=5))["result"]["allow"])' "$opa_url")
+    deny=$(kubectl -n "$DEVELOPMENT_NAMESPACE" exec deployment/governance-api -c api -- \
+      python3 -c 'import json,sys,urllib.request; body=json.dumps({"input":{"subject":{"roles":["reader"]},"context":{"authorization_class":"project-write"}}}).encode(); print(json.load(urllib.request.urlopen(urllib.request.Request(sys.argv[1],data=body,headers={"Content-Type":"application/json"}),timeout=5))["result"]["allow"])' "$opa_url")
+    [[ $allow == True && $deny == False ]]
     kubectl -n "$DEVELOPMENT_NAMESPACE" auth can-i create deployments \
       --as=system:serviceaccount:"$DEVELOPMENT_NAMESPACE":default | grep -qx no
     ;;

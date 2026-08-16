@@ -20,6 +20,10 @@ providers:
   barbican: ""
   designate: ""
   octavia: ""
+  nova: ""
+  cinder: ""
+  neutron: ""
+  glance: ""
   postgresqlHost: ""
   rabbitmqHost: ""
 postgresql:

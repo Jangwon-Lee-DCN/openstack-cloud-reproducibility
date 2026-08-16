@@ -42,6 +42,10 @@ spec:
             - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
             - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
             - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
+            - {name: GOVERNANCE_NOVA_URL, value: {{ .Values.providers.nova | quote }}}
+            - {name: GOVERNANCE_CINDER_URL, value: {{ .Values.providers.cinder | quote }}}
+            - {name: GOVERNANCE_NEUTRON_URL, value: {{ .Values.providers.neutron | quote }}}
+            - {name: GOVERNANCE_GLANCE_URL, value: {{ .Values.providers.glance | quote }}}
             - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
             - {name: GOVERNANCE_POSTGRESQL_PORT, value: "5432"}
             - {name: GOVERNANCE_RABBITMQ_HOST, value: {{ .Values.providers.rabbitmqHost | quote }}}
@@ -69,6 +73,22 @@ spec:
               valueFrom: {secretKeyRef: {name: governance-postgresql, key: password}}
             - name: GOVERNANCE_RABBITMQ_URL
               valueFrom: {secretKeyRef: {name: governance-real-integrations, key: rabbitmq-url}}
+            - {name: GOVERNANCE_KEYSTONE_URL, value: {{ .Values.providers.keystone | quote }}}
+            - {name: GOVERNANCE_GNOCCHI_URL, value: {{ .Values.providers.gnocchi | quote }}}
+            - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
+            - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
+            - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
+            - {name: GOVERNANCE_NOVA_URL, value: {{ .Values.providers.nova | quote }}}
+            - {name: GOVERNANCE_CINDER_URL, value: {{ .Values.providers.cinder | quote }}}
+            - {name: GOVERNANCE_NEUTRON_URL, value: {{ .Values.providers.neutron | quote }}}
+            - {name: GOVERNANCE_GLANCE_URL, value: {{ .Values.providers.glance | quote }}}
+            - {name: GOVERNANCE_TEST_RESOURCE_PREFIX, value: governance-dev-}
+            - name: GOVERNANCE_APPLICATION_CREDENTIAL_ID
+              valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: application-credential-id}}
+            - name: GOVERNANCE_APPLICATION_CREDENTIAL_SECRET
+              valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: application-credential-secret}}
+            - name: GOVERNANCE_KEYSTONE_PROJECT_ID
+              valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: project-id}}
           resources: {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false

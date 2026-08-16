@@ -23,21 +23,23 @@ are listed as blockers and never replaced by deterministic fakes.
 | Integration | Development state |
 | --- | --- |
 | Keystone | discovered at `keystone-api.openstack.svc:5000`; self-token validation implemented |
-| OPA | adapter uses `vpc.authz/decision`; **blocked by the OPA namespace ingress NetworkPolicy**, and every authorized API request fails closed with 503 until the shared policy owner permits this development namespace |
+| OPA | development-local runtime uses the byte-identical `vpc.authz-v4` policy, source annotation and SHA-256 `25774f…ad2c`; shared OPA and its NetworkPolicy remain unchanged |
 | PostgreSQL | dedicated ephemeral development instance, immutable image digest |
 | RabbitMQ | real platform broker; least-privilege Ceilometer vhost credential copied without decoding into the development namespace |
 | Gnocchi | real API adapter and authenticated probe implemented |
 | Barbican / Designate / Octavia | real API adapters and authenticated probes implemented |
-| Nova / Cinder / Neutron / Glance native tags | endpoint adapter slots present; service-specific mutation acceptance still blocked on a governance application credential |
+| Nova / Cinder / Neutron / Glance native tags | real metadata/tag adapters and authenticated list probes; writes are limited to explicit `governance-dev-*` acceptance resources |
 | CloudKitty | **blocked: no service/endpoints discovered** |
 | SMTP | **blocked: no platform SMTP relay or approved test-sink endpoint discovered** |
 | Webhook | **blocked: `hooks.dev.dcn.ssu.ac.kr` test sink is not deployed** |
 | Audit search/index/export backend | **blocked: no dedicated append-only/index backend discovered** |
 
-OpenStack mutation adapters require a least-privilege application credential and
-the resource prefix `governance-dev-`. An admin password is not embedded or
-copied. Until that credential is provisioned, the worker reports
-`blocked_missing_application_credential` and does not mutate OpenStack.
+The development component idempotently creates a dedicated Keystone project,
+user and restricted application credential with only the available `reader`,
+`member`, and `load-balancer_member` roles. Only the application credential is
+stored in the development namespace. The one-time user password and admin token
+are not persisted or printed. OpenStack writes additionally require the resource
+prefix `governance-dev-`.
 
 ## Acceptance
 
@@ -48,7 +50,9 @@ copied. Until that credential is provisioned, the worker reports
    `/readyz` reports every required provider configured, and PostgreSQL contains
    `governance_worker_checkpoint`.
 5. Verify the Rabbit queue exists without consuming or altering service queues.
-6. Use only `governance-dev-*` resources for later authenticated provider tests.
+6. Verify OPA allows `member/project-write`, denies `reader/project-write`, and
+   the mounted policy checksum equals the recorded source checksum.
+7. Use only `governance-dev-*` resources for native tag mutation tests.
 
 ## Rollback
 

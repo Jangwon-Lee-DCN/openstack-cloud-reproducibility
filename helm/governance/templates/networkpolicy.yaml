@@ -21,12 +21,19 @@ spec:
         - {port: 9001, protocol: TCP}
         - {port: 9311, protocol: TCP}
         - {port: 9876, protocol: TCP}
+        - {port: 8774, protocol: TCP}
+        - {port: 8776, protocol: TCP}
+        - {port: 9292, protocol: TCP}
+        - {port: 9696, protocol: TCP}
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: vpc-control-plane-system}}
       ports: [{port: 8181, protocol: TCP}]
     - to:
         - podSelector: {matchLabels: {app.kubernetes.io/name: governance-postgresql}}
       ports: [{port: 5432, protocol: TCP}]
+    - to:
+        - podSelector: {matchLabels: {app.kubernetes.io/name: governance-opa}}
+      ports: [{port: 8181, protocol: TCP}]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+from urllib.request import Request, urlopen
 from dataclasses import dataclass
 
 from governance_api.providers import OpenStackClient, ProviderError
@@ -9,6 +10,16 @@ from governance_api.providers import OpenStackClient, ProviderError
 
 class IntegrationError(RuntimeError):
     pass
+
+
+def application_credential_token(auth_url: str, credential_id: str, secret: str) -> str:
+    body = {"auth": {"identity": {"methods": ["application_credential"],
+            "application_credential": {"id": credential_id, "secret": secret}}}}
+    request = Request(auth_url.rstrip("/") + "/v3/auth/tokens",
+                      data=json.dumps(body, separators=(",", ":")).encode(), method="POST",
+                      headers={"Content-Type": "application/json"})
+    with urlopen(request, timeout=10) as response:
+        return response.headers["X-Subject-Token"]
 
 
 @dataclass
@@ -75,12 +86,16 @@ class GovernanceProviders:
             raise IntegrationError("test resource prefix must start governance-dev-")
         self.clients = {
             name: OpenStackClient(os.environ[f"GOVERNANCE_{name.upper()}_URL"], token)
-            for name in ("gnocchi", "barbican", "designate", "octavia")
+            for name in ("gnocchi", "barbican", "designate", "octavia", "nova", "cinder", "neutron", "glance")
         }
+        self.project_id = os.environ["GOVERNANCE_KEYSTONE_PROJECT_ID"]
 
     def probe(self):
         paths = {"gnocchi": "/v1/status", "barbican": "/v1/secrets?limit=1",
-                 "designate": "/v2/zones?limit=1", "octavia": "/v2.0/lbaas/loadbalancers?limit=1"}
+                 "designate": "/v2/zones?limit=1", "octavia": "/v2.0/lbaas/loadbalancers?limit=1",
+                 "nova": f"/v2.1/{self.project_id}/servers?limit=1",
+                 "cinder": f"/v3/{self.project_id}/volumes?limit=1",
+                 "neutron": "/v2.0/networks?limit=1", "glance": "/v2/images?limit=1"}
         result = {}
         for name, client in self.clients.items():
             try:
@@ -101,7 +116,11 @@ def initialize_real_integrations():
     bus.initialize()
     # OpenStack mutation adapters remain disabled until a least-privilege governance
     # application credential is provisioned. Missing credentials never select fakes.
-    token = os.getenv("GOVERNANCE_SERVICE_TOKEN")
-    if token:
-        GovernanceProviders(token, os.environ["GOVERNANCE_TEST_RESOURCE_PREFIX"]).probe()
+    credential_id = os.getenv("GOVERNANCE_APPLICATION_CREDENTIAL_ID")
+    credential_secret = os.getenv("GOVERNANCE_APPLICATION_CREDENTIAL_SECRET")
+    if not credential_id or not credential_secret:
+        raise IntegrationError("governance application credential is required")
+    token = application_credential_token(os.environ["GOVERNANCE_KEYSTONE_URL"],
+                                         credential_id, credential_secret)
+    GovernanceProviders(token, os.environ["GOVERNANCE_TEST_RESOURCE_PREFIX"]).probe()
     return bus
