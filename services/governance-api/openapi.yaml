@@ -14,6 +14,36 @@ paths:
     get: {$ref: "#/components/x-list"}
     post: {$ref: "#/components/x-create"}
   /v1/notifications/{id}: {$ref: "#/components/x-item"}
+  /v1/events:
+    get:
+      security: [{keystoneToken: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [accepted]}}
+      responses:
+        "200": {description: project-scoped canonical event status page, content: {application/json: {schema: {$ref: "#/components/schemas/EventList"}}}}
+    post:
+      security: [{keystoneToken: []}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/CanonicalEvent"}}}
+      responses:
+        "201": {description: event accepted transactionally, content: {application/json: {schema: {$ref: "#/components/schemas/EventStatus"}}}}
+        "200": {description: byte-equivalent event or idempotency replay}
+        "400": {description: schema, scope-independent, or bounds validation failure}
+        "403": {description: Keystone scope or central OPA denial}
+        "409": {description: event_id or Idempotency-Key content conflict}
+        "413": {description: event exceeds 256 KiB}
+  /v1/events/{event_id}:
+    get:
+      security: [{keystoneToken: []}]
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: project-scoped ingestion status, content: {application/json: {schema: {$ref: "#/components/schemas/EventStatus"}}}}
+        "404": {description: absent or not visible}
   /v1/subscriptions:
     get: {$ref: "#/components/x-list"}
     post: {$ref: "#/components/x-create"}
@@ -57,6 +87,43 @@ components:
       required: true
       schema: {type: string, minLength: 8, maxLength: 255}
   schemas:
+    CanonicalEvent:
+      type: object
+      additionalProperties: false
+      required: [contract_version, event_id, event_type, occurred_at, domain_id, project_id, actor_id, resource, severity, operation_id, correlation_id, request_id, payload]
+      properties:
+        contract_version: {const: track-b.event.v1alpha1}
+        event_id: {type: string, format: uuid}
+        event_type: {type: string, enum: [resource.changed, notification.delivery.succeeded, notification.delivery.failed, budget.threshold.crossed, certificate.renewal.succeeded, certificate.renewal.failed, credential.rotation.succeeded, credential.rotation.failed, audit.export.succeeded, audit.export.failed, tag.drift.detected, tag.drift.reconciled]}
+        occurred_at: {type: string, format: date-time}
+        domain_id: {type: string, minLength: 1}
+        project_id: {type: string, minLength: 1}
+        actor_id: {type: string, minLength: 1}
+        resource:
+          type: object
+          additionalProperties: false
+          required: [type, id]
+          properties: {type: {type: string, minLength: 1}, id: {type: string, format: uuid}}
+        severity: {type: string, enum: [INFO, WARNING, ERROR, CRITICAL]}
+        operation_id: {type: string, format: uuid}
+        correlation_id: {type: string, format: uuid}
+        request_id: {type: string, minLength: 1}
+        payload: {type: object, additionalProperties: true}
+    EventStatus:
+      type: object
+      additionalProperties: false
+      required: [event_id, status, received_at, event]
+      properties:
+        event_id: {type: string, format: uuid}
+        status: {type: string, enum: [accepted]}
+        received_at: {type: string, format: date-time}
+        event: {$ref: "#/components/schemas/CanonicalEvent"}
+    EventList:
+      type: object
+      required: [items, next]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/EventStatus"}}
+        next: {type: [string, "null"]}
     Resource:
       type: object
       required: [id, domain_id, project_id, operation_id, revision]
