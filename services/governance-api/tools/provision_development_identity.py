@@ -80,11 +80,11 @@ def main():
                  admin_token, "PUT")
             assigned.append(name)
     user_token, _ = password_token(base, user["name"], password, project["name"], domain)
-    _, existing = call(f"{base}/users/{user['id']}/application_credentials", user_token)
+    _, existing = call(f"{base}/users/{user['id']}/application_credentials", admin_token)
     for credential in existing.get("application_credentials", []):
         if credential.get("name") == "governance-development":
             call(f"{base}/users/{user['id']}/application_credentials/{credential['id']}",
-                 user_token, "DELETE")
+                 admin_token, "DELETE")
     _, created = call(f"{base}/users/{user['id']}/application_credentials", user_token, "POST",
                       {"application_credential": {"name": "governance-development",
                        "description": "Track B development-only provider probes", "unrestricted": False}})
