@@ -58,9 +58,10 @@ transactional outbox. The runtime refuses SQLite whenever the mode is not
 `development`. The real ASG scheduler deliberately reconciles desired=0 only;
 desired>0 is surfaced as `DEGRADED` without creating fake instances.
 
-The platform OPA ingress policy admits only `vpc-facade` and monitoring Pods;
-development direct access correctly times out. Development therefore runs the
-same digest-pinned OPA engine and an exact Track-A-owned copy of
-`vpc-authz-v4` as a localhost sidecar. Production OPA policy was not changed.
-Promotion must replace the sidecar URL with the approved central proxy path;
-the API remains fail-closed if that decision endpoint is unavailable.
+Track A now targets the central `opa-pilot` decision endpoint directly. Its Pod
+is labelled `dcn.ssu.ac.kr/central-opa-client=allowed`, and development egress
+is restricted to Pods labelled `app=opa-pilot` in
+`vpc-control-plane-system`, TCP 8181. The prior local OPA sidecar and copied
+policy ConfigMap are removed. Deployment must wait until the separately owned
+central OPA ingress policy admits that client label; the API remains fail-closed
+until then.
