@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: p1-resilience-journal
+  namespace: __NAMESPACE__
+spec:
+  storageClassName: dcn-local-rwo
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: p1-resilience-operations
+  namespace: __NAMESPACE__
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: p1-resilience-operations}}
+  template:
+    metadata:
+      labels:
+        app: p1-resilience-operations
+        dcn.ssu.ac.kr/central-opa-client: allowed
+    spec:
+      priorityClassName: dcn-development-interruptible
+      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+      tolerations:
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: api
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: RESILIENCE_MODE, value: integration}
+            - {name: RESILIENCE_DB, value: /data/resilience.db}
+            - {name: RESILIENCE_SCHEDULER, value: "true"}
+            - {name: RESILIENCE_ALLOW_DESTRUCTIVE, value: "false"}
+            - {name: KEYSTONE_AUTH_URL, value: "http://keystone-api.openstack.svc.cluster.local:5000"}
+            - name: KEYSTONE_APPLICATION_CREDENTIAL_ID
+              valueFrom: {secretKeyRef: {name: p1-resilience-openstack, key: application-credential-id}}
+            - name: KEYSTONE_APPLICATION_CREDENTIAL_SECRET
+              valueFrom: {secretKeyRef: {name: p1-resilience-openstack, key: application-credential-secret}}
+            - {name: OPA_URL, value: "http://opa-pilot.vpc-control-plane-system.svc.cluster.local:8181"}
+            - {name: TRACK_A_URL, value: "http://p0-core-orchestration.development-p0-core-orchestration.svc.cluster.local"}
+            - {name: TRACK_B_URL, value: "http://governance-api.development-p1-governance-services.svc.cluster.local"}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: journal, mountPath: /data}]
+      volumes: [{name: journal, persistentVolumeClaim: {claimName: p1-resilience-journal}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: p1-resilience-operations, namespace: __NAMESPACE__}
+spec: {selector: {app: p1-resilience-operations}, ports: [{name: http, port: 80, targetPort: http}]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: p1-resilience-operations, namespace: __NAMESPACE__}
+spec:
+  podSelector: {matchLabels: {app: p1-resilience-operations}}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}}]
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: openstack}}
+      ports:
+        - {protocol: TCP, port: 5000}
+        - {protocol: TCP, port: 8776}
+        - {protocol: TCP, port: 9292}
+        - {protocol: TCP, port: 8786}
+        - {protocol: TCP, port: 8774}
+        - {protocol: TCP, port: 9696}
+        - {protocol: TCP, port: 9876}
+        - {protocol: TCP, port: 9001}
+        - {protocol: TCP, port: 15868}
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: development-p0-core-orchestration}}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: development-p1-governance-services}}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: vpc-control-plane-system}}
+      ports: [{protocol: TCP, port: 8181}]

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools==75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dcn-resilience-horizon"
+version = "0.2.0"
+description = "Independent Horizon dashboard for DCN Track C resilience inventory"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dcn_resilience_dashboard*"]
+
+[tool.setuptools.package-data]
+dcn_resilience_dashboard = ["templates/**/*.html", "enabled/*.py"]

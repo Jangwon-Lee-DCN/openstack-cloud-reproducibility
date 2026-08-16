@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Resilience Operations" %}{% endblock %}
+{% block main %}
+<div class="page-header"><h1>{% trans "Resilience Operations" %}</h1></div>
+<p>{% trans "Development Track C inventory. Mutating actions remain disabled until Keystone and OPA integration." %}</p>
+<ul class="nav nav-tabs" id="resilience-tabs">
+  {% for collection in collections %}<li><a href="#" data-collection="{{ collection|escape }}">{{ collection|escape }}</a></li>{% endfor %}
+</ul>
+<div class="alert alert-danger hidden" id="resilience-error"></div>
+<table class="table table-striped"><thead><tr><th>{% trans "Name / ID" %}</th><th>{% trans "Phase" %}</th><th>{% trans "Generation" %}</th></tr></thead><tbody id="resilience-items"></tbody></table>
+<button class="btn btn-default hidden" id="resilience-next">{% trans "Next" %}</button>
+<script>
+(function () {
+  "use strict";
+  var marker = null, selected = null;
+  function load(collection, next) {
+    selected = collection; marker = next ? marker : null;
+    var url = "/resilience-api/v1/" + encodeURIComponent(collection) + "?limit=50" + (marker ? "&marker=" + encodeURIComponent(marker) : "");
+    fetch(url, {credentials: "same-origin", headers: {"Accept": "application/json"}}).then(function (response) {
+      if (!response.ok) { throw new Error("Inventory request failed: " + response.status); }
+      return response.json();
+    }).then(function (page) {
+      var body = document.getElementById("resilience-items"); body.textContent = "";
+      page.items.forEach(function (item) {
+        var row = document.createElement("tr");
+        [item.spec.name || item.id, item.status.phase, String(item.generation)].forEach(function (value) {
+          var cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell);
+        }); body.appendChild(row);
+      });
+      marker = page.next_marker; document.getElementById("resilience-next").classList.toggle("hidden", !marker);
+    }).catch(function (error) { var box = document.getElementById("resilience-error"); box.textContent = error.message; box.classList.remove("hidden"); });
+  }
+  document.getElementById("resilience-tabs").addEventListener("click", function (event) {
+    var collection = event.target.getAttribute("data-collection"); if (collection) { event.preventDefault(); load(collection, false); }
+  });
+  document.getElementById("resilience-next").addEventListener("click", function () { load(selected, true); });
+  load("backup-policies", false);
+}());
+</script>
+{% endblock %}
