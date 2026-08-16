@@ -23,7 +23,7 @@ are listed as blockers and never replaced by deterministic fakes.
 | Integration | Development state |
 | --- | --- |
 | Keystone | discovered at `keystone-api.openstack.svc:5000`; self-token validation implemented |
-| OPA | discovered at `opa-pilot.vpc-control-plane-system.svc:8181`; `vpc.authz/decision` contract used |
+| OPA | adapter uses `vpc.authz/decision`; **blocked by the OPA namespace ingress NetworkPolicy**, and every authorized API request fails closed with 503 until the shared policy owner permits this development namespace |
 | PostgreSQL | dedicated ephemeral development instance, immutable image digest |
 | RabbitMQ | real platform broker; least-privilege Ceilometer vhost credential copied without decoding into the development namespace |
 | Gnocchi | real API adapter and authenticated probe implemented |

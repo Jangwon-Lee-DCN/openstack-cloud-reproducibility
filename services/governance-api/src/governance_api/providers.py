@@ -90,7 +90,7 @@ def tcp_probe(host: str, port: int, timeout=3) -> None:
 class ProviderRegistry:
     HTTP_PROVIDERS = ("keystone", "opa", "gnocchi", "barbican", "designate", "octavia",
                       "nova", "cinder", "neutron", "glance", "cloudkitty", "audit")
-    REQUIRED = ("keystone", "opa", "gnocchi", "barbican", "designate", "octavia",
+    REQUIRED = ("keystone", "gnocchi", "barbican", "designate", "octavia",
                 "postgresql", "rabbitmq")
 
     def __init__(self, environ=None):

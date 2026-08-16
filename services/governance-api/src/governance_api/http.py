@@ -42,7 +42,11 @@ class Handler(BaseHTTPRequestHandler):
             "context": {"authorization_class": "read" if self.command == "GET" else "project-write",
                         "method": self.command, "path": urlsplit(self.path).path},
         }
-        if not self.authorizer.authorize(policy_input):
+        try:
+            allowed = self.authorizer.authorize(policy_input)
+        except ProviderError as exc:
+            raise GovernanceError("policy service unavailable", code="policy_unavailable", status=503) from exc
+        if not allowed:
             raise GovernanceError("policy denied", code="policy_denied", status=403)
         return RequestContext(identity["domain_id"], project_id, identity["user_id"], frozenset(identity["roles"]))
     server_version = "dcn-governance/0.1"

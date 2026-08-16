@@ -63,7 +63,7 @@ case "$operation" in
       python3 -c 'import json,sys; assert json.load(sys.stdin) == {"status":"ok"}'
     readiness=$(curl --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
       --resolve "$host:443:$DEVELOPMENT_GATEWAY_IP" "https://$host/readyz")
-    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","opa","gnocchi","barbican","designate","octavia","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required)' "$readiness"
+    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); required={"keystone","gnocchi","barbican","designate","octavia","postgresql","rabbitmq"}; states={p["name"]:p for p in d["providers"]}; assert d["status"] == "ready"; assert all(states[n]["configured"] and states[n]["reachable"] for n in required); assert states["opa"]["configured"]' "$readiness"
     kubectl -n "$DEVELOPMENT_NAMESPACE" auth can-i create deployments \
       --as=system:serviceaccount:"$DEVELOPMENT_NAMESPACE":default | grep -qx no
     ;;
