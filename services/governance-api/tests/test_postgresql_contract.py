@@ -22,14 +22,16 @@ class PostgreSQLContractTest(unittest.TestCase):
     def test_migrations_are_transactional_append_only_and_tenant_scoped(self):
         migration_dir = pathlib.Path(__file__).parents[1] / "migrations"
         migrations = sorted(migration_dir.glob("*.sql"))
-        self.assertEqual([item.name for item in migrations], ["001_governance.sql", "002_tenant_rls.sql"])
+        self.assertEqual([item.name for item in migrations], [
+            "001_governance.sql", "002_tenant_rls.sql", "003_canonical_event_ingestion.sql"])
         combined = "\n".join(item.read_text() for item in migrations)
         for migration in migrations:
             text = migration.read_text().strip()
             self.assertTrue(text.startswith("BEGIN;"))
             self.assertTrue(text.endswith("COMMIT;"))
         for required in ("governance_outbox", "governance_cost_ledger", "governance_audit_event",
-                         "ENABLE ROW LEVEL SECURITY", "current_setting('dcn.project_id', true)"):
+                         "governance_canonical_event", "ENABLE ROW LEVEL SECURITY",
+                         "current_setting('dcn.project_id', true)"):
             self.assertIn(required, combined)
         for destructive in ("DROP TABLE", "TRUNCATE", "DELETE FROM"):
             self.assertNotIn(destructive, combined.upper())

@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from .errors import Conflict, Forbidden, GovernanceError, NotFound
 from .events import resource_changed_event
+from .event_ingestion import (decode_cursor, encode_cursor, event_hash, normalize_event,
+                              validate_event)
 from .operation import FakeOperationClient
 from .security import RequestContext, safe_projection, validate_webhook_url
 from .store import Store
@@ -174,6 +176,90 @@ class GovernanceService:
         body.setdefault("delivery_status", "pending")
         return self._write(ctx, "notification", body, action="notification.ingest", key=key,
                            request_id=request_id)
+
+    # Canonical Track B producer ingress. The accepted, redacted event, outbox
+    # row and tamper-evident audit row commit as one transaction.
+    def ingest_canonical_event(self, ctx, event, *, key, request_id, encoded_size):
+        if not key or len(key) < 8 or len(key) > 255:
+            raise GovernanceError("Idempotency-Key must contain 8 to 255 characters",
+                                  code="idempotency_key_required")
+        validate_event(event, encoded_size)
+        if event["project_id"] != ctx.project_id or event["domain_id"] != ctx.domain_id:
+            raise Forbidden("event scope must match the scoped Keystone token")
+        accepted = normalize_event(event)
+        digest = event_hash(self.store, accepted)
+        received = now()
+        record = {"event_id": accepted["event_id"], "status": "accepted",
+                  "received_at": received, "event": accepted}
+        with self.store.transaction() as db:
+            prior = db.execute(
+                "SELECT domain_id,project_id,request_hash,body FROM canonical_events WHERE event_id=?",
+                (accepted["event_id"],)).fetchone()
+            if prior:
+                if prior[0] != ctx.domain_id or prior[1] != ctx.project_id or prior[2] != digest:
+                    raise Conflict("event_id was already used for different content or scope")
+                return self.store.decode(prior[3]), True
+            prior_key = db.execute(
+                "SELECT event_id,request_hash,body FROM canonical_events WHERE project_id=? AND idempotency_key=?",
+                (ctx.project_id, key)).fetchone()
+            if prior_key:
+                if prior_key[0] != accepted["event_id"] or prior_key[1] != digest:
+                    raise Conflict("Idempotency-Key was already used for a different event")
+                return self.store.decode(prior_key[2]), True
+            db.execute(
+                "INSERT INTO canonical_events(event_id,domain_id,project_id,idempotency_key,request_hash,status,body,received_at) "
+                "VALUES(?,?,?,?,?,'accepted',?,?)",
+                (accepted["event_id"], ctx.domain_id, ctx.project_id, key, digest,
+                 self.store.encode(record), received))
+            db.execute(
+                "INSERT INTO outbox(id,project_id,event_type,dedup_key,payload,status,available_at,created_at) "
+                "VALUES(?,?,?,?,?,'pending',?,?)",
+                (accepted["event_id"], ctx.project_id, accepted["event_type"],
+                 "canonical-event:" + accepted["event_id"], self.store.encode(accepted), received, received))
+            audit = {
+                "event_id": str(uuid4()), "occurred_at": received, "received_at": received,
+                "domain_id": ctx.domain_id, "project_id": ctx.project_id,
+                "actor": {"type": "user", "id": ctx.user_id}, "service": "governance",
+                "action": "canonical_event.ingest",
+                "target": {"type": "canonical_event", "id": accepted["event_id"]},
+                "outcome": "success", "request_id": request_id,
+                "operation_id": accepted["operation_id"], "changes": {},
+            }
+            prior_hash = db.execute(
+                "SELECT integrity_hash FROM audit_events ORDER BY seq DESC LIMIT 1").fetchone()
+            previous = prior_hash[0] if prior_hash else "0" * 64
+            integrity = hashlib.sha256((previous + self.store.encode(audit)).encode()).hexdigest()
+            audit["integrity_hash"] = integrity
+            db.execute(
+                "INSERT INTO audit_events(event_id,project_id,occurred_at,body,previous_hash,integrity_hash) "
+                "VALUES(?,?,?,?,?,?)", (audit["event_id"], ctx.project_id, received,
+                                         self.store.encode(audit), previous, integrity))
+        return record, False
+
+    def get_canonical_event(self, ctx, event_id):
+        row = self.store.connection.execute(
+            "SELECT body FROM canonical_events WHERE event_id=? AND domain_id=? AND project_id=?",
+            (event_id, ctx.domain_id, ctx.project_id)).fetchone()
+        if not row:
+            raise NotFound("canonical event not found")
+        return self.store.decode(row[0])
+
+    def page_canonical_events(self, ctx, *, limit=50, cursor=None, status=None):
+        if limit < 1 or limit > 200:
+            raise GovernanceError("limit must be between 1 and 200")
+        if status and status not in {"accepted"}:
+            raise GovernanceError("unsupported event status", code="invalid_status")
+        offset = decode_cursor(cursor)
+        query = "SELECT body FROM canonical_events WHERE project_id=?"
+        params = [ctx.project_id]
+        if status:
+            query += " AND status=?"
+            params.append(status)
+        query += " ORDER BY received_at DESC,event_id LIMIT ? OFFSET ?"
+        params.extend([limit + 1, offset])
+        rows = list(self.store.connection.execute(query, params))
+        items = [self.store.decode(row[0]) for row in rows[:limit]]
+        return {"items": items, "next": encode_cursor(offset + limit) if len(rows) > limit else None}
 
     # FinOps
     def create_rate_card(self, ctx, body, *, key, request_id):
