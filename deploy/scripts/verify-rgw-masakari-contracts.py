@@ -15,6 +15,9 @@ runtime_check = script.index('ceph daemon "$socket" config get rgw_swift_account
 assert account_setting < account_check < runtime_restart < runtime_check < accept, (
     "AUTH_<project_id> handling must be persisted, loaded and runtime-verified before acceptance"
 )
+assert '"url":"http://keystone-api.openstack.svc.cluster.local:5000"' in script
+assert "method='PUT'" in script and "?format=json" in script and "method='DELETE'" in script
+assert script.index("method='PUT'") < script.index("?format=json") < script.index("method='DELETE'") < catalog
 for interface in ("public", "internal", "admin"):
     assert f"endpoint create --region $region \"\\$service_id\" {interface}" in script
 
