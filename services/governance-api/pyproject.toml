@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dcn-governance-api"
+version = "0.1.0"
+description = "Tenant-isolated OpenStack governance control plane"
+requires-python = ">=3.12"
+dependencies = ["psycopg[binary]==3.2.9", "pika==1.3.2"]
+
+[project.scripts]
+dcn-governance-api = "governance_api.http:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

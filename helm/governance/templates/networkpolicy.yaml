@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: governance-api}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: governance-api}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: development-gateway-system}}
+      ports: [{port: 8080, protocol: TCP}]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: openstack}}
+      ports:
+        - {port: 5000, protocol: TCP}
+        - {port: 5672, protocol: TCP}
+        - {port: 8041, protocol: TCP}
+        - {port: 9001, protocol: TCP}
+        - {port: 9311, protocol: TCP}
+        - {port: 9876, protocol: TCP}
+        - {port: 8774, protocol: TCP}
+        - {port: 8776, protocol: TCP}
+        - {port: 9292, protocol: TCP}
+        - {port: 9696, protocol: TCP}
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: vpc-control-plane-system}}
+      ports: [{port: 8181, protocol: TCP}]
+    - to:
+        - podSelector: {matchLabels: {app.kubernetes.io/name: governance-postgresql}}
+      ports: [{port: 5432, protocol: TCP}]
+{{- if .Values.localOpa.enabled }}
+    - to:
+        - podSelector: {matchLabels: {app.kubernetes.io/name: governance-opa}}
+      ports: [{port: 8181, protocol: TCP}]
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: governance-postgresql}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: governance-postgresql}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app.kubernetes.io/name: governance-api}}
+      ports: [{port: 5432, protocol: TCP}]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
