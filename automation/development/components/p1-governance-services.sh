@@ -26,6 +26,16 @@ case "$operation" in
       echo 'GOVERNANCE_WORKER_IMAGE_DIGEST must be sha256:<64 lowercase hex>' >&2
       exit 2
     }
+    # Development-only Rabbit connection: copy the already least-privilege
+    # Ceilometer bus credential without decoding or printing it. This Secret is
+    # namespace-local and is removed with the development namespace.
+    kubectl -n openstack get secret ceilometer-rabbitmq-user -o json |
+      jq --arg namespace "$DEVELOPMENT_NAMESPACE" '
+        {apiVersion:"v1",kind:"Secret",
+         metadata:{name:"governance-real-integrations",namespace:$namespace},
+         type:"Opaque",data:{"rabbitmq-url":((.data.RABBITMQ_CONNECTION|@base64d|
+           sub("^rabbit://";"amqp://")|sub(":15672/";":5672/"))|@base64)}}' |
+      kubectl apply -f - >/dev/null
     helm upgrade --install governance "$chart" \
       --namespace "$DEVELOPMENT_NAMESPACE" \
       --values "$values" \
@@ -35,6 +45,7 @@ case "$operation" in
     ;;
   verify)
     kubectl -n "$DEVELOPMENT_NAMESPACE" rollout status deployment/governance-api --timeout=5m
+    kubectl -n "$DEVELOPMENT_NAMESPACE" rollout status statefulset/governance-postgresql --timeout=5m
     actual_images=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment governance-api \
       -o jsonpath='{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}')
     [[ $(grep -c '@sha256:' <<<"$actual_images") == 2 ]] || {
@@ -50,6 +61,9 @@ case "$operation" in
     curl --fail --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
       --resolve "$host:443:$DEVELOPMENT_GATEWAY_IP" "https://$host/healthz" |
       python3 -c 'import json,sys; assert json.load(sys.stdin) == {"status":"ok"}'
+    readiness=$(curl --silent --show-error --insecure --connect-timeout 5 --max-time 15 \
+      --resolve "$host:443:$DEVELOPMENT_GATEWAY_IP" "https://$host/readyz")
+    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["status"] in {"ready","blocked"}; assert all(p["configured"] for p in d["providers"])' "$readiness"
     kubectl -n "$DEVELOPMENT_NAMESPACE" auth can-i create deployments \
       --as=system:serviceaccount:"$DEVELOPMENT_NAMESPACE":default | grep -qx no
     ;;

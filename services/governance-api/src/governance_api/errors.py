@@ -2,10 +2,12 @@ class GovernanceError(Exception):
     status = 400
     code = "invalid_request"
 
-    def __init__(self, message: str, *, code: str | None = None):
+    def __init__(self, message: str, *, code: str | None = None, status: int | None = None):
         super().__init__(message)
         if code:
             self.code = code
+        if status is not None:
+            self.status = status
 
 
 class Forbidden(GovernanceError):

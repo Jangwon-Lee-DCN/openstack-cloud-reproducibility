@@ -13,6 +13,17 @@ priorityClassName: dcn-development-interruptible
 webhookAllowedHosts: ""
 mode: development
 providerMode: fake
+providers:
+  keystone: ""
+  opa: ""
+  gnocchi: ""
+  barbican: ""
+  designate: ""
+  octavia: ""
+  postgresqlHost: ""
+  rabbitmqHost: ""
+postgresql:
+  image: docker.io/bitnamilegacy/postgresql@sha256:926356130b77d5742d8ce605b258d35db9b62f2f8fd1601f9dbaef0c8a710a8d
 resources:
   requests: {cpu: 50m, memory: 64Mi}
   limits: {cpu: 500m, memory: 256Mi}

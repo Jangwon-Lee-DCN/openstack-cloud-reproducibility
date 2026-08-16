@@ -35,6 +35,15 @@ spec:
             - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
             - {name: GOVERNANCE_WEBHOOK_ALLOWED_HOSTS, value: {{ .Values.webhookAllowedHosts | quote }}}
             - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
+            - {name: GOVERNANCE_PROVIDER_MODE, value: {{ .Values.providerMode | quote }}}
+            - {name: GOVERNANCE_KEYSTONE_URL, value: {{ .Values.providers.keystone | quote }}}
+            - {name: GOVERNANCE_OPA_URL, value: {{ .Values.providers.opa | quote }}}
+            - {name: GOVERNANCE_GNOCCHI_URL, value: {{ .Values.providers.gnocchi | quote }}}
+            - {name: GOVERNANCE_BARBICAN_URL, value: {{ .Values.providers.barbican | quote }}}
+            - {name: GOVERNANCE_DESIGNATE_URL, value: {{ .Values.providers.designate | quote }}}
+            - {name: GOVERNANCE_OCTAVIA_URL, value: {{ .Values.providers.octavia | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
+            - {name: GOVERNANCE_RABBITMQ_HOST, value: {{ .Values.providers.rabbitmqHost | quote }}}
           ports: [{name: http, containerPort: 8080}]
           readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
@@ -51,6 +60,13 @@ spec:
             - {name: GOVERNANCE_DB_PATH, value: /var/lib/governance/governance.db}
             - {name: GOVERNANCE_MODE, value: {{ .Values.mode | quote }}}
             - {name: GOVERNANCE_PROVIDER_MODE, value: {{ .Values.providerMode | quote }}}
+            - {name: GOVERNANCE_POSTGRESQL_HOST, value: {{ .Values.providers.postgresqlHost | quote }}}
+            - {name: GOVERNANCE_POSTGRES_USER, value: governance}
+            - {name: GOVERNANCE_POSTGRES_DB, value: governance}
+            - name: GOVERNANCE_POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: governance-postgresql, key: password}}
+            - name: GOVERNANCE_RABBITMQ_URL
+              valueFrom: {secretKeyRef: {name: governance-real-integrations, key: rabbitmq-url}}
           resources: {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false

@@ -9,6 +9,7 @@ from .errors import GovernanceError
 from .security import RequestContext
 from .service import GovernanceService
 from .store import Store
+from .providers import KeystoneIdentity, OpaAuthorizer, ProviderError, ProviderRegistry
 
 
 ROUTES = {
@@ -23,16 +24,27 @@ ROUTES = {
 }
 
 
-def context(headers) -> RequestContext:
-    required = ("X-Domain-Id", "X-Project-Id", "X-User-Id")
-    if any(not headers.get(item) for item in required):
-        raise GovernanceError("Keystone-authenticated identity headers are required", code="identity_required")
-    return RequestContext(headers["X-Domain-Id"], headers["X-Project-Id"], headers["X-User-Id"],
-                          frozenset(filter(None, headers.get("X-Roles", "").split(","))))
-
-
 class Handler(BaseHTTPRequestHandler):
     service: GovernanceService
+    providers: ProviderRegistry | None = None
+    identity: KeystoneIdentity | None = None
+    authorizer: OpaAuthorizer | None = None
+
+    def request_context(self) -> RequestContext:
+        project_id = self.headers.get("X-Project-Id", "")
+        try:
+            identity = self.identity.validate(self.headers.get("X-Auth-Token", ""), project_id)
+        except ProviderError as exc:
+            raise GovernanceError(str(exc), code="identity_required", status=401) from exc
+        policy_input = {
+            "subject": {"project_id": project_id, "user_id": identity["user_id"],
+                        "roles": identity["roles"]},
+            "context": {"authorization_class": "read" if self.command == "GET" else "project-write",
+                        "method": self.command, "path": urlsplit(self.path).path},
+        }
+        if not self.authorizer.authorize(policy_input):
+            raise GovernanceError("policy denied", code="policy_denied", status=403)
+        return RequestContext(identity["domain_id"], project_id, identity["user_id"], frozenset(identity["roles"]))
     server_version = "dcn-governance/0.1"
 
     def log_message(self, fmt, *args):
@@ -57,7 +69,11 @@ class Handler(BaseHTTPRequestHandler):
             parsed = urlsplit(self.path)
             if parsed.path == "/healthz":
                 return self.reply(200, {"status": "ok"})
-            ctx = context(self.headers)
+            if parsed.path == "/readyz":
+                statuses = [item.__dict__ for item in self.providers.statuses()] if self.providers else []
+                ready = bool(self.providers and self.providers.ready())
+                return self.reply(200 if ready else 503, {"status": "ready" if ready else "blocked", "providers": statuses})
+            ctx = self.request_context()
             if parsed.path == "/v1/audit-events":
                 return self.reply(200, {"items": self.service.search_audit(ctx)})
             route = ROUTES.get(parsed.path)
@@ -76,7 +92,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            ctx = context(self.headers)
+            ctx = self.request_context()
             route = ROUTES.get(self.path)
             if not route:
                 return self.reply(404, {"error": {"code": "not_found"}})
@@ -101,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PATCH(self):
         try:
-            ctx = context(self.headers)
+            ctx = self.request_context()
             collection, resource_id = self._resource_path(urlsplit(self.path).path)
             route = ROUTES.get(collection)
             if not route or not resource_id:
@@ -119,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         try:
-            ctx = context(self.headers)
+            ctx = self.request_context()
             collection, resource_id = self._resource_path(urlsplit(self.path).path)
             route = ROUTES.get(collection)
             if not route or not resource_id:
@@ -135,11 +151,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if os.getenv("GOVERNANCE_MODE", "production") != "development":
-        raise SystemExit("real Keystone/OPA/provider integrations are not implemented; refusing production mode")
+    mode = os.getenv("GOVERNANCE_MODE", "production")
+    provider_mode = os.getenv("GOVERNANCE_PROVIDER_MODE", "disabled")
+    if mode != "development" or provider_mode != "real":
+        raise SystemExit("real provider configuration is required; refusing fake or production execution")
     store = Store(os.getenv("GOVERNANCE_DB_PATH", "/var/lib/governance/governance.db"))
     Handler.service = GovernanceService(
         store, webhook_hosts=os.getenv("GOVERNANCE_WEBHOOK_ALLOWED_HOSTS", "").split(","))
+    Handler.providers = ProviderRegistry()
+    Handler.identity = KeystoneIdentity(os.environ["GOVERNANCE_KEYSTONE_URL"])
+    Handler.authorizer = OpaAuthorizer(os.environ["GOVERNANCE_OPA_URL"],
+                                      os.getenv("GOVERNANCE_OPA_DECISION", "vpc/authz/decision"))
     address = os.getenv("GOVERNANCE_LISTEN", "0.0.0.0")
     port = int(os.getenv("GOVERNANCE_PORT", "8080"))
     ThreadingHTTPServer((address, port), Handler).serve_forever()

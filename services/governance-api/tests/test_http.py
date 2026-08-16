@@ -15,6 +15,9 @@ from governance_api.store import Store
 class HttpSmokeTest(unittest.TestCase):
     def serve(self):
         Handler.service = GovernanceService(Store())
+        Handler.identity = type("Identity", (), {"validate": lambda self, token, project: {
+            "domain_id": "d", "project_id": project, "user_id": "u", "roles": []}})()
+        Handler.authorizer = type("Authorizer", (), {"authorize": lambda self, value: True})()
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -40,12 +43,12 @@ class HttpSmokeTest(unittest.TestCase):
             env=dict(os.environ, GOVERNANCE_MODE="production"),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn(b"refusing production mode", result.stderr)
+        self.assertIn(b"refusing fake or production execution", result.stderr)
 
     def test_http_crud_flow(self):
         server, thread, opener = self.serve()
         base = f"http://127.0.0.1:{server.server_port}"
-        identity = {"X-Domain-Id": "d", "X-Project-Id": "p", "X-User-Id": "u",
+        identity = {"X-Auth-Token": "fixture", "X-Project-Id": "p",
                     "X-Openstack-Request-Id": "req", "Content-Type": "application/json"}
         try:
             create = urllib.request.Request(

@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dcn-governance-worker"
 version = "0.1.0"
 requires-python = ">=3.12"
+dependencies = ["psycopg[binary]==3.2.9", "pika==1.3.2"]
 
 [project.scripts]
 dcn-governance-worker = "governance_worker.runner:main"
