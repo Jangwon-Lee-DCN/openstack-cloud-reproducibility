@@ -36,9 +36,17 @@ class CloudKittyRateCardContract(unittest.TestCase):
         script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
         self.assertIn("helm/packages/patched/cloudkitty-2026.1.0.tgz", script)
         self.assertIn(
-            "37383178b564d1fbccf1cbdc42f40f0f6a774d7156ad73add8ba898d7f2163c4",
+            "84b4f8d1e3cb3383534bd79a3057e3f5e8580a88879faad1fc1de367f7c1f089",
             script,
         )
+
+    def test_rate_bootstrap_runs_after_keystone_hooks(self):
+        template = (
+            ROOT / "helm/openstack-helm/cloudkitty/templates/job-bootstrap.yaml"
+        ).read_text()
+        self.assertIn("helm.sh/hook: post-install,post-upgrade", template)
+        self.assertIn('helm.sh/hook-weight: "0"', template)
+        self.assertIn('set $bootstrapJob "jobAnnotations"', template)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ package="$root/helm/packages/patched/cloudkitty-2026.1.0.tgz"
 values="$root/deploy/values/site/cloudkitty.yaml"
 secrets="$root/deploy/secrets/cloudkitty.values.sops.yaml"
 route="$root/deploy/manifests/cloudkitty-public-route.yaml"
-expected_package_sha=37383178b564d1fbccf1cbdc42f40f0f6a774d7156ad73add8ba898d7f2163c4
+expected_package_sha=84b4f8d1e3cb3383534bd79a3057e3f5e8580a88879faad1fc1de367f7c1f089
 mode="${1:-check}"
 
 for command in helm kubectl sops sha256sum; do
