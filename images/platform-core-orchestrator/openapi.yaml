@@ -21,7 +21,7 @@ components:
         id: {type: string, format: uuid, description: Platform Operation UUID.}
         project_id: {type: string, format: uuid, description: Keystone project UUID that owns the Operation.}
         region_id: {type: string, minLength: 1}
-        action: {type: string, minLength: 1}
+        action: {type: string, minLength: 1, description: "Actions prefixed with producer. are externally transitioned and are never claimed by the Track A worker."}
         target_type: {type: string, minLength: 1}
         target_id: {type: [string, "null"], format: uuid}
         fingerprint: {type: string, pattern: '^[0-9a-f]{64}$'}
