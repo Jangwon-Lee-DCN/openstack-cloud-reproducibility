@@ -78,6 +78,16 @@ class Handler(BaseHTTPRequestHandler):
                 ready = bool(self.providers and self.providers.ready())
                 return self.reply(200 if ready else 503, {"status": "ready" if ready else "blocked", "providers": statuses})
             ctx = self.request_context()
+            if parsed.path == "/v1/events":
+                query = parse_qs(parsed.query)
+                return self.reply(200, self.service.page_canonical_events(
+                    ctx, limit=int(query.get("limit", [50])[0]),
+                    cursor=query.get("cursor", [None])[0], status=query.get("status", [None])[0]))
+            if parsed.path.startswith("/v1/events/"):
+                event_id = parsed.path.removeprefix("/v1/events/")
+                if not event_id or "/" in event_id:
+                    return self.reply(404, {"error": {"code": "not_found"}})
+                return self.reply(200, self.service.get_canonical_event(ctx, event_id))
             if parsed.path == "/v1/audit-events":
                 return self.reply(200, {"items": self.service.search_audit(ctx)})
             route = ROUTES.get(parsed.path)
@@ -97,12 +107,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             ctx = self.request_context()
-            route = ROUTES.get(self.path)
+            parsed = urlsplit(self.path)
+            length = int(self.headers.get("Content-Length", "0"))
+            if parsed.path == "/v1/events":
+                if length > 262_144:
+                    raise GovernanceError("request is too large", code="payload_too_large", status=413)
+                raw = self.rfile.read(length) or b"{}"
+                body = json.loads(raw)
+                result, replayed = self.service.ingest_canonical_event(
+                    ctx, body, key=self.headers.get("Idempotency-Key", ""), encoded_size=len(raw),
+                    request_id=self.headers.get("X-Openstack-Request-Id", "req-unknown"))
+                return self.reply(200 if replayed else 201, result)
+            route = ROUTES.get(parsed.path)
             if not route:
                 return self.reply(404, {"error": {"code": "not_found"}})
-            length = int(self.headers.get("Content-Length", "0"))
             if length > 1_048_576:
-                raise GovernanceError("request is too large", code="payload_too_large")
+                raise GovernanceError("request is too large", code="payload_too_large", status=413)
             body = json.loads(self.rfile.read(length) or b"{}")
             result = getattr(self.service, route[1])(
                 ctx, body, key=self.headers.get("Idempotency-Key", ""),

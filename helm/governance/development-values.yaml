@@ -18,3 +18,7 @@ providers:
   rabbitmqHost: rabbitmq.openstack.svc.cluster.local
 localOpa:
   enabled: false
+canonicalEventConsumers:
+  - namespace: development-p1-resilience-operations
+    podLabels:
+      app: p1-resilience-operations

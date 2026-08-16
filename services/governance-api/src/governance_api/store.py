@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import RLock
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class Store:
@@ -69,6 +69,14 @@ class Store:
           consumer_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at TEXT NOT NULL,
           PRIMARY KEY(consumer_id,nonce)
         );
+        CREATE TABLE IF NOT EXISTS canonical_events(
+          event_id TEXT PRIMARY KEY, domain_id TEXT NOT NULL, project_id TEXT NOT NULL,
+          idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, status TEXT NOT NULL,
+          body TEXT NOT NULL, received_at TEXT NOT NULL,
+          UNIQUE(project_id,idempotency_key)
+        );
+        CREATE INDEX IF NOT EXISTS canonical_events_scope
+          ON canonical_events(project_id,status,received_at,event_id);
         """)
         self.connection.execute("UPDATE schema_version SET version=?", (SCHEMA_VERSION,))
         self.connection.commit()
