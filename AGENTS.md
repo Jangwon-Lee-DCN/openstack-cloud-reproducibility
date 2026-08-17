@@ -50,3 +50,6 @@ and the central change contract advance only for the final accepted revision.
 - Do not weaken, bypass, edit around, or selectively skip a failing gate to
   deploy. A gate defect must be fixed and the full acceptance rerun before
   promotion.
+- Production Helm changes must run through the repository reconciler and hold
+  its cluster-wide deployment lock through rollout. Direct `helm upgrade`, or
+  starting another reconciliation while the lock exists, is prohibited.

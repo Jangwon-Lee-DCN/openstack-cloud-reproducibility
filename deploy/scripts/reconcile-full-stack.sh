@@ -177,11 +177,27 @@ install_release() {
 }
 
 WORK_DIR=$(mktemp -d /tmp/openstack-full-reconcile.XXXXXX)
+DEPLOY_LOCK=dcn-production-deploy-lock
+DEPLOY_HOLDER="$(hostname)-$$-$(date +%s)"
 cleanup() {
+  if [[ "$(kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" \
+      -o jsonpath='{.data.holder}' 2>/dev/null || true)" == "$DEPLOY_HOLDER" ]]; then
+    kubectl -n "$NAMESPACE" delete configmap "$DEPLOY_LOCK" \
+      --ignore-not-found --wait=false >/dev/null
+  fi
   shred -u "$WORK_DIR"/*.yaml 2>/dev/null || true
   rmdir "$WORK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
+
+if ! kubectl -n "$NAMESPACE" create configmap "$DEPLOY_LOCK" \
+    --from-literal="holder=$DEPLOY_HOLDER" \
+    --from-literal="release=${ONLY_RELEASE:-full-stack}" >/dev/null; then
+  echo "another production reconciliation owns $NAMESPACE/$DEPLOY_LOCK" >&2
+  kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" \
+    -o jsonpath='holder={.data.holder} release={.data.release}{"\n"}' >&2 || true
+  exit 1
+fi
 
 validate_admin_passwords
 
