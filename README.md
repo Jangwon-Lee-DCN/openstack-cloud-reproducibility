@@ -17,9 +17,9 @@ FIX, RECONCILE, and VERIFY record and a separate commit.
 - `helm/packages/upstream`: packaged upstream charts with SHA-256 checksums
 - `helm/packages/patched`: locally patched chart packages, when required
 - `images`: immutable base-image provenance and local Dockerfiles
-- `components`: component-specific problem and operational records
+- `components`: one authoritative operational contract per component
 - `deploy`: values, manifests, encrypted secrets, and reconciliation scripts
-- `docs`: repository policy and provenance
+- `docs`: indexed policy, build, operation, and development documentation
 
 The repository now contains every OpenStack-Helm chart used by the accepted
 PoC, all final release values snapshots, the deployed chart patches, and the
@@ -56,10 +56,13 @@ BUILD_IMAGES=1 ./deploy/scripts/reconcile-full-stack.sh
 ./deploy/scripts/verify-full-stack.sh
 ```
 
-Read each component's `ISSUE.md`, `FIX.md`, `RECONCILE.md`, and `VERIFY.md`
-before using the environment-specific encrypted profile on another cloud.
+Read the [component contract index](components/README.md) before using the
+environment-specific encrypted profile on another cloud. Each component now
+has one document containing its issue, remediation, reconciliation, and
+verification contract.
 
 For a rebuild from fresh Ubuntu Server 24.04 hosts, start with
 [`automation/README.md`](automation/README.md) and the
 [`fresh-server-rebuild-runbook`](docs/fresh-server-rebuild-runbook.md). The
 Ansible workflow deliberately stops at disk and provider-network safety gates.
+The complete documentation hierarchy is in the [documentation map](docs/README.md).
