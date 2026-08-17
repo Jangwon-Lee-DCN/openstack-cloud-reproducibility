@@ -98,15 +98,6 @@ pod:
           # The provider-agent Unix sockets live in a root-owned hostPath
           # shared with the API pod on each control-plane node.
           runAsUser: 0
-  probes:
-    api:
-      octavia-api:
-        readiness:
-          params:
-            timeoutSeconds: 30
-        liveness:
-          params:
-            timeoutSeconds: 30
   tolerations:
     octavia_worker:
       - key: node-role.kubernetes.io/control-plane
