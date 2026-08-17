@@ -12,6 +12,8 @@ from .errors import Conflict, Forbidden, GovernanceError, NotFound
 from .events import resource_changed_event
 from .event_ingestion import (decode_cursor, encode_cursor, event_hash, normalize_event,
                               validate_event)
+from .finops import (AwsCalibration, AwsMeterMapping, AwsPrice, FinOpsError,
+                     aws_cost_forecast, decimal)
 from .operation import FakeOperationClient
 from .security import RequestContext, safe_projection, validate_webhook_url
 from .store import Store
@@ -318,6 +320,80 @@ class GovernanceService:
             raise GovernanceError("thresholds must be sorted unique positive values")
         return self._write(ctx, "budget", body, action="budget.create", key=key,
                            request_id=request_id)
+
+    def create_aws_price_profile(self, ctx, body, *, key, request_id):
+        required = ("version", "region", "currency", "effective_at", "prices", "mappings")
+        if any(not body.get(field) for field in required):
+            raise GovernanceError("AWS price profile provenance and mappings are required")
+        try:
+            prices = {item["sku"]: AwsPrice(item["sku"], item["unit"], decimal(item["unit_price"]))
+                      for item in body["prices"]}
+            mappings = {item["meter"]: AwsMeterMapping(
+                item["meter"], item["sku"], decimal(item.get("conversion_factor", "1")))
+                for item in body["mappings"]}
+        except (KeyError, TypeError, FinOpsError) as exc:
+            raise GovernanceError("invalid AWS price profile") from exc
+        if len(prices) != len(body["prices"]) or len(mappings) != len(body["mappings"]):
+            raise GovernanceError("AWS profile keys must be unique")
+        if any(mapping.sku not in prices for mapping in mappings.values()):
+            raise GovernanceError("every AWS meter mapping must reference a price")
+        if any(price.unit_price < 0 for price in prices.values()):
+            raise GovernanceError("AWS unit price cannot be negative")
+        return self._write(ctx, "aws_price_profile", body, action="aws_price_profile.create",
+                           key=key, request_id=request_id)
+
+    def create_aws_calibration_profile(self, ctx, body, *, key, request_id):
+        if not body.get("version") or not isinstance(body.get("calibrations"), list):
+            raise GovernanceError("versioned AWS calibrations are required")
+        try:
+            for item in body["calibrations"]:
+                value = AwsCalibration(item["sku"], decimal(item["multiplier"]),
+                                       decimal(item["error_percent"]), int(item["sample_count"]))
+                if value.multiplier <= 0 or not 0 <= value.error_percent <= 100 or value.sample_count < 0:
+                    raise FinOpsError("invalid calibration")
+        except (KeyError, TypeError, ValueError, FinOpsError) as exc:
+            raise GovernanceError("invalid AWS calibration profile") from exc
+        return self._write(ctx, "aws_calibration_profile", body,
+                           action="aws_calibration_profile.create", key=key,
+                           request_id=request_id)
+
+    def aws_forecast(self, ctx, *, period, price_profile_id, calibration_profile_id=None,
+                     elapsed_fraction="1", budget_id=None):
+        profile = self.get_resource(ctx, "aws_price_profile", price_profile_id)
+        calibration_body = ({"calibrations": []} if not calibration_profile_id else
+                            self.get_resource(ctx, "aws_calibration_profile", calibration_profile_id))
+        quantities = {}
+        for row in self.store.connection.execute(
+                "SELECT meter,quantity FROM usage_raw WHERE project_id=? AND period LIKE ?",
+                (ctx.project_id, f"{period}%")):
+            quantities[row[0]] = quantities.get(row[0], Decimal("0")) + Decimal(row[1])
+        try:
+            result = aws_cost_forecast(
+                quantities=quantities,
+                prices={item["sku"]: AwsPrice(item["sku"], item["unit"], decimal(item["unit_price"]))
+                        for item in profile["prices"]},
+                mappings={item["meter"]: AwsMeterMapping(
+                    item["meter"], item["sku"], decimal(item.get("conversion_factor", "1")))
+                    for item in profile["mappings"]},
+                calibrations={item["sku"]: AwsCalibration(
+                    item["sku"], decimal(item["multiplier"]), decimal(item["error_percent"]),
+                    int(item["sample_count"])) for item in calibration_body["calibrations"]},
+                elapsed_fraction=elapsed_fraction, currency=profile["currency"],
+                region=profile["region"], price_version=profile["version"], as_of=now())
+        except (KeyError, TypeError, ValueError, FinOpsError) as exc:
+            raise GovernanceError("invalid AWS forecast inputs") from exc
+        result.update({"period": period, "project_id": ctx.project_id,
+                       "price_profile_id": price_profile_id,
+                       "calibration_profile_id": calibration_profile_id})
+        if budget_id:
+            budget = self.get_resource(ctx, "budget", budget_id)
+            amount = Decimal(str(budget["amount"]))
+            estimate = Decimal(result["estimate"])
+            result["budget"] = {"id": budget_id, "amount": str(amount),
+                                "forecast_percent": str((estimate / amount * 100).quantize(
+                                    Decimal("0.01"), ROUND_HALF_EVEN)),
+                                "exceeded": estimate > amount}
+        return result
 
     # Certificates and secret rotation store references/state only.
     def create_certificate_policy(self, ctx, body, *, key, request_id):
