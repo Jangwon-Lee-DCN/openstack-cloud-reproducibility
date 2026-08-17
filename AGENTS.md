@@ -9,6 +9,15 @@ This worktree is the portable source used by the live three-rack production
 deployment. Read the parent repository's `AGENTS.md` and production inventory
 before applying charts.
 
+Feature delivery must also follow the workspace pull-request hygiene policy.
+In particular, keep related implementation and acceptance-harness corrections
+on one open feature branch until the complete development acceptance passes.
+Do not create a new development and main promotion pair for every live probe or
+diagnostic finding. A separate PR is reserved for a material product/security
+defect, rollback, or independently deployable unit and must state that reason.
+The normal feature budget is one feature PR and one promotion PR; source locks
+and the central change contract advance only for the final accepted revision.
+
 - Never use the PoC interface names `eno1` or `eno2` for production OpenStack
   networking.
 - On Compute nodes, `dcn-ovn0` is the stable name of the dedicated physical
