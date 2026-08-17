@@ -32,6 +32,12 @@ def checkpoint_for_measure(measure_time: datetime) -> datetime:
     return measure_time
 
 
+def eligible_measure_time(now: datetime, *, period_hours: int = 1,
+                          wait_periods: int = 1) -> datetime:
+    """Choose a closed interval older than CloudKitty's wait window."""
+    return now - timedelta(hours=period_hours * (wait_periods + 1))
+
+
 def call(url, token, *, method="GET", body=None, headers=None, expected=(200, 201, 202, 204)):
     request_headers = {"Accept": "application/json", "X-Auth-Token": token, **(headers or {})}
     data = None
@@ -82,7 +88,7 @@ def seed():
     token, project_id = identity()
     resource_id = str(uuid4())
     now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
-    measure_time = now - timedelta(hours=1)
+    measure_time = eligible_measure_time(now)
     _, resource = call(os.environ["GOVERNANCE_GNOCCHI_URL"] + "/v1/resource/generic", token,
         method="POST", body={"id": resource_id, "project_id": project_id,
                              "user_id": "governance-finops-acceptance",
