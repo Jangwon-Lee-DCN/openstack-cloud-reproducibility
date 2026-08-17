@@ -29,13 +29,27 @@ def checkpoint_for_measure(measure_time: datetime) -> datetime:
     Starting one period earlier would process the preceding interval and then
     wait for the normal collection period before reaching the acceptance data.
     """
-    return measure_time
+    return measure_time.replace(minute=0, second=0, microsecond=0)
 
 
 def eligible_measure_time(now: datetime, *, period_hours: int = 1,
                           wait_periods: int = 1) -> datetime:
     """Choose a closed interval older than CloudKitty's wait window."""
-    return now - timedelta(hours=period_hours * (wait_periods + 1))
+    interval_start = now - timedelta(hours=period_hours * (wait_periods + 1))
+    # A point exactly equal to the query start is backend-sensitive. Place the
+    # measure one native low-policy granule inside the closed rating interval.
+    return interval_start + timedelta(minutes=5)
+
+
+def wait_for_metric_measures(urls: list[str], token: str, *, attempts: int = 12,
+                             delay: int = 5) -> None:
+    """Wait until Gnocchi exposes every asynchronously archived measure."""
+    for attempt in range(attempts):
+        if all(call(url, token)[1] for url in urls):
+            return
+        if attempt + 1 < attempts:
+            time.sleep(delay)
+    raise RuntimeError("Gnocchi measures did not become visible before rating reset")
 
 
 def wait_for_metric_measures(urls: list[str], token: str, *, attempts: int = 12,
