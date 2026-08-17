@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -24,6 +25,13 @@ class _Response:
 
 
 class AcceptanceTransportTests(unittest.TestCase):
+    def test_backfill_metrics_disable_revision_history_filter(self):
+        values = (Path(__file__).parents[3] / "deploy/values/site/cloudkitty.yaml").read_text()
+        for metric in ("governance.acceptance", "governance.acceptance.undefined"):
+            section = re.search(rf"^      {re.escape(metric)}:\n((?:        .*\n)+)",
+                                values, re.MULTILINE).group(1)
+            self.assertIn("use_all_resource_revisions: false", section)
+
     def test_rating_archive_policy_matches_hourly_cloudkitty_collection(self):
         self.assertEqual(acceptance.RATING_ARCHIVE_POLICY, "medium")
 
