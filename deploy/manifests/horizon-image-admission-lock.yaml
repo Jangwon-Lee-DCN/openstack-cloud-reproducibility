@@ -1,0 +1,28 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: horizon-image-lock.dcn.ssu.ac.kr
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+  validations:
+    - expression: >-
+        object.metadata.namespace != 'openstack' ||
+        object.metadata.name != 'horizon' ||
+        object.spec.template.spec.containers.exists(c,
+          c.name == 'horizon' &&
+          c.image == 'registry.dcn.ssu.ac.kr/openstack/horizon:source-imgapi-c739dd5@sha256:2c528a221617616cca2ab5d889195583ffc26d1cc545aedfd249bcea4f8d5f95')
+      message: Horizon may only run the production-approved immutable image digest.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: horizon-image-lock.dcn.ssu.ac.kr
+spec:
+  policyName: horizon-image-lock.dcn.ssu.ac.kr
+  validationActions: [Deny]
