@@ -23,12 +23,15 @@ pod="$(select_ready_pod "$namespace" app.kubernetes.io/name=governance-api api w
 
 cleanup() {
   kubectl -n "$namespace" exec "$pod" -c worker -- \
-    env GOVERNANCE_FINOPS_ACCEPTANCE=cleanup python -m governance_worker.acceptance >/dev/null 2>&1 || true
+    env GOVERNANCE_FINOPS_ACCEPTANCE=cleanup \
+      GOVERNANCE_FINOPS_STATE_JSON="${acceptance_state:-}" \
+      python -m governance_worker.acceptance >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 seed=$(kubectl -n "$namespace" exec "$pod" -c worker -- \
   env GOVERNANCE_FINOPS_ACCEPTANCE=seed python -m governance_worker.acceptance)
+acceptance_state=$seed
 project_id=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["project_id"])' "$seed")
 reset_timestamp=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["reset_timestamp"])' "$seed")
 processor=$(select_ready_pod openstack application=cloudkitty,component=processor cloudkitty-processor)
@@ -39,8 +42,9 @@ processor=$(select_ready_pod openstack application=cloudkitty,component=processo
 kubectl -n openstack exec "$processor" -c cloudkitty-processor -- python3 -c \
   'import datetime,sys; from cloudkitty import collector,service,storage; from cloudkitty.orchestrator import Worker; service.prepare_service(["finops-acceptance"], config_files=["/etc/cloudkitty/cloudkitty.conf"]); Worker(collector.get_collector(), storage.get_storage(), sys.argv[1], "finops-acceptance").do_execute_scope_processing(datetime.datetime.fromisoformat(sys.argv[2]))' \
   "$project_id" "$reset_timestamp"
-kubectl -n "$namespace" exec "$pod" -c worker -- \
+acceptance_state=$(kubectl -n "$namespace" exec "$pod" -c worker -- \
   env GOVERNANCE_FINOPS_ACCEPTANCE=setup python -m governance_worker.acceptance
+)
 # Exercise persistence across a normal Kubernetes-managed replacement. Pod
 # deletion is graceful (never forced), and the Deployment/PDB own recovery.
 previous_pod=$pod
@@ -52,6 +56,7 @@ pod="$(select_ready_pod "$namespace" app.kubernetes.io/name=governance-api api w
   exit 1
 }
 kubectl -n "$namespace" exec "$pod" -c worker -- \
-  env GOVERNANCE_FINOPS_ACCEPTANCE=verify python -m governance_worker.acceptance
+  env GOVERNANCE_FINOPS_ACCEPTANCE=verify GOVERNANCE_FINOPS_STATE_JSON="$acceptance_state" \
+    python -m governance_worker.acceptance
 cleanup
 trap - EXIT
