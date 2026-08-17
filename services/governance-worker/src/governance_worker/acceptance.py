@@ -22,6 +22,16 @@ from governance_api.store import Store
 STATE = Path("/var/lib/governance/finops-acceptance.json")
 
 
+def checkpoint_for_measure(measure_time: datetime) -> datetime:
+    """Return the start of the CloudKitty interval containing the measure.
+
+    CloudKitty collects half-open intervals beginning at its stored checkpoint.
+    Starting one period earlier would process the preceding interval and then
+    wait for the normal collection period before reaching the acceptance data.
+    """
+    return measure_time
+
+
 def call(url, token, *, method="GET", body=None, headers=None, expected=(200, 201, 202, 204)):
     request_headers = {"Accept": "application/json", "X-Auth-Token": token, **(headers or {})}
     data = None
@@ -97,7 +107,7 @@ def seed():
                 "ledger_count": 0, "ledger_cost": 0.0}
     STATE.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
     print(json.dumps({"seed": "complete", "project_id": project_id,
-                      "reset_timestamp": (measure_time - timedelta(hours=1)).isoformat()},
+                      "reset_timestamp": checkpoint_for_measure(measure_time).isoformat()},
                      sort_keys=True))
 
 
