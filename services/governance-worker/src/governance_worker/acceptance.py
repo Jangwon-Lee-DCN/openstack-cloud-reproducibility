@@ -20,6 +20,7 @@ from governance_api.store import Store
 
 
 STATE = Path("/var/lib/governance/finops-acceptance.json")
+RATING_ARCHIVE_POLICY = "medium"  # Includes CloudKitty's 3600-second granularity.
 
 
 def checkpoint_for_measure(measure_time: datetime) -> datetime:
@@ -118,8 +119,10 @@ def seed():
         method="POST", body={"id": resource_id, "project_id": project_id,
                              "user_id": "governance-finops-acceptance",
                              "metrics": {
-                                 "governance.acceptance": {"archive_policy_name": "low"},
-                                 "governance.acceptance.undefined": {"archive_policy_name": "low"}}})
+                                 "governance.acceptance": {
+                                     "archive_policy_name": RATING_ARCHIVE_POLICY},
+                                 "governance.acceptance.undefined": {
+                                     "archive_policy_name": RATING_ARCHIVE_POLICY}}})
     metric_id = resource["metrics"]["governance.acceptance"]
     undefined_metric_id = resource["metrics"]["governance.acceptance.undefined"]
     call(os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{metric_id}/measures", token,
