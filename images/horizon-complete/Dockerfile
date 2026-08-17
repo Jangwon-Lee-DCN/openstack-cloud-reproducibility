@@ -31,8 +31,10 @@ COPY track-a/dcn_core_orchestration/ /var/lib/openstack/lib/python3.12/site-pack
 COPY track-a/_2210_core_orchestration.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2210_core_orchestration.py
 COPY track-b/governance_dashboard/ /var/lib/openstack/lib/python3.12/site-packages/governance_dashboard/
 COPY track-b/governance_dashboard/enabled/_3100_governance.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3100_governance.py
+COPY track-b/governance_dashboard/enabled/_3110_governance_overview.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3110_governance_overview.py
 COPY track-c/dcn_resilience_dashboard/ /var/lib/openstack/lib/python3.12/site-packages/dcn_resilience_dashboard/
 COPY track-c/dcn_resilience_dashboard/enabled/_2030_resilience.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2030_resilience.py
+COPY track-c/dcn_resilience_dashboard/enabled/_2040_resilience_operations.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2040_resilience_operations.py
 
 RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
     && echo "5937bb7c901f59142d97afc14dd7e48b9e80ea679e9c25d214d5eb88b632716c  /tmp/designate_dashboard.whl" | sha256sum -c - \
@@ -133,8 +135,10 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
     && test -f "$local_enabled/_1930_project_s3.py" \
     && test -f "$local_enabled/_2030_resilience.py" \
+    && test -f "$local_enabled/_2040_resilience_operations.py" \
     && test -f "$local_enabled/_2210_core_orchestration.py" \
     && test -f "$local_enabled/_3100_governance.py" \
+    && test -f "$local_enabled/_3110_governance_overview.py" \
     && test -f "$local_enabled/_9999_platform_navigation.py" \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py \
