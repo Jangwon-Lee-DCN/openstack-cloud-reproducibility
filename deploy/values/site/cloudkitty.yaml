@@ -89,7 +89,7 @@ conf:
       region_name: seoul-ssu-1
     storage:
       backend: sqlalchemy
-      version: 2
+      version: 1
   processor_metrics: |
     metrics:
       governance.acceptance:
