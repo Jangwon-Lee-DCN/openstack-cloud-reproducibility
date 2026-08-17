@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from .real import application_credential_token
 from .cloudkitty import SHOWBACK_RATES
+from .cloudkitty import CloudKittyCollector
 from governance_api.telemetry import DeterministicTelemetrySource, LedgerRepository, Rate
 from governance_api.store import Store
 
@@ -105,10 +106,44 @@ def read_state() -> dict:
     return json.loads(inline) if inline else json.loads(STATE.read_text(encoding="utf-8"))
 
 
+def converge_existing_history(token: str, project_id: str, *, attempts: int = 12,
+                              delay: int = 5) -> tuple[list[str], list[str]]:
+    """Import the immutable CloudKitty history before fixing the test baseline.
+
+    A newly deployed Governance database may be empty while CloudKitty already
+    contains rated frames.  Seeding first would misclassify those historical,
+    distinct samples as acceptance deltas.  Use the normal collector/ledger
+    adapter and require two consecutive stable snapshots within a fixed bound.
+    """
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    begin = now.replace(day=1).isoformat().replace("+00:00", "Z")
+    end = (now + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+    store = Store(os.environ["GOVERNANCE_DB_PATH"])
+    collector = CloudKittyCollector(os.environ["GOVERNANCE_CLOUDKITTY_URL"], token)
+    previous = None
+    for attempt in range(attempts):
+        collector.collect(store, project_id, begin, end)
+        database = store.connection
+        ledger = sorted(row[0] for row in database.execute(
+            "SELECT sample_id FROM cost_ledger WHERE project_id=?", (project_id,)))
+        missing = sorted(row[0] for row in database.execute(
+            "SELECT r.sample_id FROM usage_raw r LEFT JOIN cost_ledger l "
+            "ON l.project_id=r.project_id AND l.sample_id=r.sample_id "
+            "WHERE r.project_id=? AND l.sample_id IS NULL", (project_id,)))
+        snapshot = (ledger, missing)
+        if snapshot == previous:
+            return ledger, missing
+        previous = snapshot
+        if attempt + 1 < attempts:
+            time.sleep(delay)
+    raise RuntimeError("CloudKitty history did not converge before acceptance seed")
+
+
 def seed():
     if STATE.exists():
         raise RuntimeError("acceptance state already exists; cleanup first")
     token, project_id = identity()
+    baseline_ledger_ids, baseline_missing_ids = converge_existing_history(token, project_id)
     resource_id = str(uuid4())
     now = datetime.now(UTC)
     _, resource = call(os.environ["GOVERNANCE_GNOCCHI_URL"] + "/v1/resource/generic", token,
@@ -138,14 +173,6 @@ def seed():
         headers={"X-Project-Id": project_id, "Idempotency-Key": f"finops-{resource_id}"},
         body={"amount": "1.000000", "period": period, "thresholds": [50, 100],
               "name": "governance-finops-acceptance"})
-    database = sqlite3.connect(os.environ["GOVERNANCE_DB_PATH"])
-    baseline_ledger_ids = [row[0] for row in database.execute(
-        "SELECT sample_id FROM cost_ledger WHERE project_id=?", (project_id,))]
-    baseline_missing_ids = [row[0] for row in database.execute(
-        "SELECT r.sample_id FROM usage_raw r LEFT JOIN cost_ledger l "
-        "ON l.project_id=r.project_id AND l.sample_id=r.sample_id "
-        "WHERE r.project_id=? AND r.meter=? AND l.sample_id IS NULL",
-        (project_id, "governance.acceptance.undefined"))]
     snapshot = {"resource_id": resource_id, "metric_id": metric_id,
                 "undefined_metric_id": undefined_metric_id,
                 "budget_id": budget["id"], "budget_revision": budget["revision"],
