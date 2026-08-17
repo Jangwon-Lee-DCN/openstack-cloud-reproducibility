@@ -1,0 +1,60 @@
+schema: dcn.glance.catalog/v1
+images:
+  - name: ubuntu-22.04-lts-20260807
+    visibility: public
+    hidden: false
+    protected: true
+    class: platform
+    workload_type: general
+    support_status: recommended
+    os_distro: ubuntu
+    os_version: "22.04"
+  - name: ubuntu-24.04-lts-20260801
+    visibility: public
+    hidden: false
+    protected: true
+    class: platform
+    workload_type: general
+    support_status: recommended
+    os_distro: ubuntu
+    os_version: "24.04"
+  - name: ubuntu-noble-kube-v1.34.10-260810-1105
+    visibility: public
+    hidden: true
+    protected: true
+    class: service
+    workload_type: capi
+    support_status: recommended
+    os_distro: ubuntu
+    os_version: "24.04"
+    kube_version: v1.34.10
+  - name: ubuntu-noble-kube-v1.35.7-260810-1105
+    visibility: public
+    hidden: true
+    protected: true
+    class: service
+    workload_type: capi
+    support_status: supported
+    os_distro: ubuntu
+    os_version: "24.04"
+    kube_version: v1.35.7
+  - name: ubuntu-noble-kube-v1.36.3-260810-1105
+    visibility: public
+    hidden: true
+    protected: true
+    class: service
+    workload_type: capi
+    support_status: supported
+    os_distro: ubuntu
+    os_version: "24.04"
+    kube_version: v1.36.3
+  - name: amphora-x64-haproxy-ubuntu-noble-2026.1-20260816
+    visibility: private
+    hidden: true
+    protected: true
+    class: service
+    workload_type: amphora
+    support_status: recommended
+    os_distro: ubuntu
+    os_version: "24.04"
+    tags: [amphora]

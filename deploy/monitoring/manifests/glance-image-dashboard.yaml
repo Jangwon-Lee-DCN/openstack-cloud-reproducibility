@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: grafana-dashboard-glance-image-lifecycle, namespace: monitoring, labels: {grafana_dashboard: "1"}}
+data:
+  glance-image-lifecycle.json: |
+    {"uid":"glance-image-lifecycle","title":"OpenStack / Glance Image Lifecycle","tags":["openstack","glance","images"],"schemaVersion":39,"refresh":"1m","time":{"from":"now-7d","to":"now"},"panels":[
+      {"id":1,"type":"stat","title":"Glance API readiness","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"max(kube_deployment_status_replicas_ready{namespace=\"openstack\",deployment=\"glance-api\"})/clamp_min(max(kube_deployment_status_replicas{namespace=\"openstack\",deployment=\"glance-api\"}),1)"}],"fieldConfig":{"defaults":{"unit":"percentunit","min":0,"max":1},"overrides":[]},"gridPos":{"x":0,"y":0,"w":6,"h":5}},
+      {"id":2,"type":"stat","title":"Catalogue audit age","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"time()-kube_cronjob_status_last_successful_time{namespace=\"openstack\",cronjob=\"glance-image-catalog-audit\"}"}],"fieldConfig":{"defaults":{"unit":"s"},"overrides":[]},"gridPos":{"x":6,"y":0,"w":6,"h":5}},
+      {"id":3,"type":"stat","title":"Image backup age","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"time()-kube_cronjob_status_last_successful_time{namespace=\"openstack\",cronjob=\"glance-image-backup\"}"}],"fieldConfig":{"defaults":{"unit":"s"},"overrides":[]},"gridPos":{"x":12,"y":0,"w":6,"h":5}},
+      {"id":4,"type":"table","title":"Current image lifecycle alerts","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"ALERTS{alertstate=\"firing\",alertname=~\"GlanceImage.*\"}","format":"table","instant":true}],"gridPos":{"x":0,"y":5,"w":24,"h":9}}
+    ]}
