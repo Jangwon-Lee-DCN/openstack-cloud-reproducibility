@@ -18,4 +18,3 @@ evidence that previously lived in separate `ISSUE.md`, `FIX.md`,
 | Octavia | [components/octavia](octavia/README.md) |
 | OVN | [components/ovn](ovn/README.md) |
 | Skyline | [components/skyline](skyline/README.md) |
-

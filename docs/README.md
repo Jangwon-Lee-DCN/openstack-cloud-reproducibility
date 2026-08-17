@@ -33,4 +33,3 @@ Historical evidence may remain in Git, but operators should start here.
 Files whose names begin with `todo-` or end in `-todo.md` are planning queues,
 not current-state operating instructions. Dated capability records are release
 evidence and do not override the runbooks above.
-
