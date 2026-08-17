@@ -86,6 +86,39 @@ if grep -q '— CAPI Kubernetes' "$images_html"; then
   echo "CAPI metadata leaked into the image display name" >&2
   exit 1
 fi
+image_id=$(python3 - "$images_html" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+rows = re.findall(r"<tr\b.*?</tr>", text, flags=re.I | re.S)
+preferred = next((row for row in rows if "ubuntu-noble-kube" in row), "")
+scope = preferred or text
+match = re.search(
+    r"<input\b(?=[^>]*\bname=[\"']object_ids[\"'])[^>]*\bvalue=[\"']([^\"']+)",
+    scope,
+    flags=re.I | re.S,
+)
+if not match:
+    raise SystemExit("images catalogue has no selectable image UUID")
+print(match.group(1))
+PY
+)
+image_json="$work_dir/image-detail.json"
+detail_status=$(curl "${curl_args[@]}" -b "$cookie" -o "$image_json" \
+  -w '%{http_code}' "$HORIZON_URL/api/glance/images/$image_id/")
+[[ "$detail_status" == 200 ]] || {
+  echo "image detail API returned HTTP $detail_status" >&2
+  exit 1
+}
+python3 - "$image_json" "$image_id" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data.get("id") == sys.argv[2], data
+assert data.get("name"), data
+properties = data.get("properties") or data
+if "kube" in data["name"]:
+    assert properties.get("kube_version"), properties
+    assert properties.get("dcn_support_status"), properties
+PY
 
 # These pages exercise Nova, Glance, Cinder, Designate, the VPC facade, and
 # Horizon's common project overview. Budgets are medians, so a rolling restart
