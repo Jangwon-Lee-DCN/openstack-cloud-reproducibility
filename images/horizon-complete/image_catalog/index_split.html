@@ -47,7 +47,9 @@
     function load(id) {
       if (!id) { body.className = 'panel-body text-muted'; body.textContent = '{% trans "Select one image in the list to inspect its main properties." %}'; return; }
       body.className = 'panel-body'; body.textContent = '{% trans "Loading image details…" %}';
-      fetch('/api/glance/images/' + encodeURIComponent(id) + '/', {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+      var webroot = window.WEBROOT || '/horizon/';
+      if (webroot.slice(-1) !== '/') webroot += '/';
+      fetch(webroot + 'api/glance/images/' + encodeURIComponent(id) + '/', {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
         .then(function (response) { if (!response.ok) throw new Error(response.status); return response.json(); })
         .then(render).catch(function () { body.innerHTML = '<div class="alert alert-danger">{% trans "Unable to load image details." %}</div>'; });
     }

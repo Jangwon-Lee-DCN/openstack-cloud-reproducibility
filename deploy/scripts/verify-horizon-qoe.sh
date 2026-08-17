@@ -61,7 +61,20 @@ status=$(curl "${curl_args[@]}" -b "$cookie" -c "$cookie" -o "$work_dir/auth-res
   --data-urlencode "domain=$domain" \
   -e "$HORIZON_URL/auth/login/")
 unset username password domain
-[[ "$status" == 302 ]] || { echo "Horizon benchmark login failed: HTTP $status" >&2; exit 1; }
+if [[ "$status" != 302 ]]; then
+  echo "Horizon benchmark login failed: HTTP $status" >&2
+  python3 - "$work_dir/auth-response" <<'PY' >&2
+import re, sys
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+messages = re.findall(r'<div[^>]+class="[^"]*alert[^"]*"[^>]*>(.*?)</div>', text, re.I | re.S)
+for message in messages:
+    clean = re.sub(r'<[^>]+>', ' ', message)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    if clean:
+        print(clean)
+PY
+  exit 1
+fi
 
 affinity=$(kubectl get service -n "$NAMESPACE" horizon-int -o jsonpath='{.spec.sessionAffinity}')
 [[ "$affinity" == ClientIP ]] || {
@@ -86,6 +99,48 @@ if grep -q '— CAPI Kubernetes' "$images_html"; then
   echo "CAPI metadata leaked into the image display name" >&2
   exit 1
 fi
+image_id=$(python3 - "$images_html" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+rows = re.findall(r"<tr\b.*?</tr>", text, flags=re.I | re.S)
+preferred = next((row for row in rows if "ubuntu-noble-kube" in row), "")
+scope = preferred or text
+match = re.search(
+    r"<input\b(?=[^>]*\bname=[\"']object_ids[\"'])[^>]*\bvalue=[\"']([^\"']+)",
+    scope,
+    flags=re.I | re.S,
+)
+if not match:
+    raise SystemExit("images catalogue has no selectable image UUID")
+print(match.group(1))
+PY
+)
+image_json="$work_dir/image-detail.json"
+detail_status=$(curl "${curl_args[@]}" -b "$cookie" -o "$image_json" \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -w '%{http_code}' "$HORIZON_URL/api/glance/images/$image_id/")
+[[ "$detail_status" == 200 ]] || {
+  echo "image detail API returned HTTP $detail_status" >&2
+  python3 - "$image_json" <<'PY' >&2
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+    print(json.dumps(data, sort_keys=True)[:1000])
+except Exception:
+    print(open(sys.argv[1], encoding="utf-8", errors="replace").read()[:1000])
+PY
+  exit 1
+}
+python3 - "$image_json" "$image_id" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data.get("id") == sys.argv[2], data
+assert data.get("name"), data
+properties = data.get("properties") or data
+if "kube" in data["name"]:
+    assert properties.get("kube_version"), properties
+    assert properties.get("dcn_support_status"), properties
+PY
 
 # These pages exercise Nova, Glance, Cinder, Designate, the VPC facade, and
 # Horizon's common project overview. Budgets are medians, so a rolling restart
