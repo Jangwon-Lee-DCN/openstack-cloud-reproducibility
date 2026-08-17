@@ -136,7 +136,7 @@ conf:
 
 bootstrap:
   enabled: true
-  ks_user: cloudkitty
+  ks_user: admin
   script: |
     set -euo pipefail
     openstack rating module enable hashmap >/dev/null

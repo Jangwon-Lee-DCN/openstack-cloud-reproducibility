@@ -95,6 +95,11 @@ class CloudKittyRateCardContract(unittest.TestCase):
         self.assertIn('"$release_status" != deployed', script)
         self.assertIn("refusing to mutate CloudKitty release", script)
 
+    def test_rate_card_bootstrap_uses_admin_but_runtime_does_not(self):
+        values = yaml.safe_load((ROOT / "deploy/values/site/cloudkitty.yaml").read_text())
+        self.assertEqual(values["bootstrap"]["ks_user"], "admin")
+        self.assertEqual(values["endpoints"]["identity"]["auth"]["cloudkitty"]["username"], "cloudkitty")
+
 
 if __name__ == "__main__":
     unittest.main()
