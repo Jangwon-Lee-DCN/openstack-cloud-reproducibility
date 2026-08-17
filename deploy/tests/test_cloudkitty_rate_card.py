@@ -83,6 +83,11 @@ class CloudKittyRateCardContract(unittest.TestCase):
         self.assertIn("job/cloudkitty-storage-init --timeout=10m", script)
         self.assertIn("kubectl logs", script)
 
+    def test_mariadb_uses_the_available_v1_sql_storage_driver(self):
+        values = yaml.safe_load((ROOT / "deploy/values/site/cloudkitty.yaml").read_text())
+        storage = values["conf"]["cloudkitty"]["storage"]
+        self.assertEqual(storage, {"backend": "sqlalchemy", "version": 1})
+
 
 if __name__ == "__main__":
     unittest.main()
