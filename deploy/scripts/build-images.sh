@@ -55,8 +55,9 @@ selected() {
 }
 
 build_context() {
-  local name=$1 context=$2 image=$3 job
-  job="source-rebuild-${name}"
+  local name=$1 context=$2 image=$3 job safe_build_id
+  safe_build_id=$(printf '%s' "$BUILD_ID" | tr -cs 'a-zA-Z0-9-' '-' | tr 'A-Z' 'a-z' | cut -c1-20)
+  job="source-rebuild-${name}-${safe_build_id}"
   local archive="$WORK_DIR/${name}.tar.gz" digest
   tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
   kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
