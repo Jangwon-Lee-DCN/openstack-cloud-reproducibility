@@ -135,7 +135,8 @@ def main():
     try:
         return reconcile(load_catalog(args.catalog), apply=args.mode == "apply")
     except (ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
-        print(f"catalogue reconciliation failed: {exc}", file=sys.stderr)
+        detail = getattr(exc, "stderr", None) or getattr(exc, "stdout", None) or str(exc)
+        print(f"catalogue reconciliation failed: {str(detail).strip()}", file=sys.stderr)
         return 1
 
 
