@@ -99,6 +99,12 @@ def require_absent(url, token, headers=None):
     raise RuntimeError("acceptance resource remains after cleanup")
 
 
+def read_state() -> dict:
+    """Read non-secret harness state from an explicit restart-safe fixture."""
+    inline = os.environ.get("GOVERNANCE_FINOPS_STATE_JSON")
+    return json.loads(inline) if inline else json.loads(STATE.read_text(encoding="utf-8"))
+
+
 def seed():
     if STATE.exists():
         raise RuntimeError("acceptance state already exists; cleanup first")
@@ -138,7 +144,7 @@ def seed():
                 "project_id": project_id, "period": period,
                 "ledger_count": 0, "ledger_cost": 0.0}
     STATE.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
-    print(json.dumps({"seed": "complete", "project_id": project_id,
+    print(json.dumps({"seed": "complete", **snapshot,
                       "reset_timestamp": checkpoint_for_measure(measure_time).isoformat()},
                      sort_keys=True))
 
@@ -192,7 +198,7 @@ def setup():
 
 
 def verify():
-    state = json.loads(STATE.read_text(encoding="utf-8"))
+    state = read_state()
     token, project_id = identity()
     _, ledger = call("http://127.0.0.1:8080/v1/usage-summary?" + urlencode({"period": state["period"]}), token,
                      headers={"X-Project-Id": project_id})
@@ -224,7 +230,7 @@ def verify():
 
 
 def cleanup():
-    state = json.loads(STATE.read_text(encoding="utf-8"))
+    state = read_state()
     token, project_id = identity()
     try:
         call(os.environ["GOVERNANCE_GNOCCHI_URL"] +
@@ -243,7 +249,7 @@ def cleanup():
                    f"/v1/resource/generic/{state['resource_id']}", token)
     require_absent("http://127.0.0.1:8080/v1/budgets/" + state["budget_id"], token,
                    {"X-Project-Id": project_id})
-    STATE.unlink()
+    STATE.unlink(missing_ok=True)
     print(json.dumps({"cleanup": "complete", "resource_remaining": 0, "budget_remaining": 0}))
 
 

@@ -81,6 +81,13 @@ class AcceptanceTransportTests(unittest.TestCase):
         self.assertIn('rollout status deployment/governance-api', script)
         self.assertNotIn("kill -9 1", script)
         self.assertNotIn("--force", script)
+        self.assertIn('GOVERNANCE_FINOPS_STATE_JSON="$acceptance_state"', script)
+
+    def test_inline_fixture_state_survives_pod_replacement(self):
+        fixture = {"resource_id": "resource", "budget_id": "budget"}
+        with patch.dict(os.environ, {
+                "GOVERNANCE_FINOPS_STATE_JSON": json.dumps(fixture)}):
+            self.assertEqual(acceptance.read_state(), fixture)
 
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")
