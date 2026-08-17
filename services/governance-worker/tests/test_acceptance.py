@@ -31,6 +31,13 @@ class AcceptanceTransportTests(unittest.TestCase):
         self.assertLessEqual(checkpoint, measure)
         self.assertLess(measure, checkpoint + timedelta(hours=1))
 
+    def test_measure_interval_is_older_than_cloudkitty_wait_window(self):
+        now = datetime(2026, 8, 17, 9, 0, tzinfo=UTC)
+        measure = acceptance.eligible_measure_time(now)
+        checkpoint = acceptance.checkpoint_for_measure(measure)
+        interval_end = checkpoint + timedelta(hours=1)
+        self.assertLessEqual(interval_end, now - timedelta(hours=1))
+
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")
     def test_call_retries_transient_transport_with_a_fixed_bound(self, urlopen, sleep):
