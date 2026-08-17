@@ -177,6 +177,14 @@ selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
 selected project-facade && simple_context project-facade
 
+build_loki_tenant_gateway() {
+  local context="$WORK_DIR/loki-tenant-gateway"
+  mkdir -p "$context"
+  cp -a "$REPO_ROOT/services/loki-tenant-gateway/." "$context/"
+  build_context loki-tenant-gateway "$context" "$REGISTRY/loki-tenant-gateway:source-$BUILD_ID"
+}
+selected loki-tenant-gateway && build_loki_tenant_gateway
+
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context
   git -C "$VPC_CONTROL_PLANE_REPO" diff --quiet && git -C "$VPC_CONTROL_PLANE_REPO" diff --cached --quiet || {
