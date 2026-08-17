@@ -58,7 +58,11 @@ assert "Public IP pool" not in vpc_launch
 assert "\"ipPoolRef\": \"public\"" in vpc_launch
 assert "label=_(\"Environment\")" not in vpc_launch
 assert "label=_(\"Cost center\")" not in vpc_launch
-for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
+for app in (
+    "cloud_telemetry_dashboard",
+    "cloud_s3_dashboard",
+    "openstack_dashboard.service_catalog",
+):
     assert app in settings.INSTALLED_APPS
 for template in (
     "project/images/index_split.html",
@@ -68,6 +72,7 @@ for template in (
     "cloud_s3_dashboard/index.html",
     "cloud_s3_dashboard/create_bucket.html",
     "cloud_s3_dashboard/credential_created.html",
+    "service_catalog/index.html",
 ):
     get_template(template)
 from django.template import Context

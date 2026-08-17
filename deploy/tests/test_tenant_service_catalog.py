@@ -20,3 +20,13 @@ class CatalogTest(unittest.TestCase):
         for service in self.catalog["services"].values():
             if service["status"] == "ga":
                 self.assertEqual("project", service["audience"])
+
+    def test_horizon_catalog_app_is_registered_for_template_discovery(self):
+        enabled = (
+            ROOT.parent
+            / "images/horizon-complete/enabled/_1380_dcn_service_catalog.py"
+        ).read_text()
+        self.assertIn(
+            'ADD_INSTALLED_APPS = ["openstack_dashboard.service_catalog"]',
+            enabled,
+        )
