@@ -1,0 +1,156 @@
+"""SQLite operation journal; safe to reopen after controller restart."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import time
+from pathlib import Path
+from typing import Any
+
+
+class Journal:
+    def __init__(self, path: str):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(path)
+        self.db.row_factory = sqlite3.Row
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA foreign_keys=ON")
+        self.db.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS operations (
+              id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL,
+              idempotency_key TEXT NOT NULL, correlation_id TEXT NOT NULL,
+              state TEXT NOT NULL, request_json TEXT NOT NULL, result_json TEXT NOT NULL DEFAULT '{}',
+              UNIQUE(project_id, kind, idempotency_key)
+            );
+            CREATE TABLE IF NOT EXISTS steps (
+              operation_id TEXT NOT NULL, ordinal INTEGER NOT NULL, name TEXT NOT NULL,
+              state TEXT NOT NULL, evidence_json TEXT NOT NULL DEFAULT '{}',
+              PRIMARY KEY(operation_id, name),
+              FOREIGN KEY(operation_id) REFERENCES operations(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS leases (
+              operation_id TEXT PRIMARY KEY, owner TEXT NOT NULL, expires_at REAL NOT NULL,
+              FOREIGN KEY(operation_id) REFERENCES operations(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS deliveries (
+              target TEXT NOT NULL, delivery_key TEXT NOT NULL, operation_id TEXT NOT NULL,
+              contract_version TEXT NOT NULL, payload_json TEXT NOT NULL,
+              state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+              next_attempt_at REAL NOT NULL DEFAULT 0, last_error TEXT,
+              response_json TEXT NOT NULL DEFAULT '{}',
+              PRIMARY KEY(target, delivery_key)
+            );
+            """
+        )
+
+    def enqueue_delivery(self, target: str, key: str, operation_id: str,
+                         contract_version: str, payload: dict[str, Any]) -> None:
+        self.db.execute(
+            "INSERT OR IGNORE INTO deliveries(target,delivery_key,operation_id,contract_version,payload_json) VALUES(?,?,?,?,?)",
+            (target, key, operation_id, contract_version, json.dumps(payload, sort_keys=True)),
+        )
+        self.db.commit()
+
+    def delivery(self, target: str, key: str) -> dict[str, Any]:
+        row = self.db.execute("SELECT * FROM deliveries WHERE target=? AND delivery_key=?", (target, key)).fetchone()
+        if row is None:
+            raise KeyError((target, key))
+        value = dict(row)
+        value["payload"] = json.loads(value.pop("payload_json"))
+        value["response"] = json.loads(value.pop("response_json"))
+        return value
+
+    def mark_delivery(self, target: str, key: str, state: str, *, error: str | None = None,
+                      response: dict[str, Any] | None = None, delay: float = 0) -> None:
+        self.db.execute(
+            "UPDATE deliveries SET state=?,attempts=attempts+1,next_attempt_at=?,last_error=?,response_json=? "
+            "WHERE target=? AND delivery_key=?",
+            (state, time.time() + delay, error, json.dumps(response or {}, sort_keys=True), target, key),
+        )
+        self.db.commit()
+
+    def delivery_evidence(self, operation_id: str) -> list[dict[str, Any]]:
+        rows = self.db.execute(
+            "SELECT target,delivery_key,state,attempts,next_attempt_at,last_error,response_json "
+            "FROM deliveries WHERE operation_id=? ORDER BY target,delivery_key", (operation_id,)
+        )
+        result = []
+        for row in rows:
+            value = dict(row); value["response"] = json.loads(value.pop("response_json")); result.append(value)
+        return result
+
+    def create(self, record: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+        try:
+            self.db.execute(
+                "INSERT INTO operations(id,project_id,kind,idempotency_key,correlation_id,state,request_json) VALUES(?,?,?,?,?,?,?)",
+                (record["id"], record["project_id"], record["kind"], record["idempotency_key"],
+                 record["correlation_id"], "requested", json.dumps(record["request"], sort_keys=True)),
+            )
+            self.db.commit()
+            return self.get(record["id"], record["project_id"]), True
+        except sqlite3.IntegrityError:
+            # Clear the failed INSERT transaction before the lookup. Leaving it
+            # open holds SQLite locks and can stall a restarted controller.
+            self.db.rollback()
+            row = self.db.execute(
+                "SELECT id FROM operations WHERE project_id=? AND kind=? AND idempotency_key=?",
+                (record["project_id"], record["kind"], record["idempotency_key"]),
+            ).fetchone()
+            return self.get(row["id"], record["project_id"]), False
+
+    def get(self, operation_id: str, project_id: str) -> dict[str, Any]:
+        row = self.db.execute(
+            "SELECT * FROM operations WHERE id=? AND project_id=?", (operation_id, project_id)
+        ).fetchone()
+        if row is None:
+            raise KeyError(operation_id)
+        result = dict(row)
+        result["request"] = json.loads(result.pop("request_json"))
+        result["result"] = json.loads(result.pop("result_json"))
+        result["steps"] = [dict(step) for step in self.db.execute(
+            "SELECT ordinal,name,state,evidence_json FROM steps WHERE operation_id=? ORDER BY ordinal", (operation_id,)
+        )]
+        for step in result["steps"]:
+            step["evidence"] = json.loads(step.pop("evidence_json"))
+        return result
+
+    def set_state(self, operation_id: str, state: str, result: dict[str, Any] | None = None) -> None:
+        self.db.execute("UPDATE operations SET state=?, result_json=? WHERE id=?",
+                        (state, json.dumps(result or {}, sort_keys=True), operation_id))
+        self.db.commit()
+
+    def step_done(self, operation_id: str, ordinal: int, name: str, evidence: dict[str, Any]) -> None:
+        self.db.execute(
+            "INSERT INTO steps VALUES(?,?,?,?,?) ON CONFLICT(operation_id,name) DO UPDATE SET state=excluded.state,evidence_json=excluded.evidence_json",
+            (operation_id, ordinal, name, "succeeded", json.dumps(evidence, sort_keys=True)),
+        )
+        self.db.commit()
+
+    def completed_steps(self, operation_id: str) -> set[str]:
+        return {row[0] for row in self.db.execute(
+            "SELECT name FROM steps WHERE operation_id=? AND state='succeeded'", (operation_id,)
+        )}
+
+    def acquire_lease(self, operation_id: str, owner: str, ttl_seconds: int = 30, now: float | None = None) -> bool:
+        current = time.time() if now is None else now
+        cursor = self.db.execute(
+            """INSERT INTO leases(operation_id,owner,expires_at) VALUES(?,?,?)
+               ON CONFLICT(operation_id) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at
+               WHERE leases.expires_at <= ? OR leases.owner = excluded.owner""",
+            (operation_id, owner, current + ttl_seconds, current),
+        )
+        self.db.commit()
+        return cursor.rowcount == 1
+
+    def renew_lease(self, operation_id: str, owner: str, ttl_seconds: int = 30, now: float | None = None) -> bool:
+        current = time.time() if now is None else now
+        cursor = self.db.execute("UPDATE leases SET expires_at=? WHERE operation_id=? AND owner=? AND expires_at>?",
+                                 (current + ttl_seconds, operation_id, owner, current))
+        self.db.commit()
+        return cursor.rowcount == 1
+
+    def release_lease(self, operation_id: str, owner: str) -> None:
+        self.db.execute("DELETE FROM leases WHERE operation_id=? AND owner=?", (operation_id, owner))
+        self.db.commit()

@@ -147,12 +147,15 @@ build_horizon_complete() {
   (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   horizon_context="$WORK_DIR/horizon-complete"
-  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings"
+  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings" "$horizon_context/service_catalog"
   cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
   cp "$REPO_ROOT/images/horizon-complete/enhance_images_ui.py" "$horizon_context/enhance_images_ui.py"
   cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
   cp "$REPO_ROOT/images/horizon-complete/region_selector.html" "$horizon_context/region_selector.html"
   cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$horizon_context/enabled/_9999_platform_navigation.py"
+  cp "$REPO_ROOT/images/horizon-complete/enabled/_1380_dcn_service_catalog.py" "$horizon_context/enabled/_1380_dcn_service_catalog.py"
+  cp -a "$REPO_ROOT/images/horizon-complete/service_catalog/." "$horizon_context/service_catalog/"
+  cp "$REPO_ROOT/deploy/config/tenant-service-catalog.yaml" "$horizon_context/tenant-service-catalog.yaml"
   cp "$REPO_ROOT/images/horizon-complete/settings/0001_production_region.py" "$horizon_context/settings/0001_production_region.py"
   cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
   cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"

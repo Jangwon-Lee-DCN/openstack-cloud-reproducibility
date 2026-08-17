@@ -1,0 +1,35 @@
+schema: dcn.ssu.ac.kr/service-catalog/v1
+region: seoul-ssu-1
+services:
+  compute:
+    status: ga
+    audience: project
+  vpc:
+    status: ga
+    audience: project
+  block-storage:
+    status: ga
+    audience: project
+  object-storage:
+    status: ga
+    audience: project
+  load-balancer:
+    status: ga
+    audience: project
+  kubernetes:
+    status: ga
+    audience: project
+  project-logs:
+    status: preview
+    audience: project
+    constraints: [project-scoped-token, filtered-logql]
+  baremetal-virtual:
+    status: preview
+    audience: admin
+    flavor: bm.virtual.preview
+    constraints: [virtual-redfish-only, no-production-sla]
+  gpu-passthrough:
+    status: preview
+    audience: admin
+    flavor: gpu.passthrough.preview
+    constraints: [no-qualified-hardware, unschedulable-until-provider-admitted]

@@ -1,5 +1,10 @@
 # Production deployment safety
 
+The workspace-wide `/home/ubuntu/AGENTS.md` is mandatory. This repository owns
+immutable artifacts, release locks, final values, patches, and reproducible
+deployment inputs. It does not own live topology or UI/API behavior. Cross-repo
+work must update the central change contract in `openstack-production-datacenter`.
+
 This worktree is the portable source used by the live three-rack production
 deployment. Read the parent repository's `AGENTS.md` and production inventory
 before applying charts.
@@ -14,4 +19,3 @@ before applying charts.
   `network.interface.tunnel=dcn-geneve` and
   `conf.auto_bridge_add.br-ex=dcn-provider`.
 - Stop rather than applying an OVN release that maps `br-ex` to `eno2`.
-

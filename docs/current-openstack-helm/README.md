@@ -7,7 +7,7 @@ foundation. It contains specifications, site inventory, version pins, Helm
 value overrides, manifests, and operational scripts.
 
 External platform dependencies are owned by the sibling
-[`deployment/prerequisites/`](../prerequisites/README.md) workspace. Its
+[`prerequisites/`](../../prerequisites/) workspace. Its
 component matrix defines which lifecycle belongs here and which does not.
 
 The PoC foundation deployment is operational. As of 2026-08-04, the following
@@ -155,7 +155,7 @@ The approved PoC network uses Neutron ML2/OVN, Geneve tenant overlays over
 `eno1`, and a flat `192.168.21.0/24` external provider network on
 `br-ex -> eno2`. The management network remains `/24`; VPC address-space scale
 does not require enlarging the host L2 domain. The inclusive external allocation
-pool is `192.168.21.100-192.168.21.200`. See `docs/02-network.md`.
+pool is `192.168.21.100-192.168.21.200`. See [`02-network.md`](02-network.md).
 
 Both controllers and every future compute are provider-connected OVN gateway
 chassis. Distributed Floating IP is enabled so FIP traffic exits locally on
@@ -170,12 +170,12 @@ on a dedicated provisioning VLAN and hardware inventory.
 
 ## Documentation Index
 
-- [Requirements](docs/00-requirements.md)
-- [Architecture](docs/01-architecture.md)
-- [Network design](docs/02-network.md)
-- [Storage design](docs/03-storage.md)
-- [HA and quorum](docs/04-ha-and-quorum.md)
-- [Deployment runbook](docs/05-deployment-runbook.md)
-- [Provider bridge runbook](docs/06-provider-bridge-runbook.md)
-- [Neutron network acceptance](docs/07-network-acceptance.md)
-- [Neutron FWaaS v2 with ML2/OVN](docs/11-neutron-fwaas-v2.md)
+- [Requirements](00-requirements.md)
+- [Architecture](01-architecture.md)
+- [Network design](02-network.md)
+- [Storage design](03-storage.md)
+- [HA and quorum](04-ha-and-quorum.md)
+- [Deployment runbook](05-deployment-runbook.md)
+- [Provider bridge runbook](06-provider-bridge-runbook.md)
+- [Neutron network acceptance](07-network-acceptance.md)
+- [Neutron FWaaS v2 with ML2/OVN](11-neutron-fwaas-v2.md)
