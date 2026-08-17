@@ -28,8 +28,10 @@ def load_catalog(path):
             raise ValueError(f"non-Ubuntu platform image is forbidden: {item['name']}")
         if item["workload_type"] == "general" and item.get("hidden"):
             raise ValueError(f"general image must be visible: {item['name']}")
-        if item["workload_type"] in ("capi", "amphora") and not item.get("hidden"):
-            raise ValueError(f"service image must be hidden: {item['name']}")
+        if item["workload_type"] == "capi" and item.get("hidden"):
+            raise ValueError(f"CAPI image must be visible: {item['name']}")
+        if item["workload_type"] == "amphora" and not item.get("hidden"):
+            raise ValueError(f"Amphora image must be hidden: {item['name']}")
     return catalog
 
 
