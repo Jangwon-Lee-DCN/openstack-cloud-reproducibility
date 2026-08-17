@@ -28,6 +28,13 @@ and the central change contract advance only for the final accepted revision.
   `network.interface.tunnel=dcn-geneve` and
   `conf.auto_bridge_add.br-ex=dcn-provider`.
 - Stop rather than applying an OVN release that maps `br-ex` to `eno2`.
+- When `dcn-image-build-queue.service` is active, every image rebuild must be
+  submitted through `/usr/local/bin/dcn-image-build`. Do not invoke
+  `deploy/scripts/build-images.sh`, create an ad-hoc Kaniko/BuildKit Job, push
+  a competing tag, call the bundled Pueue client directly, or stop the queue
+  to bypass it. Pin every source to a pushed full commit, wait for the returned
+  immutable digest, and keep deployment/promotion separate. See
+  `tools/image-build-queue/README.md`.
 
 ## Mandatory production acceptance
 

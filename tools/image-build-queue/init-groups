@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PUEUE=${PUEUE_BIN:-/usr/local/libexec/dcn-image-build-queue/pueue}
+CONFIG=${PUEUE_CONFIG_PATH:-/etc/dcn-image-build-queue/pueue.yml}
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+unset GH_TOKEN SOPS_AGE_KEY SOPS_AGE_KEY_FILE KUBECONFIG SSH_AUTH_SOCK
+
+for _ in $(seq 1 100); do
+  "$PUEUE" --config "$CONFIG" status --json >/dev/null 2>&1 && break
+  sleep 0.1
+done
+"$PUEUE" --config "$CONFIG" status --json >/dev/null
+
+for group in horizon nova neutron keystone octavia magnum platform-images; do
+  "$PUEUE" --config "$CONFIG" group --json | python3 -c \
+    'import json,sys; raise SystemExit(0 if sys.argv[1] in json.load(sys.stdin) else 1)' "$group" ||
+    "$PUEUE" --config "$CONFIG" group add --parallel 1 "$group"
+done
