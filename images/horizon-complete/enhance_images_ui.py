@@ -49,7 +49,8 @@ OLD_CATEGORIES = """def get_image_categories(im, user_tenant_id):
 
 NEW_CATEGORIES = """def is_platform_image(image):
     properties = getattr(image, 'properties', {}) or {}
-    platform_class = properties.get('dcn_image_class') == 'platform'
+    platform_class = (properties.get('dcn_image_class') == 'platform' and
+                      properties.get('dcn_workload_type', 'general') == 'general')
     platform_owners = set(getattr(settings, 'PLATFORM_IMAGE_OWNER_IDS', ()))
     return platform_class or image.owner in platform_owners
 
@@ -57,6 +58,9 @@ NEW_CATEGORIES = """def is_platform_image(image):
 def get_image_categories(im, user_tenant_id):
     # Categories are deliberately exclusive. A public image is not an
     # official platform image unless its owner/property explicitly says so.
+    properties = getattr(im, 'properties', {}) or {}
+    if properties.get('dcn_workload_type') in ('capi', 'amphora'):
+        return []
     if is_platform_image(im):
         return ['platform']
     if im.owner == user_tenant_id:
@@ -76,4 +80,3 @@ source = TABLES.read_text()
 source = replace_once(source, OLD_BUTTONS, NEW_BUTTONS, "image filter")
 source = replace_once(source, OLD_CATEGORIES, NEW_CATEGORIES, "classification")
 TABLES.write_text(source)
-

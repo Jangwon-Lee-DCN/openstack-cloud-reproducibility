@@ -2,6 +2,19 @@
 # compute nodes, so the initial RWO deployment is a single API replica.
 storage: pvc
 conf:
+  policy:
+    delete_image: "(role:member or role:admin) and project_id:%(project_id)s"
+    modify_image: "(role:member or role:admin) and project_id:%(project_id)s"
+    publicize_image: "role:admin and project_id:fe9c1a5f82f440c68baf3d9c8fb40ea2"
+    communitize_image: "role:admin and project_id:fe9c1a5f82f440c68baf3d9c8fb40ea2"
+  paste:
+    "composite:api":
+      keystone: cors http_proxy_to_wsgi versionnegotiation osprofiler authtoken context audit rootapp
+      keystone+cachemanagement: cors http_proxy_to_wsgi versionnegotiation osprofiler authtoken context cache cachemanage audit rootapp
+      keystone+caching: cors http_proxy_to_wsgi versionnegotiation osprofiler authtoken context cache audit rootapp
+    "filter:audit":
+      paste.filter_factory: keystonemiddleware.audit:filter_factory
+      audit_map_file: /etc/glance/api_audit_map.conf
   # A single uWSGI worker is occupied for the full duration of a multi-GB image
   # download. Kubernetes health checks then time out and kill that worker,
   # truncating Nova's Glance stream. Keep independent workers available for

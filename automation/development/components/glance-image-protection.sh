@@ -14,6 +14,10 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" create configmap glance-image-protection-tests \
       --from-file=glance_image_protection.py="$root/deploy/scripts/glance_image_protection.py" \
       --from-file=test_glance_image_protection.py="$root/deploy/tests/test_glance_image_protection.py" \
+      --from-file=glance_image_catalog.py="$root/deploy/scripts/glance_image_catalog.py" \
+      --from-file=test_glance_image_catalog.py="$root/deploy/tests/test_glance_image_catalog.py" \
+      --from-file=verify_image_supply_chain.py="$root/deploy/scripts/verify_image_supply_chain.py" \
+      --from-file=test_verify_image_supply_chain.py="$root/deploy/tests/test_verify_image_supply_chain.py" \
       --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl -n "$DEVELOPMENT_NAMESPACE" delete job glance-image-protection-tests \
       --ignore-not-found --wait=true >/dev/null
@@ -36,7 +40,9 @@ spec:
       containers:
         - name: tests
           image: $image
-          command: [python3, /tests/test_glance_image_protection.py, -v]
+          command: [sh, -lc]
+          args:
+            - python3 /tests/test_glance_image_protection.py -v && python3 /tests/test_glance_image_catalog.py -v && python3 /tests/test_verify_image_supply_chain.py -v
           volumeMounts: [{name: tests, mountPath: /tests, readOnly: true}]
           securityContext:
             allowPrivilegeEscalation: false
