@@ -80,6 +80,14 @@ fi
 if [[ "$mode" == apply ]]; then
   : "${DCN_SITE_ROOT:?apply requires the canonical site repository path}"
   python3 "$root/deploy/scripts/verify-cloudkitty-source-lock.py" "$root" "$DCN_SITE_ROOT" >/dev/null
+  release_status="$(helm status "$release" -n "$namespace" -o json 2>/dev/null | \
+    python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["status"])' || true)"
+  if [[ "$release_status" == pending-install ]]; then
+    helm uninstall "$release" -n "$namespace" --wait --timeout 10m
+  elif [[ -n "$release_status" && "$release_status" != deployed ]]; then
+    echo "refusing to mutate CloudKitty release in status: $release_status" >&2
+    exit 1
+  fi
   # Hook failures from an interrupted older chart may leave the same ephemeral
   # names without Helm ownership. Always reconcile this exact bounded set.
   kubectl delete job -n "$namespace" --ignore-not-found --wait=true \
