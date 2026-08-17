@@ -94,7 +94,7 @@ def parse_cloudkitty_frames(document: dict, *, expected_project_id: str) -> list
         end = period.get("end") if isinstance(period, dict) and period else frame.get("end")
         resources = frame.get("resources")
         if begin and end and isinstance(resources, list):
-            for index, row in enumerate(resources):
+            for row in resources:
                 if not isinstance(row, dict) or not row.get("service"):
                     raise FinOpsError("invalid CloudKitty v1 rated resource")
                 description = row.get("desc", {})
@@ -106,7 +106,7 @@ def parse_cloudkitty_frames(document: dict, *, expected_project_id: str) -> list
                 identity = hashlib.sha256(json.dumps(
                     description, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
                 result.append({
-                    "source_id": f"{begin}/{end}/{row['service']}/{identity}/{index}",
+                    "source_id": f"{begin}/{end}/{row['service']}/{identity}",
                     "project_id": expected_project_id,
                     "period": f"{begin}/{end}",
                     "meter": row["service"],
@@ -118,14 +118,19 @@ def parse_cloudkitty_frames(document: dict, *, expected_project_id: str) -> list
         if not begin or not end or not isinstance(usage, dict):
             raise FinOpsError("CloudKitty dataframe is missing period or usage")
         for meter, rows in sorted(usage.items()):
-            for index, row in enumerate(rows if isinstance(rows, list) else []):
+            for row in rows if isinstance(rows, list) else []:
                 volume = row.get("vol", {})
                 rating = row.get("rating", {})
                 row_project = row.get("groupby", {}).get("project_id")
                 if row_project and row_project != expected_project_id:
                     raise FinOpsError("CloudKitty returned a cross-project datapoint")
+                identity = hashlib.sha256(json.dumps({
+                    "groupby": row.get("groupby", {}),
+                    "metadata": row.get("metadata", {}),
+                    "description": row.get("desc"),
+                }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
                 result.append({
-                    "source_id": f"{begin}/{end}/{meter}/{index}",
+                    "source_id": f"{begin}/{end}/{meter}/{identity}",
                     "project_id": expected_project_id,
                     "period": f"{begin}/{end}",
                     "meter": meter,
