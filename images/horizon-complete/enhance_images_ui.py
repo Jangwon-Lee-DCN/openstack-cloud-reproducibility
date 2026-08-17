@@ -8,6 +8,10 @@ TABLES = Path(
     "/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/"
     "dashboards/project/images/images/tables.py"
 )
+VIEWS = Path(
+    "/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/"
+    "dashboards/project/images/views.py"
+)
 
 OLD_BUTTONS = """        buttons = [make_dict(_('Project'), 'project', 'fa-home')]
         for button_dict in filter_tenants():
@@ -70,21 +74,6 @@ def get_image_categories(im, user_tenant_id):
     return ['shared']
 """
 
-OLD_IMAGE_NAME = """def get_image_name(image):
-    return getattr(image, "name", None) or image.id
-"""
-
-NEW_IMAGE_NAME = """def get_image_name(image):
-    name = getattr(image, "name", None) or image.id
-    properties = getattr(image, 'properties', {}) or {}
-    if properties.get('dcn_workload_type') == 'capi':
-        version = properties.get('kube_version', 'version unspecified')
-        support = properties.get('dcn_support_status', 'supported')
-        return f"{name} — CAPI Kubernetes {version} ({support})"
-    return name
-"""
-
-
 def replace_once(source, old, new, label):
     count = source.count(old)
     if count != 1:
@@ -95,5 +84,15 @@ def replace_once(source, old, new, label):
 source = TABLES.read_text()
 source = replace_once(source, OLD_BUTTONS, NEW_BUTTONS, "image filter")
 source = replace_once(source, OLD_CATEGORIES, NEW_CATEGORIES, "classification")
-source = replace_once(source, OLD_IMAGE_NAME, NEW_IMAGE_NAME, "image display name")
 TABLES.write_text(source)
+
+views = VIEWS.read_text()
+views = replace_once(
+    views,
+    "class IndexView(tables.DataTableView):\n    table_class = images_tables.ImagesTable\n",
+    "class IndexView(tables.DataTableView):\n"
+    "    table_class = images_tables.ImagesTable\n"
+    "    template_name = 'project/images/index_split.html'\n",
+    "image index template",
+)
+VIEWS.write_text(views)
