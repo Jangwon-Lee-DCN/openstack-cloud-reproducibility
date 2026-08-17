@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import redirect_stdout
+from io import StringIO
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -20,11 +22,16 @@ def request(path, body=None):
 
 def main():
     store = Store(os.environ["GOVERNANCE_DB_PATH"])
-    integrations = initialize_real_integrations()
+    # Provider discovery writes a diagnostic JSON line for operators. Keep the
+    # acceptance contract itself machine-readable as exactly one JSON object.
+    with redirect_stdout(StringIO()):
+        integrations = initialize_real_integrations()
     scheduler = RealScheduler(store, notification_bus(store, integrations.event_bus))
     project_id = os.environ["GOVERNANCE_KEYSTONE_PROJECT_ID"]
     subscription_id = "notification-acceptance-subscription"
-    event_ids = ["notification-acceptance-retry", "notification-acceptance-dead"]
+    run_id = uuid4().hex
+    event_ids = [f"notification-acceptance-retry-{run_id}",
+                 f"notification-acceptance-dead-{run_id}"]
     now = "2000-01-01T00:00:00Z"
     subscription = {"id": subscription_id, "event_types": ["notification.acceptance"],
                     "channels": [{"type": "webhook", "url": "http://127.0.0.1:8081/events"},
