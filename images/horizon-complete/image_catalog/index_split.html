@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Images" %}{% endblock %}
+{% block main %}
+  {{ table.render }}
+  <section id="image-inspector" class="panel panel-default" style="margin-top:16px;min-height:210px">
+    <div class="panel-heading"><h3 class="panel-title">{% trans "Image details" %}</h3></div>
+    <div id="image-inspector-body" class="panel-body text-muted">
+      {% trans "Select one image in the list to inspect its main properties." %}
+    </div>
+  </section>
+  <script>
+  (function () {
+    var body = document.getElementById('image-inspector-body');
+    if (!body) return;
+    function text(value) { return value === undefined || value === null || value === '' ? '—' : String(value); }
+    function cell(label, value) {
+      var row = document.createElement('tr'), key = document.createElement('th'), val = document.createElement('td');
+      key.textContent = label; val.textContent = text(value); row.appendChild(key); row.appendChild(val); return row;
+    }
+    function selected() {
+      var boxes = document.querySelectorAll('#images input[type=checkbox]:checked, table#images input[type=checkbox]:checked');
+      for (var i = 0; i < boxes.length; i++) if (boxes[i].value && boxes[i].value !== 'on') return boxes[i].value;
+      return '';
+    }
+    function render(image) {
+      var properties = image.properties || image, tags = image.tags || properties.tags || [];
+      body.innerHTML = '';
+      var tagsBox = document.createElement('p');
+      (Array.isArray(tags) ? tags : []).forEach(function (tag) {
+        var badge = document.createElement('span'); badge.className = 'label label-info';
+        badge.style.marginRight = '6px'; badge.textContent = tag; tagsBox.appendChild(badge);
+      });
+      if (!tagsBox.childNodes.length) tagsBox.textContent = '{% trans "No tags" %}';
+      body.appendChild(tagsBox);
+      var table = document.createElement('table'); table.className = 'table table-condensed';
+      table.appendChild(cell('{% trans "Name" %}', image.name));
+      table.appendChild(cell('{% trans "Purpose" %}', properties.dcn_workload_type));
+      table.appendChild(cell('{% trans "Kubernetes version" %}', properties.kube_version));
+      table.appendChild(cell('{% trans "Support status" %}', properties.dcn_support_status));
+      table.appendChild(cell('{% trans "Operating system" %}', [properties.os_distro, properties.os_version].filter(Boolean).join(' ')));
+      table.appendChild(cell('{% trans "Visibility" %}', image.visibility));
+      table.appendChild(cell('{% trans "Protected" %}', image.protected));
+      table.appendChild(cell('SHA-512', properties.os_hash_value || image.os_hash_value));
+      body.appendChild(table);
+    }
+    function load(id) {
+      if (!id) { body.className = 'panel-body text-muted'; body.textContent = '{% trans "Select one image in the list to inspect its main properties." %}'; return; }
+      body.className = 'panel-body'; body.textContent = '{% trans "Loading image details…" %}';
+      fetch('/api/glance/images/' + encodeURIComponent(id) + '/', {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(function (response) { if (!response.ok) throw new Error(response.status); return response.json(); })
+        .then(render).catch(function () { body.innerHTML = '<div class="alert alert-danger">{% trans "Unable to load image details." %}</div>'; });
+    }
+    document.addEventListener('change', function (event) {
+      if (!event.target.matches('#images input[type=checkbox], table#images input[type=checkbox]')) return;
+      if (event.target.checked) document.querySelectorAll('#images input[type=checkbox]:checked, table#images input[type=checkbox]:checked').forEach(function (box) { if (box !== event.target && box.value !== 'on') box.checked = false; });
+      load(selected());
+    });
+  }());
+  </script>
+{% endblock %}

@@ -11,7 +11,7 @@ image=quay.io/airshipit/openstack-client@sha256:8a402a50ecf2afe14f580ad2bae17433
 
 case "$operation" in
   deploy)
-    grep -q 'CAPI Kubernetes' "$root/images/horizon-complete/enhance_images_ui.py"
+    grep -q 'image-inspector-body' "$root/images/horizon-complete/image_catalog/index_split.html"
     bash -n "$root/deploy/scripts/verify-glance-image-rbac.sh"
     bash -n "$root/deploy/scripts/reconcile-glance-image-freshness.sh"
     bash -n "$root/deploy/scripts/drill-glance-image-restore.sh"
