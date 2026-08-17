@@ -45,20 +45,23 @@ def main():
         request("/control/fail-next", {"count": 2})
         for _ in range(3):
             scheduler.run_once()
-            store.connection.execute("UPDATE outbox SET available_at=? WHERE id=?", (now, event_ids[0]))
+            with store.transaction() as db:
+                db.execute("UPDATE outbox SET available_at=? WHERE id=?", (now, event_ids[0]))
         retry = store.connection.execute("SELECT status,attempts FROM outbox WHERE id=?", (event_ids[0],)).fetchone()
         if tuple(retry) != ("delivered", 2):
             raise RuntimeError(f"retry acceptance failed: {tuple(retry)}")
         payload = {"event_id": event_ids[1], "event_type": "notification.acceptance",
                    "project_id": project_id, "payload": {"safe": "acceptance"}}
-        store.connection.execute(
-            "INSERT INTO outbox(id,project_id,event_type,dedup_key,payload,status,attempts,available_at,created_at) VALUES(?,?,?,?,?,'pending',0,?,?)",
-            (event_ids[1], project_id, "notification.acceptance", event_ids[1],
-             store.encode(payload), now, now))
+        with store.transaction() as db:
+            db.execute(
+                "INSERT INTO outbox(id,project_id,event_type,dedup_key,payload,status,attempts,available_at,created_at) VALUES(?,?,?,?,?,'pending',0,?,?)",
+                (event_ids[1], project_id, "notification.acceptance", event_ids[1],
+                 store.encode(payload), now, now))
         request("/control/fail-next", {"count": 10})
         for _ in range(5):
             scheduler.run_once()
-            store.connection.execute("UPDATE outbox SET available_at=? WHERE id=?", (now, event_ids[1]))
+            with store.transaction() as db:
+                db.execute("UPDATE outbox SET available_at=? WHERE id=?", (now, event_ids[1]))
         dead = store.connection.execute("SELECT status,attempts FROM outbox WHERE id=?", (event_ids[1],)).fetchone()
         if tuple(dead) != ("dead", 5):
             raise RuntimeError(f"DLQ acceptance failed: {tuple(dead)}")
