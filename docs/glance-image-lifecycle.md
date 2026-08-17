@@ -10,6 +10,8 @@ read-only drift audit.
 - Supported Ubuntu general-purpose and CAPI images appear in Horizon.
 - CAPI images remain public, visible and protected so project users can build
   their own CAPI clusters.
+- Horizon labels CAPI entries with their Kubernetes version and support status
+  under `Platform Images`, while ordinary Ubuntu VM images keep their base name.
 - The Amphora image remains private, hidden and owned by the service project.
 - All managed images carry class, workload type, support status and OS version.
 
@@ -23,6 +25,11 @@ New images use `deploy/scripts/import-verified-glance-image.sh`. It requires
 HTTPS, pinned SHA-256, a valid QCOW2 check, a non-empty CycloneDX SBOM and zero
 critical vulnerability findings. Images start private and protected.
 
+`glance-image-freshness-audit` runs every Monday and fails when a managed image
+is older than 45 days or lacks its pinned source SHA-256. A failed audit starts
+the verified import, Nova/CAPI/Octavia acceptance and explicit catalogue
+promotion workflow; it never replaces a protected production image in place.
+
 Before publication, `deploy/scripts/smoke-test-glance-image.sh` must observe an
 ACTIVE Nova server and a cloud-init console marker. CAPI images additionally
 require the existing Magnum/CAPO cluster create-delete acceptance, and Amphora
@@ -35,8 +42,10 @@ seven generations. The hourly audit detects missing images, metadata drift,
 missing tags and duplicate checksums. Prometheus alerts and the
 `OpenStack / Glance Image Lifecycle` dashboard report failures and staleness.
 
-A recovery drill restores a snapshot into a new PVC and compares every active
-image UUID, size and checksum before cutover. Never restore over the live PVC.
+`deploy/scripts/drill-glance-image-restore.sh` restores the latest snapshot into
+a temporary PVC, mounts it read-only and compares every active image UUID and
+SHA-512 before deleting only the temporary volume. It never mounts or replaces
+the live PVC.
 
 ## Known infrastructure gate
 
