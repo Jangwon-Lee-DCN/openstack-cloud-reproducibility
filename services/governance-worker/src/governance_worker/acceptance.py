@@ -118,6 +118,7 @@ def seed():
     _, resource = call(os.environ["GOVERNANCE_GNOCCHI_URL"] + "/v1/resource/generic", token,
         method="POST", body={"id": resource_id, "project_id": project_id,
                              "user_id": "governance-finops-acceptance",
+                             "started_at": checkpoint_for_measure(measure_time).isoformat(),
                              "metrics": {
                                  "governance.acceptance": {
                                      "archive_policy_name": RATING_ARCHIVE_POLICY},

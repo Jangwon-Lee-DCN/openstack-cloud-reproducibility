@@ -60,6 +60,13 @@ class AcceptanceTransportTests(unittest.TestCase):
         self.assertEqual(measure, datetime(2026, 8, 17, 7, 5, tzinfo=UTC))
         self.assertLessEqual(interval_end, now - timedelta(hours=1))
 
+    def test_backfilled_resource_revision_starts_at_rating_checkpoint(self):
+        measure = datetime(2026, 8, 17, 7, 5, tzinfo=UTC)
+        resource_started_at = acceptance.checkpoint_for_measure(measure)
+        self.assertEqual(resource_started_at,
+                         datetime(2026, 8, 17, 7, 0, tzinfo=UTC))
+        self.assertLessEqual(resource_started_at, measure)
+
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")
     def test_call_retries_transient_transport_with_a_fixed_bound(self, urlopen, sleep):
