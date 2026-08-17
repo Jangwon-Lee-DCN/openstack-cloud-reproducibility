@@ -88,6 +88,13 @@ class CloudKittyRateCardContract(unittest.TestCase):
         storage = values["conf"]["cloudkitty"]["storage"]
         self.assertEqual(storage, {"backend": "sqlalchemy", "version": 1})
 
+    def test_apply_recovers_only_pending_install_and_rejects_other_states(self):
+        script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
+        self.assertIn('"$release_status" == pending-install', script)
+        self.assertIn('helm uninstall "$release"', script)
+        self.assertIn('"$release_status" != deployed', script)
+        self.assertIn("refusing to mutate CloudKitty release", script)
+
 
 if __name__ == "__main__":
     unittest.main()
