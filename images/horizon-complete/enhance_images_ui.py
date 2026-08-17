@@ -70,6 +70,20 @@ def get_image_categories(im, user_tenant_id):
     return ['shared']
 """
 
+OLD_IMAGE_NAME = """def get_image_name(image):
+    return getattr(image, "name", None) or image.id
+"""
+
+NEW_IMAGE_NAME = """def get_image_name(image):
+    name = getattr(image, "name", None) or image.id
+    properties = getattr(image, 'properties', {}) or {}
+    if properties.get('dcn_workload_type') == 'capi':
+        version = properties.get('kube_version', 'version unspecified')
+        support = properties.get('dcn_support_status', 'supported')
+        return f"{name} — CAPI Kubernetes {version} ({support})"
+    return name
+"""
+
 
 def replace_once(source, old, new, label):
     count = source.count(old)
@@ -81,4 +95,5 @@ def replace_once(source, old, new, label):
 source = TABLES.read_text()
 source = replace_once(source, OLD_BUTTONS, NEW_BUTTONS, "image filter")
 source = replace_once(source, OLD_CATEGORIES, NEW_CATEGORIES, "classification")
+source = replace_once(source, OLD_IMAGE_NAME, NEW_IMAGE_NAME, "image display name")
 TABLES.write_text(source)

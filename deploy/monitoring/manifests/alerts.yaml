@@ -298,3 +298,11 @@ spec:
             summary: Glance image data snapshot is stale
             description: The retained PowerStore snapshot has not completed successfully in 36 hours.
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/docs/glance-image-lifecycle.md
+        - alert: GlanceImageFreshnessAuditFailed
+          expr: kube_job_status_failed{namespace="openstack",job_name=~"glance-image-freshness-audit-.*"} > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: A managed Glance image requires verified refresh
+            description: The weekly audit found an image older than 45 days or without a pinned source SHA-256.
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/docs/glance-image-lifecycle.md
