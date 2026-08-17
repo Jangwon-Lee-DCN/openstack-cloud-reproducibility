@@ -27,6 +27,12 @@ COPY region_selector.html /var/lib/openstack/lib/python3.12/site-packages/horizo
 COPY service_catalog/ /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/service_catalog/
 COPY enabled/_1380_dcn_service_catalog.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1380_dcn_service_catalog.py
 COPY tenant-service-catalog.yaml /etc/openstack-dashboard/dcn-service-catalog.yaml
+COPY track-a/dcn_core_orchestration/ /var/lib/openstack/lib/python3.12/site-packages/dcn_core_orchestration/
+COPY track-a/_2210_core_orchestration.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2210_core_orchestration.py
+COPY track-b/governance_dashboard/ /var/lib/openstack/lib/python3.12/site-packages/governance_dashboard/
+COPY track-b/governance_dashboard/enabled/_3100_governance.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3100_governance.py
+COPY track-c/dcn_resilience_dashboard/ /var/lib/openstack/lib/python3.12/site-packages/dcn_resilience_dashboard/
+COPY track-c/dcn_resilience_dashboard/enabled/_2030_resilience.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2030_resilience.py
 
 RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
     && echo "5937bb7c901f59142d97afc14dd7e48b9e80ea679e9c25d214d5eb88b632716c  /tmp/designate_dashboard.whl" | sha256sum -c - \
@@ -113,7 +119,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && sed -i "s/region_name = request.COOKIES.get('services_region')/region_name = getattr(request.user, 'services_region', None) or request.COOKIES.get('services_region')/" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && sed -i "/region_name = getattr(request.user, 'services_region'/a\\    if region_name in ('RegionOne', 'RegionOne-VM'):\\n        region_name = None" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && grep -q "getattr(request.user, 'services_region'" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
-    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, cloud_telemetry_dashboard, cloud_s3_dashboard" \
+    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, cloud_telemetry_dashboard, cloud_s3_dashboard, dcn_core_orchestration, governance_dashboard, dcn_resilience_dashboard" \
     && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard \
     && test -f "$local_enabled/_1395_compute_network_interfaces.py" \
     && test -f "$local_enabled/_1380_dcn_service_catalog.py" \
@@ -126,6 +132,9 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_1620_project_alarms.py" \
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
     && test -f "$local_enabled/_1930_project_s3.py" \
+    && test -f "$local_enabled/_2030_resilience.py" \
+    && test -f "$local_enabled/_2210_core_orchestration.py" \
+    && test -f "$local_enabled/_3100_governance.py" \
     && test -f "$local_enabled/_9999_platform_navigation.py" \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py \
