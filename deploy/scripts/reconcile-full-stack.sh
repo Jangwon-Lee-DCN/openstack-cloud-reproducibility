@@ -185,7 +185,9 @@ trap cleanup EXIT
 
 validate_admin_passwords
 
-"$REPO_ROOT/deploy/scripts/install-local-path-storage.sh"
+if [[ -z "$ONLY_RELEASE" ]]; then
+  "$REPO_ROOT/deploy/scripts/install-local-path-storage.sh"
+fi
 
 if [[ "$BUILD_IMAGES" == "1" ]]; then
   "$REPO_ROOT/deploy/scripts/build-images.sh"
