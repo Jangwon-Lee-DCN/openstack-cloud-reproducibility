@@ -24,6 +24,24 @@ class _Response:
 
 
 class AcceptanceTransportTests(unittest.TestCase):
+    @patch.object(acceptance.time, "sleep")
+    @patch.object(acceptance, "call")
+    def test_metric_visibility_is_bounded_before_rating_reset(self, call, sleep):
+        call.side_effect = [(200, [["measure"]]), (200, []),
+                            (200, [["measure"]]), (200, [["measure"]])]
+        acceptance.wait_for_metric_measures(["metric-a", "metric-b"], "token",
+                                            attempts=3, delay=5)
+        self.assertEqual(call.call_count, 4)
+        sleep.assert_called_once_with(5)
+
+    @patch.object(acceptance.time, "sleep")
+    @patch.object(acceptance, "call", return_value=(200, []))
+    def test_metric_visibility_fails_after_bound(self, call, sleep):
+        with self.assertRaisesRegex(RuntimeError, "did not become visible"):
+            acceptance.wait_for_metric_measures(["metric"], "token", attempts=3, delay=5)
+        self.assertEqual(call.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
     def test_checkpoint_starts_the_half_open_interval_containing_measure(self):
         measure = datetime(2026, 8, 17, 7, 0, tzinfo=UTC)
         checkpoint = acceptance.checkpoint_for_measure(measure)
