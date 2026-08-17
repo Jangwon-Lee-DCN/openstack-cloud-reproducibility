@@ -10,16 +10,18 @@ from governance_api.providers import ProviderError
 from .real import initialize_real_integrations
 from .cloudkitty import CloudKittyCollector
 from .delivery import NotificationEventBus, SmtpSender, WebhookSender
+from .audit_loki import LokiAuditExporter
 from .finops import Budget, BudgetReconciler, SQLiteBudgetEvents
 from decimal import Decimal
 
 
 class RealScheduler:
-    def __init__(self, store: Store, event_bus, *, owner="governance-worker", finops=None):
+    def __init__(self, store: Store, event_bus, *, owner="governance-worker", finops=None, audit=None):
         self.outbox = OutboxRepository(store)
         self.event_bus = event_bus
         self.owner = owner
         self.finops = finops
+        self.audit = audit
 
     def run_once(self) -> dict:
         claimed = self.outbox.claim(self.owner, limit=100, lease_seconds=30)
@@ -58,6 +60,7 @@ class RealScheduler:
                 evaluator.evaluate(Budget(row[0], row[1], row[2], budget_period,
                                           Decimal(str(body["amount"])),
                                           tuple(body.get("thresholds", [50, 80, 90, 100]))), spend)
+        result["audit_exported"] = self.audit.export(self.outbox.store) if self.audit else 0
         return result
 
 
@@ -86,7 +89,8 @@ def main():
     store = Store(os.getenv("GOVERNANCE_DB_PATH", "/var/lib/governance/governance.db"))
     collector = CloudKittyCollector(os.environ["GOVERNANCE_CLOUDKITTY_URL"], integrations.token)
     event_bus = notification_bus(store, integrations.event_bus)
-    scheduler = RealScheduler(store, event_bus, finops=collector)
+    audit = LokiAuditExporter(os.environ["GOVERNANCE_LOKI_URL"]) if os.getenv("GOVERNANCE_LOKI_URL") else None
+    scheduler = RealScheduler(store, event_bus, finops=collector, audit=audit)
     if os.getenv("GOVERNANCE_RUN_ONCE") == "1":
         scheduler.run_once()
         return
