@@ -143,6 +143,11 @@ conf:
         # touching any of these four settings; each one only exercises
         # one of the two paths, and both must be checked independently.
         raw:
+          # English is the platform default for new sessions. Asia/Seoul is
+          # UTC+9 year-round and is Django's canonical South Korea zone name.
+          # A user's saved Horizon preference may still override these defaults.
+          LANGUAGE_CODE: en
+          TIME_ZONE: Asia/Seoul
           FORCE_SCRIPT_NAME: /horizon
           WEBROOT: /horizon/
           # Horizon replicas share the Django cache. Caching this fragment
