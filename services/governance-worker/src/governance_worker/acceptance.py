@@ -101,16 +101,27 @@ def setup():
     cloudkitty_total = 0
     ledger = {}
     while time.monotonic() < deadline:
+        # Refresh the scoped token each poll. Development acceptance includes
+        # a processor rollout and must tolerate a transient Keystone/service
+        # route convergence without treating an old validation failure as a
+        # permanent credential failure.
+        token, project_id = identity()
         query = urlencode({"tenant_id": project_id, "begin": begin, "end": end})
         try:
             _, frames = call(os.environ["GOVERNANCE_CLOUDKITTY_URL"] +
                              f"/v1/storage/dataframes?{query}", token)
             cloudkitty_total = len(frames.get("dataframes", []))
         except HTTPError as exc:
-            if exc.code not in (404,):
+            if exc.code not in (401, 404):
                 raise
-        _, ledger = call("http://127.0.0.1:8080/v1/usage-summary?" + urlencode({"period": period}), token,
-                         headers={"X-Project-Id": project_id})
+        try:
+            _, ledger = call("http://127.0.0.1:8080/v1/usage-summary?" +
+                             urlencode({"period": period}), token,
+                             headers={"X-Project-Id": project_id})
+        except HTTPError as exc:
+            if exc.code != 401:
+                raise
+            ledger = {}
         if cloudkitty_total and ledger.get("items"):
             break
         time.sleep(10)
