@@ -1,5 +1,16 @@
-# Three-rack production OVN topology. Three Raft members are used for each
-# database and are spread across the available Compute nodes.
+# Three-rack production OVN topology. Central NB/SB Raft and northd run only
+# on the dedicated OpenStack control workload pool. Per-host ovn-controller
+# remains on Compute/gateway nodes through the upstream openvswitch selector.
+labels:
+  ovn_ovsdb_nb:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
+  ovn_ovsdb_sb:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
+  ovn_northd:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
 volume:
   ovn_ovsdb_nb:
     enabled: true
