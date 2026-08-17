@@ -20,7 +20,7 @@ images:
     os_version: "24.04"
   - name: ubuntu-noble-kube-v1.34.10-260810-1105
     visibility: public
-    hidden: true
+    hidden: false
     protected: true
     class: service
     workload_type: capi
@@ -30,7 +30,7 @@ images:
     kube_version: v1.34.10
   - name: ubuntu-noble-kube-v1.35.7-260810-1105
     visibility: public
-    hidden: true
+    hidden: false
     protected: true
     class: service
     workload_type: capi
@@ -40,7 +40,7 @@ images:
     kube_version: v1.35.7
   - name: ubuntu-noble-kube-v1.36.3-260810-1105
     visibility: public
-    hidden: true
+    hidden: false
     protected: true
     class: service
     workload_type: capi

@@ -7,9 +7,9 @@ read-only drift audit.
 
 ## User catalogue
 
-- Only supported Ubuntu general-purpose images appear in Horizon.
-- CAPI images remain public and bootable by ID but are hidden from the general
-  VM image catalogue.
+- Supported Ubuntu general-purpose and CAPI images appear in Horizon.
+- CAPI images remain public, visible and protected so project users can build
+  their own CAPI clusters.
 - The Amphora image remains private, hidden and owned by the service project.
 - All managed images carry class, workload type, support status and OS version.
 
