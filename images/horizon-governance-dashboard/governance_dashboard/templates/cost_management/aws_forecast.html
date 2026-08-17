@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{% trans "AWS Cost Forecast" %}{% endblock %}
+{% block main %}
+<div class="page-header"><h1>{% trans "AWS Cost Forecast" %}</h1></div>
+<form method="get" class="form-inline panel panel-default"><div class="panel-body">
+<label>{% trans "Period" %} <input class="form-control" name="period" required pattern="[0-9]{4}-[0-9]{2}" value="{{ request.GET.period }}"></label>
+<label>{% trans "Price profile" %} <select class="form-control" name="price_profile_id" required><option value="">—</option>{% for item in price_profiles %}<option value="{{ item.id }}">{{ item.version }} / {{ item.region }}</option>{% endfor %}</select></label>
+<label>{% trans "Calibration" %} <select class="form-control" name="calibration_profile_id"><option value="">{% trans "None" %}</option>{% for item in calibration_profiles %}<option value="{{ item.id }}">{{ item.version }}</option>{% endfor %}</select></label>
+<label>{% trans "Budget" %} <select class="form-control" name="budget_id"><option value="">{% trans "None" %}</option>{% for item in budgets %}<option value="{{ item.id }}">{{ item.name|default:item.id }}</option>{% endfor %}</select></label>
+<label>{% trans "Month elapsed" %} <input class="form-control" type="number" min="0.01" max="1" step="0.01" name="elapsed_fraction" value="{{ request.GET.elapsed_fraction|default:'1' }}"></label>
+<button class="btn btn-primary" type="submit">{% trans "Forecast" %}</button></div></form>
+{% if forecast %}<section class="panel panel-info"><div class="panel-heading"><h2 class="panel-title">{{ forecast.region }} / {{ forecast.currency }}</h2></div><div class="panel-body">
+<p><strong>{% trans "Month-end estimate" %}: {{ forecast.estimate }}</strong></p><p>{% trans "Expected range" %}: {{ forecast.lower }} – {{ forecast.upper }} · {% trans "Confidence" %}: {{ forecast.confidence_percent }}%</p>
+{% if forecast.budget %}<p>{% trans "Budget utilization" %}: {{ forecast.budget.forecast_percent }}%{% if forecast.budget.exceeded %} · <span class="text-danger">{% trans "Forecast exceeds budget" %}</span>{% endif %}</p>{% endif %}
+<table class="table"><thead><tr><th>{% trans "Meter" %}</th><th>AWS SKU</th><th>{% trans "Projected quantity" %}</th><th>{% trans "Cost" %}</th></tr></thead><tbody>{% for line in forecast.lines %}<tr><td>{{ line.meter }}</td><td>{{ line.sku }}</td><td>{{ line.projected_quantity }} {{ line.unit }}</td><td>{{ line.cost }}</td></tr>{% endfor %}</tbody></table>
+</div></section>{% endif %}
+{% endblock %}
