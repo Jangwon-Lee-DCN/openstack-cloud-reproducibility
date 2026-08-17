@@ -25,12 +25,12 @@ class _Response:
 
 
 class AcceptanceTransportTests(unittest.TestCase):
-    def test_backfill_metrics_disable_revision_history_filter(self):
+    def test_processor_metrics_do_not_contain_schema_invalid_revision_key(self):
         values = (Path(__file__).parents[3] / "deploy/values/site/cloudkitty.yaml").read_text()
         for metric in ("governance.acceptance", "governance.acceptance.undefined"):
             section = re.search(rf"^      {re.escape(metric)}:\n((?:        .*\n)+)",
                                 values, re.MULTILINE).group(1)
-            self.assertIn("use_all_resource_revisions: false", section)
+            self.assertNotIn("use_all_resource_revisions", section)
 
     def test_rating_archive_policy_matches_hourly_cloudkitty_collection(self):
         self.assertEqual(acceptance.RATING_ARCHIVE_POLICY, "medium")
@@ -60,20 +60,19 @@ class AcceptanceTransportTests(unittest.TestCase):
         self.assertLessEqual(checkpoint, measure)
         self.assertLess(measure, checkpoint + timedelta(hours=1))
 
-    def test_measure_interval_is_older_than_cloudkitty_wait_window(self):
-        now = datetime(2026, 8, 17, 9, 0, tzinfo=UTC)
+    def test_measure_is_in_current_resource_revision(self):
+        now = datetime(2026, 8, 17, 9, 12, 30, tzinfo=UTC)
         measure = acceptance.eligible_measure_time(now)
         checkpoint = acceptance.checkpoint_for_measure(measure)
-        interval_end = checkpoint + timedelta(hours=1)
-        self.assertEqual(measure, datetime(2026, 8, 17, 7, 5, tzinfo=UTC))
-        self.assertLessEqual(interval_end, now - timedelta(hours=1))
+        self.assertEqual(measure, now)
+        self.assertLessEqual(checkpoint, measure)
+        self.assertLess(measure, checkpoint + timedelta(hours=1))
 
-    def test_backfilled_resource_revision_starts_at_rating_checkpoint(self):
-        measure = datetime(2026, 8, 17, 7, 5, tzinfo=UTC)
-        resource_started_at = acceptance.checkpoint_for_measure(measure)
-        self.assertEqual(resource_started_at,
-                         datetime(2026, 8, 17, 7, 0, tzinfo=UTC))
-        self.assertLessEqual(resource_started_at, measure)
+    def test_acceptance_uses_official_worker_without_scheduler_restart(self):
+        script = (Path(__file__).parents[3] /
+                  "deploy/tests/cloudkitty-finops-acceptance.sh").read_text()
+        self.assertIn("Worker(collector.get_collector(), storage.get_storage()", script)
+        self.assertNotIn("rollout restart deployment/cloudkitty-processor", script)
 
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")

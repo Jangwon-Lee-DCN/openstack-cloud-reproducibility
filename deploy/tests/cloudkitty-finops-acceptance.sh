@@ -32,15 +32,13 @@ seed=$(kubectl -n "$namespace" exec "$pod" -c worker -- \
 project_id=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["project_id"])' "$seed")
 reset_timestamp=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["reset_timestamp"])' "$seed")
 processor=$(select_ready_pod openstack application=cloudkitty,component=processor cloudkitty-processor)
-[[ -n "$processor" ]] || { echo 'no Ready CloudKitty processor for acceptance reset' >&2; exit 1; }
+[[ -n "$processor" ]] || { echo 'no Ready CloudKitty processor for acceptance processing' >&2; exit 1; }
+# Acceptance-only synchronous processing uses CloudKitty's official Worker
+# against the real configured collector, rater and storage. It deliberately
+# does not reset/restart/reconfigure the production scheduler.
 kubectl -n openstack exec "$processor" -c cloudkitty-processor -- python3 -c \
-  'import datetime,sys; from cloudkitty import service; service.prepare_service(["finops-acceptance"], config_files=["/etc/cloudkitty/cloudkitty.conf"]); from cloudkitty.storage_state import StateManager; StateManager().set_last_processed_timestamp(sys.argv[1], datetime.datetime.fromisoformat(sys.argv[2]))' \
+  'import datetime,sys; from cloudkitty import collector,service,storage; from cloudkitty.orchestrator import Worker; service.prepare_service(["finops-acceptance"], config_files=["/etc/cloudkitty/cloudkitty.conf"]); Worker(collector.get_collector(), storage.get_storage(), sys.argv[1], "finops-acceptance").do_execute_scope_processing(datetime.datetime.fromisoformat(sys.argv[2]))' \
   "$project_id" "$reset_timestamp"
-# Processor scope discovery sleeps for the configured collection period. A
-# rollout after the supported state reset makes the dedicated acceptance scope
-# discoverable immediately without shortening production rating periods.
-kubectl -n openstack rollout restart deployment/cloudkitty-processor >/dev/null
-kubectl -n openstack rollout status deployment/cloudkitty-processor --timeout=5m
 kubectl -n "$namespace" exec "$pod" -c worker -- \
   env GOVERNANCE_FINOPS_ACCEPTANCE=setup python -m governance_worker.acceptance
 before="$(kubectl -n "$namespace" get pod "$pod" -o jsonpath='{.status.containerStatuses[?(@.name=="worker")].restartCount}')"
