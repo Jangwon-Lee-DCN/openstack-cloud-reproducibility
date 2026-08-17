@@ -94,7 +94,7 @@ _order_groups(
 _order_panels(
     project,
     "compute",
-    ("overview", "instances", "network_interfaces", "images", "key_pairs", "server_groups"),
+    ("overview", "dcn_service_catalog", "instances", "network_interfaces", "images", "key_pairs", "server_groups"),
 )
 _order_panels(
     project,

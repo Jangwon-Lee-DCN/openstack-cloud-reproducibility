@@ -23,6 +23,9 @@ COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/open
 COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
 COPY settings/0001_production_region.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py
 COPY region_selector.html /var/lib/openstack/lib/python3.12/site-packages/horizon/templates/horizon/common/_region_selector.html
+COPY service_catalog/ /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/service_catalog/
+COPY enabled/_1380_dcn_service_catalog.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1380_dcn_service_catalog.py
+COPY tenant-service-catalog.yaml /etc/openstack-dashboard/dcn-service-catalog.yaml
 
 RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
     && echo "5937bb7c901f59142d97afc14dd7e48b9e80ea679e9c25d214d5eb88b632716c  /tmp/designate_dashboard.whl" | sha256sum -c - \
@@ -112,6 +115,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, cloud_telemetry_dashboard, cloud_s3_dashboard" \
     && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard \
     && test -f "$local_enabled/_1395_compute_network_interfaces.py" \
+    && test -f "$local_enabled/_1380_dcn_service_catalog.py" \
     && test -f "$local_enabled/_1482_project_load_balancer_panel.py" \
     && test -f "$local_enabled/_2360_admin_network_interfaces.py" \
     && test -f "$local_enabled/_1800_project_selfservice_app.py" \
@@ -127,6 +131,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \
+    && grep -q 'baremetal-virtual' /etc/openstack-dashboard/dcn-service-catalog.yaml \
     && grep -q 'openstack_dashboard.platform_navigation' "$local_enabled/_9999_platform_navigation.py" \
     && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py" \
     && chmod -R a+rX /var/lib/openstack/lib/python3.12/site-packages
