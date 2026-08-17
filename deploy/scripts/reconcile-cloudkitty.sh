@@ -14,8 +14,8 @@ mode="${1:-check}"
 for command in helm kubectl sops sha256sum; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
-[[ "$mode" =~ ^(check|diff|apply|verify|rollback)$ ]] || {
-  echo "usage: $0 check|diff|apply|verify|rollback" >&2; exit 2;
+[[ "$mode" =~ ^(check|diff|apply|verify|rollback|retry-storage-init)$ ]] || {
+  echo "usage: $0 check|diff|apply|verify|rollback|retry-storage-init" >&2; exit 2;
 }
 [[ "$(sha256sum "$package" | awk '{print $1}')" == "$expected_package_sha" ]] || {
   echo "CloudKitty package digest mismatch" >&2; exit 1;
@@ -30,6 +30,34 @@ trap 'rm -rf "$work_dir"' EXIT
 sops -d "$secrets" >"$work_dir/secrets.yaml"
 chmod 600 "$work_dir/secrets.yaml"
 helm template "$release" "$package" -n "$namespace" -f "$values" -f "$work_dir/secrets.yaml" >"$work_dir/rendered.yaml"
+
+if [[ "$mode" == retry-storage-init ]]; then
+  helm status "$release" -n "$namespace" >/dev/null || {
+    echo "CloudKitty release must exist before retrying storage-init" >&2; exit 1;
+  }
+  kubectl delete job -n "$namespace" cloudkitty-storage-init --ignore-not-found --wait=true
+  python3 - "$work_dir/rendered.yaml" <<'PY' | kubectl apply -n openstack -f -
+import sys
+import yaml
+
+matches = [
+    doc for doc in yaml.safe_load_all(open(sys.argv[1], encoding="utf-8"))
+    if doc and doc.get("kind") == "Job"
+    and doc.get("metadata", {}).get("name") == "cloudkitty-storage-init"
+]
+if len(matches) != 1:
+    raise SystemExit(f"expected one cloudkitty-storage-init Job, found {len(matches)}")
+yaml.safe_dump(matches[0], sys.stdout, sort_keys=False)
+PY
+  if ! kubectl wait -n "$namespace" --for=condition=complete \
+    job/cloudkitty-storage-init --timeout=10m; then
+    kubectl describe job -n "$namespace" cloudkitty-storage-init
+    kubectl logs -n "$namespace" job/cloudkitty-storage-init --all-containers=true --tail=-1 || true
+    exit 1
+  fi
+  echo "CloudKitty storage-init retry completed"
+  exit 0
+fi
 
 if [[ "$mode" == check ]]; then
   kubectl apply --dry-run=server -n "$namespace" -f "$work_dir/rendered.yaml" >/dev/null
