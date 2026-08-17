@@ -70,13 +70,16 @@ for template in (
     "cloud_s3_dashboard/credential_created.html",
 ):
     get_template(template)
-from django.test import override_settings
-with override_settings(COMPRESS_OFFLINE=False):
-    image_index = get_template("project/images/index_split.html").render({
-        "table": {"render": "IMAGE_TABLE_RENDER_SENTINEL"},
-    })
+from django.template import Context
+from django.template.loader_tags import BlockNode
+image_template = get_template("project/images/index_split.html")
+image_blocks = image_template.template.nodelist.get_nodes_by_type(BlockNode)
+image_main = next(block for block in image_blocks if block.name == "main")
+image_index = image_main.render(Context({
+    "table": {"render": "IMAGE_TABLE_RENDER_SENTINEL"},
+}))
 assert "IMAGE_TABLE_RENDER_SENTINEL" in image_index
-assert 'id="image-inspector"' in image_index
+assert "id=\"image-inspector\"" in image_index
 for name in (
     "horizon:project:cloud_metrics:index",
     "horizon:project:cloud_alarms:index",
