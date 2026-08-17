@@ -91,11 +91,24 @@
   register: declared_role_labels
   changed_when: false
 
-- name: Apply canonical OpenStack node labels explicitly
+- name: Derive the dedicated OpenStack control workload pool
+  ansible.builtin.set_fact:
+    openstack_control_nodes: "{{ openstack_control_nodes | default([]) + [item] }}"
+  loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique }}"
+  when: "'control_plane' in (hostvars[item].node_roles | default([]))"
+
+- name: Apply canonical OpenStack control workload label only to declared service nodes
   ansible.builtin.command: "kubectl label node {{ item }} openstack-control-plane=enabled --overwrite"
-  loop: "{{ groups['control_plane'] }}"
+  loop: "{{ openstack_control_nodes | default([]) }}"
   register: control_plane_labels
   changed_when: false
+
+- name: Remove OpenStack control workload eligibility from every other node
+  ansible.builtin.command: "kubectl label node {{ item }} openstack-control-plane-"
+  loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique | difference(openstack_control_nodes | default([])) }}"
+  register: stale_control_plane_labels
+  changed_when: "'not labeled' not in (stale_control_plane_labels.stdout | default(''))"
+  failed_when: false
 
 - name: Apply canonical Nova and OVS labels to compute nodes
   ansible.builtin.command: >-
