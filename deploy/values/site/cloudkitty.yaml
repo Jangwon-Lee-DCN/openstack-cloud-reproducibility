@@ -147,11 +147,11 @@ bootstrap:
       if [ -z "$service_id" ]; then
         service_id="$(openstack rating hashmap service create "$meter" -f value -c 'Service ID')"
       fi
-      existing="$(openstack rating hashmap mapping list --service-id "$service_id" -f value -c Name | grep -Fx 'dcn-showback-v1' || true)"
+      existing="$(openstack rating hashmap mapping list --service-id "$service_id" \
+        -f value -c Cost -c Type -c Value | awk -v cost="$price" '($1 + 0) == (cost + 0) && $2 == "flat" {print $0}')"
       if [ -z "$existing" ]; then
-        openstack rating hashmap mapping create --service-id "$service_id" --type flat \
-          --name dcn-showback-v1 --start 2026-08-01T00:00:00Z \
-          --description 'immutable DCN-CREDIT showback rate card v1' "$price" >/dev/null
+        openstack rating hashmap mapping create --service-id "$service_id" \
+          --type flat "$price" >/dev/null
       fi
     }
     ensure_rate instance 1.000000
