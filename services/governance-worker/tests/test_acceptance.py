@@ -77,7 +77,7 @@ class AcceptanceTransportTests(unittest.TestCase):
     def test_restart_probe_uses_shell_builtin_kill(self):
         script = (Path(__file__).parents[3] /
                   "deploy/tests/cloudkitty-finops-acceptance.sh").read_text()
-        self.assertIn("-- /bin/sh -c 'kill 1'", script)
+        self.assertIn("-- /bin/sh -c 'kill -9 1'", script)
         self.assertNotIn('exec "$pod" -c worker -- kill 1', script)
 
     @patch.object(acceptance.time, "sleep")
