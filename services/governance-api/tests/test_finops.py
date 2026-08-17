@@ -51,6 +51,18 @@ class FinOpsTests(unittest.TestCase):
         with self.assertRaises(FinOpsError):
             parse_cloudkitty_frames(document, expected_project_id="p")
 
+    def test_cloudkitty_v1_scope_and_shape(self):
+        document = {"dataframes": [{
+            "begin": "2026-08-01T00:00:00", "end": "2026-08-01T01:00:00",
+            "tenant_id": "p", "resources": [{"service": "instance", "volume": "2",
+                "rating": "2.25", "desc": {"project_id": "p", "id": "vm-1"}}]}]}
+        item = parse_cloudkitty_frames(document, expected_project_id="p")[0]
+        self.assertEqual((item["meter"], item["quantity"], item["cloudkitty_cost"]),
+                         ("instance", "2", "2.25"))
+        document["dataframes"][0]["tenant_id"] = "other"
+        with self.assertRaises(FinOpsError):
+            parse_cloudkitty_frames(document, expected_project_id="p")
+
     def test_rate_card_digest_is_canonical(self):
         self.assertEqual(canonical_rate_card({"b": 2, "a": 1}),
                          canonical_rate_card({"a": 1, "b": 2}))
