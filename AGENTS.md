@@ -53,3 +53,6 @@ and the central change contract advance only for the final accepted revision.
 - Production Helm changes must run through the repository reconciler and hold
   its cluster-wide deployment lock through rollout. Direct `helm upgrade`, or
   starting another reconciliation while the lock exists, is prohibited.
+- Admission-enforced immutable image locks are production safety controls.
+  Never remove or bypass them to deploy; update the approved digest in source,
+  pass acceptance, and reconcile the policy before the release.

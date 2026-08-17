@@ -210,6 +210,9 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
 fi
 
 if [[ -n "$ONLY_RELEASE" ]]; then
+  if [[ "$ONLY_RELEASE" == "horizon" ]]; then
+    kubectl apply -f "$REPO_ROOT/deploy/manifests/horizon-image-admission-lock.yaml"
+  fi
   install_release "$ONLY_RELEASE"
   if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then
     case "$ONLY_RELEASE" in
