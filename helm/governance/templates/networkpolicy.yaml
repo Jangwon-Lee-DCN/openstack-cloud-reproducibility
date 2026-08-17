@@ -40,6 +40,9 @@ spec:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: vpc-control-plane-system}}
       ports: [{port: 8181, protocol: TCP}]
     - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+      ports: [{port: 8080, protocol: TCP}]
+    - to:
         - podSelector: {matchLabels: {app.kubernetes.io/name: governance-postgresql}}
       ports: [{port: 5432, protocol: TCP}]
 {{- if .Values.localOpa.enabled }}

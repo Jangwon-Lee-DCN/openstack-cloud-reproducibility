@@ -30,6 +30,7 @@ providers:
   opa: ""
   gnocchi: ""
   cloudkitty: ""
+  loki: ""
   barbican: ""
   designate: ""
   octavia: ""
