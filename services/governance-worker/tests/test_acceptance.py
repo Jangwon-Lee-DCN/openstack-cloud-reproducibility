@@ -90,6 +90,44 @@ class AcceptanceTransportTests(unittest.TestCase):
             self.assertEqual(acceptance.read_state(), fixture)
 
     @patch.object(acceptance.time, "sleep")
+    @patch.object(acceptance, "CloudKittyCollector")
+    @patch.object(acceptance, "Store")
+    def test_existing_history_converges_before_seed_baseline(self, store_type, collector_type,
+                                                             sleep):
+        connection = store_type.return_value.connection
+        connection.execute.side_effect = [
+            [("rated-old",)], [("missing-old",)],
+            [("rated-old",)], [("missing-old",)],
+        ]
+        with patch.dict(os.environ, {
+                "GOVERNANCE_DB_PATH": "/state/governance.db",
+                "GOVERNANCE_CLOUDKITTY_URL": "http://cloudkitty"}):
+            baseline = acceptance.converge_existing_history(
+                "token", "project", attempts=3, delay=5)
+        self.assertEqual(baseline, (["rated-old"], ["missing-old"]))
+        self.assertEqual(collector_type.return_value.collect.call_count, 2)
+        sleep.assert_called_once_with(5)
+
+    @patch.object(acceptance.time, "sleep")
+    @patch.object(acceptance, "CloudKittyCollector")
+    @patch.object(acceptance, "Store")
+    def test_existing_history_convergence_is_bounded_and_fail_closed(
+            self, store_type, _collector_type, sleep):
+        connection = store_type.return_value.connection
+        connection.execute.side_effect = [
+            [("rated-1",)], [],
+            [("rated-2",)], [],
+            [("rated-3",)], [],
+        ]
+        with patch.dict(os.environ, {
+                "GOVERNANCE_DB_PATH": "/state/governance.db",
+                "GOVERNANCE_CLOUDKITTY_URL": "http://cloudkitty"}):
+            with self.assertRaisesRegex(RuntimeError, "did not converge"):
+                acceptance.converge_existing_history(
+                    "token", "project", attempts=3, delay=5)
+        self.assertEqual(sleep.call_count, 2)
+
+    @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")
     def test_call_retries_transient_transport_with_a_fixed_bound(self, urlopen, sleep):
         urlopen.side_effect = [URLError("route"), TimeoutError("timeout"), _Response()]
