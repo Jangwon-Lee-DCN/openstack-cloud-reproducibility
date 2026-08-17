@@ -63,6 +63,21 @@ class FinOpsTests(unittest.TestCase):
         with self.assertRaises(FinOpsError):
             parse_cloudkitty_frames(document, expected_project_id="p")
 
+    def test_cloudkitty_resource_identity_is_stable_across_frame_reordering(self):
+        resources = [
+            {"service": "instance", "volume": "2", "rating": "2",
+             "desc": {"project_id": "p", "id": "vm-1"}},
+            {"service": "instance", "volume": "3", "rating": "3",
+             "desc": {"project_id": "p", "id": "vm-2"}},
+        ]
+        def parse(rows):
+            return parse_cloudkitty_frames({"dataframes": [{
+                "begin": "a", "end": "b", "tenant_id": "p", "resources": rows
+            }]}, expected_project_id="p")
+        original = {item["source_id"] for item in parse(resources)}
+        reordered = {item["source_id"] for item in parse(list(reversed(resources)))}
+        self.assertEqual(original, reordered)
+
     def test_rate_card_digest_is_canonical(self):
         self.assertEqual(canonical_rate_card({"b": 2, "a": 1}),
                          canonical_rate_card({"a": 1, "b": 2}))
