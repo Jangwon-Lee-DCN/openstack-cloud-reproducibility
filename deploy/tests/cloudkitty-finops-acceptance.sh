@@ -21,6 +21,11 @@ processor=$(kubectl -n openstack get pod -l application=cloudkitty,component=pro
 kubectl -n openstack exec "$processor" -c cloudkitty-processor -- python3 -c \
   'import datetime,sys; from cloudkitty import service; service.prepare_service(["finops-acceptance"], config_files=["/etc/cloudkitty/cloudkitty.conf"]); from cloudkitty.storage_state import StateManager; StateManager().set_last_processed_timestamp(sys.argv[1], datetime.datetime.fromisoformat(sys.argv[2]))' \
   "$project_id" "$reset_timestamp"
+# Processor scope discovery sleeps for the configured collection period. A
+# rollout after the supported state reset makes the dedicated acceptance scope
+# discoverable immediately without shortening production rating periods.
+kubectl -n openstack rollout restart deployment/cloudkitty-processor >/dev/null
+kubectl -n openstack rollout status deployment/cloudkitty-processor --timeout=5m
 kubectl -n "$namespace" exec "$pod" -c worker -- \
   env GOVERNANCE_FINOPS_ACCEPTANCE=setup python -m governance_worker.acceptance
 before="$(kubectl -n "$namespace" get pod "$pod" -o jsonpath='{.status.containerStatuses[?(@.name=="worker")].restartCount}')"
