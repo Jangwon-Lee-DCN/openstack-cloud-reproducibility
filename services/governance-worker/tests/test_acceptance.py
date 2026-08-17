@@ -24,6 +24,9 @@ class _Response:
 
 
 class AcceptanceTransportTests(unittest.TestCase):
+    def test_rating_archive_policy_matches_hourly_cloudkitty_collection(self):
+        self.assertEqual(acceptance.RATING_ARCHIVE_POLICY, "medium")
+
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "call")
     def test_metric_visibility_is_bounded_before_rating_reset(self, call, sleep):
