@@ -8,7 +8,7 @@ package="$root/helm/packages/patched/cloudkitty-2026.1.0.tgz"
 values="$root/deploy/values/site/cloudkitty.yaml"
 secrets="$root/deploy/secrets/cloudkitty.values.sops.yaml"
 route="$root/deploy/manifests/cloudkitty-public-route.yaml"
-expected_package_sha=cfb0df843ccb9d23bb0d8e8966bddd90532c41c1260b2e96c1a962b5ae05702e
+expected_package_sha=51a49cef8791ce87f852a0117c9ef60c5f06dd3d0040e5e230f5b9db95549d66
 mode="${1:-check}"
 
 for command in helm kubectl sops sha256sum; do
@@ -91,7 +91,7 @@ if [[ "$mode" == apply ]]; then
   # Hook failures from an interrupted older chart may leave the same ephemeral
   # names without Helm ownership. Always reconcile this exact bounded set.
   kubectl delete job -n "$namespace" --ignore-not-found --wait=true \
-    cloudkitty-db-init cloudkitty-db-sync cloudkitty-rabbit-init \
+    cloudkitty-bootstrap cloudkitty-db-init cloudkitty-db-sync cloudkitty-rabbit-init \
     cloudkitty-storage-init cloudkitty-ks-service cloudkitty-ks-endpoints \
     cloudkitty-ks-user
   helm upgrade --install "$release" "$package" -n "$namespace" \
