@@ -74,11 +74,13 @@ class AcceptanceTransportTests(unittest.TestCase):
         self.assertIn("Worker(collector.get_collector(), storage.get_storage()", script)
         self.assertNotIn("rollout restart deployment/cloudkitty-processor", script)
 
-    def test_restart_probe_uses_shell_builtin_kill(self):
+    def test_restart_probe_uses_graceful_kubernetes_replacement(self):
         script = (Path(__file__).parents[3] /
                   "deploy/tests/cloudkitty-finops-acceptance.sh").read_text()
-        self.assertIn("-- /bin/sh -c 'kill -9 1'", script)
-        self.assertNotIn('exec "$pod" -c worker -- kill 1', script)
+        self.assertIn('delete pod "$previous_pod" --wait=true --timeout=2m', script)
+        self.assertIn('rollout status deployment/governance-api', script)
+        self.assertNotIn("kill -9 1", script)
+        self.assertNotIn("--force", script)
 
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")
