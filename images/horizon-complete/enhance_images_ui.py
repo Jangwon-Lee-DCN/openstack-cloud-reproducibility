@@ -59,8 +59,10 @@ def get_image_categories(im, user_tenant_id):
     # Categories are deliberately exclusive. A public image is not an
     # official platform image unless its owner/property explicitly says so.
     properties = getattr(im, 'properties', {}) or {}
-    if properties.get('dcn_workload_type') in ('capi', 'amphora'):
+    if properties.get('dcn_workload_type') == 'amphora':
         return []
+    if properties.get('dcn_workload_type') == 'capi':
+        return ['platform']
     if is_platform_image(im):
         return ['platform']
     if im.owner == user_tenant_id:
