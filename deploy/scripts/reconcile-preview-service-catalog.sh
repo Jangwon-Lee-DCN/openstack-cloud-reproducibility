@@ -23,12 +23,14 @@ if [[ "$apply" != true ]]; then
 fi
 
 ensure_flavor() {
-  local name=$1 ram=$2 disk=$3 vcpus=$4 project_id
+  local name=$1 ram=$2 disk=$3 vcpus=$4 output
   openstack flavor show "$name" >/dev/null 2>&1 ||
     openstack flavor create --private --ram "$ram" --disk "$disk" --vcpus "$vcpus" "$name"
-  project_id=$(openstack project show "$admin_project" -f value -c id)
-  if ! openstack flavor access list "$name" -f value -c Project_ID | grep -Fxq "$project_id"; then
-    openstack flavor set --project "$admin_project" "$name"
+  if ! output=$(openstack flavor set --project "$admin_project" "$name" 2>&1); then
+    grep -Fq 'Flavor access already exists' <<<"$output" || {
+      printf '%s\n' "$output" >&2
+      return 1
+    }
   fi
 }
 
