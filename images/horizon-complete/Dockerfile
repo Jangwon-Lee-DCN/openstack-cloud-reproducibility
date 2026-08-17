@@ -154,6 +154,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_3124_governance_cost_profiles.py" \
     && test -f "$local_enabled/_9999_platform_navigation.py" \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
+    && grep -q 'GOVERNANCE_FAKE_API_ENDPOINT' /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py \
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
