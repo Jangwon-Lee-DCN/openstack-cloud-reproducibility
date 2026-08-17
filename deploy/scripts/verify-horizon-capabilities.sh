@@ -61,6 +61,7 @@ assert "label=_(\"Cost center\")" not in vpc_launch
 for app in ("cloud_telemetry_dashboard", "cloud_s3_dashboard"):
     assert app in settings.INSTALLED_APPS
 for template in (
+    "project/images/index_split.html",
     "cloud_telemetry_dashboard/metrics.html",
     "cloud_telemetry_dashboard/alarms.html",
     "cloud_telemetry_dashboard/health.html",
@@ -69,6 +70,13 @@ for template in (
     "cloud_s3_dashboard/credential_created.html",
 ):
     get_template(template)
+from django.test import override_settings
+with override_settings(COMPRESS_OFFLINE=False):
+    image_index = get_template("project/images/index_split.html").render({
+        "table": {"render": "IMAGE_TABLE_RENDER_SENTINEL"},
+    })
+assert "IMAGE_TABLE_RENDER_SENTINEL" in image_index
+assert 'id="image-inspector"' in image_index
 for name in (
     "horizon:project:cloud_metrics:index",
     "horizon:project:cloud_alarms:index",
