@@ -61,7 +61,20 @@ status=$(curl "${curl_args[@]}" -b "$cookie" -c "$cookie" -o "$work_dir/auth-res
   --data-urlencode "domain=$domain" \
   -e "$HORIZON_URL/auth/login/")
 unset username password domain
-[[ "$status" == 302 ]] || { echo "Horizon benchmark login failed: HTTP $status" >&2; exit 1; }
+if [[ "$status" != 302 ]]; then
+  echo "Horizon benchmark login failed: HTTP $status" >&2
+  python3 - "$work_dir/auth-response" <<'PY' >&2
+import re, sys
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+messages = re.findall(r'<div[^>]+class="[^"]*alert[^"]*"[^>]*>(.*?)</div>', text, re.I | re.S)
+for message in messages:
+    clean = re.sub(r'<[^>]+>', ' ', message)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    if clean:
+        print(clean)
+PY
+  exit 1
+fi
 
 affinity=$(kubectl get service -n "$NAMESPACE" horizon-int -o jsonpath='{.spec.sessionAffinity}')
 [[ "$affinity" == ClientIP ]] || {
@@ -104,9 +117,18 @@ PY
 )
 image_json="$work_dir/image-detail.json"
 detail_status=$(curl "${curl_args[@]}" -b "$cookie" -o "$image_json" \
+  -H 'X-Requested-With: XMLHttpRequest' \
   -w '%{http_code}' "$HORIZON_URL/api/glance/images/$image_id/")
 [[ "$detail_status" == 200 ]] || {
   echo "image detail API returned HTTP $detail_status" >&2
+  python3 - "$image_json" <<'PY' >&2
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+    print(json.dumps(data, sort_keys=True)[:1000])
+except Exception:
+    print(open(sys.argv[1], encoding="utf-8", errors="replace").read()[:1000])
+PY
   exit 1
 }
 python3 - "$image_json" "$image_id" <<'PY'
