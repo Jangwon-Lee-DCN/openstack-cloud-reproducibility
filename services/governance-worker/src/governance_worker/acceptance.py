@@ -38,6 +38,17 @@ def eligible_measure_time(now: datetime, *, period_hours: int = 1,
     return now - timedelta(hours=period_hours * (wait_periods + 1))
 
 
+def wait_for_metric_measures(urls: list[str], token: str, *, attempts: int = 12,
+                             delay: int = 5) -> None:
+    """Wait until Gnocchi exposes every asynchronously archived measure."""
+    for attempt in range(attempts):
+        if all(call(url, token)[1] for url in urls):
+            return
+        if attempt + 1 < attempts:
+            time.sleep(delay)
+    raise RuntimeError("Gnocchi measures did not become visible before rating reset")
+
+
 def call(url, token, *, method="GET", body=None, headers=None, expected=(200, 201, 202, 204)):
     request_headers = {"Accept": "application/json", "X-Auth-Token": token, **(headers or {})}
     data = None
@@ -101,6 +112,10 @@ def seed():
          method="POST", body=[{"timestamp": measure_time.isoformat(), "value": 2.0}])
     call(os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{undefined_metric_id}/measures", token,
          method="POST", body=[{"timestamp": measure_time.isoformat(), "value": 1.0}])
+    wait_for_metric_measures([
+        os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{metric_id}/measures",
+        os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{undefined_metric_id}/measures",
+    ], token)
     period = now.strftime("%Y-%m")
     _, budget = call("http://127.0.0.1:8080/v1/budgets", token, method="POST",
         headers={"X-Project-Id": project_id, "Idempotency-Key": f"finops-{resource_id}"},
