@@ -96,12 +96,10 @@ conf:
         extra_args: {aggregation_method: mean, resource_type: generic}
         groupby: [id, user_id, project_id]
         unit: unit-hour
-        use_all_resource_revisions: false
       governance.acceptance.undefined:
         extra_args: {aggregation_method: mean, resource_type: generic}
         groupby: [id, user_id, project_id]
         unit: unit-hour
-        use_all_resource_revisions: false
       cpu:
         alt_name: instance
         extra_args: {aggregation_method: mean, resource_type: instance}
