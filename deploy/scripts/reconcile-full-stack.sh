@@ -211,6 +211,11 @@ fi
 
 if [[ -n "$ONLY_RELEASE" ]]; then
   install_release "$ONLY_RELEASE"
+  if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then
+    case "$ONLY_RELEASE" in
+      horizon) "$REPO_ROOT/deploy/scripts/verify-horizon-qoe.sh" ;;
+    esac
+  fi
   exit 0
 fi
 
