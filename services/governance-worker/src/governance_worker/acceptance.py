@@ -8,7 +8,7 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -29,17 +29,30 @@ def call(url, token, *, method="GET", body=None, headers=None, expected=(200, 20
         data = json.dumps(body, separators=(",", ":")).encode()
         request_headers["Content-Type"] = "application/json"
     request = Request(url, data=data, method=method, headers=request_headers)
-    with urlopen(request, timeout=15) as response:
-        if response.status not in expected:
-            raise RuntimeError(f"unexpected HTTP status {response.status}")
-        return response.status, json.loads(response.read() or b"{}")
+    for attempt in range(6):
+        try:
+            with urlopen(request, timeout=15) as response:
+                if response.status not in expected:
+                    raise RuntimeError(f"unexpected HTTP status {response.status}")
+                return response.status, json.loads(response.read() or b"{}")
+        except (URLError, TimeoutError, OSError):
+            if attempt == 5:
+                raise
+            time.sleep(2)
 
 
 def identity():
-    token = application_credential_token(
-        os.environ["GOVERNANCE_KEYSTONE_URL"],
-        os.environ["GOVERNANCE_APPLICATION_CREDENTIAL_ID"],
-        os.environ["GOVERNANCE_APPLICATION_CREDENTIAL_SECRET"])
+    for attempt in range(6):
+        try:
+            token = application_credential_token(
+                os.environ["GOVERNANCE_KEYSTONE_URL"],
+                os.environ["GOVERNANCE_APPLICATION_CREDENTIAL_ID"],
+                os.environ["GOVERNANCE_APPLICATION_CREDENTIAL_SECRET"])
+            break
+        except (URLError, TimeoutError, OSError):
+            if attempt == 5:
+                raise
+            time.sleep(2)
     return token, os.environ["GOVERNANCE_KEYSTONE_PROJECT_ID"]
 
 
@@ -171,11 +184,19 @@ def verify():
 def cleanup():
     state = json.loads(STATE.read_text(encoding="utf-8"))
     token, project_id = identity()
-    call(os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/resource/generic/{state['resource_id']}",
-         token, method="DELETE")
-    call("http://127.0.0.1:8080/v1/budgets/" + state["budget_id"], token, method="DELETE",
-         headers={"X-Project-Id": project_id, "If-Match": str(state["budget_revision"]),
-                  "Idempotency-Key": "finops-cleanup-" + state["resource_id"]})
+    try:
+        call(os.environ["GOVERNANCE_GNOCCHI_URL"] +
+             f"/v1/resource/generic/{state['resource_id']}", token, method="DELETE")
+    except HTTPError as exc:
+        if exc.code != 404:
+            raise
+    try:
+        call("http://127.0.0.1:8080/v1/budgets/" + state["budget_id"], token, method="DELETE",
+             headers={"X-Project-Id": project_id, "If-Match": str(state["budget_revision"]),
+                      "Idempotency-Key": "finops-cleanup-" + state["resource_id"]})
+    except HTTPError as exc:
+        if exc.code != 404:
+            raise
     require_absent(os.environ["GOVERNANCE_GNOCCHI_URL"] +
                    f"/v1/resource/generic/{state['resource_id']}", token)
     require_absent("http://127.0.0.1:8080/v1/budgets/" + state["budget_id"], token,
