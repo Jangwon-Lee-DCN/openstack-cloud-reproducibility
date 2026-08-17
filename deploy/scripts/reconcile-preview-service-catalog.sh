@@ -23,10 +23,13 @@ if [[ "$apply" != true ]]; then
 fi
 
 ensure_flavor() {
-  local name=$1 ram=$2 disk=$3 vcpus=$4
+  local name=$1 ram=$2 disk=$3 vcpus=$4 project_id
   openstack flavor show "$name" >/dev/null 2>&1 ||
     openstack flavor create --private --ram "$ram" --disk "$disk" --vcpus "$vcpus" "$name"
-  openstack flavor set --project "$admin_project" "$name"
+  project_id=$(openstack project show "$admin_project" -f value -c id)
+  if ! openstack flavor access list "$name" -f value -c Project_ID | grep -Fxq "$project_id"; then
+    openstack flavor set --project "$admin_project" "$name"
+  fi
 }
 
 ensure_flavor bm.virtual.preview 2048 10 2
