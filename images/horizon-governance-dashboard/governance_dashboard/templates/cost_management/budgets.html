@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{% trans "Budgets" %}{% endblock %}
+{% block main %}
+<div class="page-header"><h1>{% trans "Budgets" %}</h1></div>
+<table class="table"><thead><tr><th>{% trans "Name" %}</th><th>{% trans "Amount" %}</th><th>{% trans "Period" %}</th></tr></thead>
+<tbody>{% for budget in budgets %}<tr><td>{{ budget.name|default:budget.id }}</td><td>{{ budget.amount }}</td><td>{{ budget.period|default:"—" }}</td></tr>
+{% empty %}<tr><td colspan="3">{% trans "No budgets configured." %}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

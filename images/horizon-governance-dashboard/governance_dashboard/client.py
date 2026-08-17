@@ -39,9 +39,13 @@ class GovernanceClient:
 
 COLLECTIONS = (
     ("notifications", "Notifications"), ("usage", "Usage & Cost"),
-    ("budgets", "Budgets"), ("aws-price-profiles", "AWS Price Profiles"),
-    ("aws-calibration-profiles", "AWS Calibration"),
-    ("certificate-policies", "Certificates"),
+    ("budgets", "Budgets"), ("certificate-policies", "Certificates"),
     ("rotation-policies", "Secret Rotation"), ("audit-events", "Audit"),
     ("tag-policies", "Tag Policies"),
+)
+
+COST_COLLECTIONS = (("usage", "Usage & Cost"), ("budgets", "Budgets"))
+ADMIN_COST_COLLECTIONS = (
+    ("aws-price-profiles", "AWS Price Profiles"),
+    ("aws-calibration-profiles", "AWS Calibration"),
 )
