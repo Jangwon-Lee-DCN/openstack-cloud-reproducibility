@@ -76,6 +76,13 @@ class CloudKittyRateCardContract(unittest.TestCase):
         ):
             self.assertIn(name, script)
 
+    def test_storage_retry_is_exact_and_fail_closed(self):
+        script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
+        self.assertIn("retry-storage-init", script)
+        self.assertIn('len(matches) != 1', script)
+        self.assertIn("job/cloudkitty-storage-init --timeout=10m", script)
+        self.assertIn("kubectl logs", script)
+
 
 if __name__ == "__main__":
     unittest.main()
