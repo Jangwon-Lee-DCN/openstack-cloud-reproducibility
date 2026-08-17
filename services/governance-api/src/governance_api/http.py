@@ -18,6 +18,8 @@ ROUTES = {
     "/v1/rate-cards": ("rate_card", "create_rate_card"),
     "/v1/usage": ("usage", "record_usage"),
     "/v1/budgets": ("budget", "create_budget"),
+    "/v1/aws-price-profiles": ("aws_price_profile", "create_aws_price_profile"),
+    "/v1/aws-calibration-profiles": ("aws_calibration_profile", "create_aws_calibration_profile"),
     "/v1/certificate-policies": ("certificate_policy", "create_certificate_policy"),
     "/v1/rotation-policies": ("rotation_policy", "create_rotation_policy"),
     "/v1/tag-policies": ("tag_policy", "create_tag_policy"),
@@ -96,6 +98,18 @@ class Handler(BaseHTTPRequestHandler):
                     ctx, limit=int(query.get("limit", [50])[0]),
                     cursor=query.get("cursor", [None])[0],
                     period=query.get("period", [None])[0], meter=query.get("meter", [None])[0]))
+            if parsed.path == "/v1/aws-cost-forecast":
+                query = parse_qs(parsed.query)
+                required = {name: query.get(name, [None])[0]
+                            for name in ("period", "price_profile_id")}
+                if not all(required.values()):
+                    raise GovernanceError("period and price_profile_id are required")
+                return self.reply(200, self.service.aws_forecast(
+                    ctx, period=required["period"],
+                    price_profile_id=required["price_profile_id"],
+                    calibration_profile_id=query.get("calibration_profile_id", [None])[0],
+                    elapsed_fraction=query.get("elapsed_fraction", ["1"])[0],
+                    budget_id=query.get("budget_id", [None])[0]))
             route = ROUTES.get(parsed.path)
             if not route:
                 collection, resource_id = self._resource_path(parsed.path)

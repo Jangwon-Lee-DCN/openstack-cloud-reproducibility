@@ -13,6 +13,7 @@ class ClientContractTest(unittest.TestCase):
     def test_all_track_b_sections_exist(self):
         names = {name for name, _ in COLLECTIONS}
         self.assertTrue({"notifications", "usage", "budgets", "certificate-policies",
+                         "aws-price-profiles", "aws-calibration-profiles",
                          "rotation-policies", "audit-events", "tag-policies"}.issubset(names))
 
 

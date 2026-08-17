@@ -71,6 +71,27 @@ paths:
     get: {$ref: "#/components/x-list"}
     post: {$ref: "#/components/x-create"}
   /v1/budgets/{id}: {$ref: "#/components/x-item"}
+  /v1/aws-price-profiles:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/aws-price-profiles/{id}: {$ref: "#/components/x-item"}
+  /v1/aws-calibration-profiles:
+    get: {$ref: "#/components/x-list"}
+    post: {$ref: "#/components/x-create"}
+  /v1/aws-calibration-profiles/{id}: {$ref: "#/components/x-item"}
+  /v1/aws-cost-forecast:
+    get:
+      security: [{keystoneToken: []}]
+      parameters:
+        - {name: period, in: query, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: price_profile_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: calibration_profile_id, in: query, schema: {type: string, format: uuid}}
+        - {name: budget_id, in: query, schema: {type: string, format: uuid}}
+        - {name: elapsed_fraction, in: query, schema: {type: number, exclusiveMinimum: 0, maximum: 1}}
+      responses:
+        "200": {description: project-scoped calibrated AWS month-end comparison forecast}
+        "400": {description: invalid or incomplete forecast inputs}
+        "403": {description: scope or central OPA denial}
   /v1/certificate-policies:
     get: {$ref: "#/components/x-list"}
     post: {$ref: "#/components/x-create"}
