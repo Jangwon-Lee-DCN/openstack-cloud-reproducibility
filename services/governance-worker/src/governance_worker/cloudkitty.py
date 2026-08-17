@@ -30,9 +30,8 @@ class CloudKittyCollector:
         self.version = version
 
     def collect(self, store, project_id: str, begin: str, end: str) -> dict:
-        query = urlencode({"begin": begin, "end": end,
-                           "filters": f"project_id:{project_id}", "limit": 1000})
-        _, document = self.client.request(f"/v2/dataframes?{query}")
+        query = urlencode({"begin": begin, "end": end, "tenant_id": project_id})
+        _, document = self.client.request(f"/v1/storage/dataframes?{query}")
         normalized = parse_cloudkitty_frames(document, expected_project_id=project_id)
         samples = []
         for item in normalized:
@@ -42,4 +41,4 @@ class CloudKittyCollector:
                                        Decimal(item["quantity"]), item["period"].split("/", 1)[1]))
         rates = {meter: Rate(self.version, meter, price) for meter, price in SHOWBACK_RATES.items()}
         return LedgerRepository(store).aggregate(
-            "cloudkitty-v2", project_id, DeterministicTelemetrySource(samples), rates)
+            "cloudkitty-v1", project_id, DeterministicTelemetrySource(samples), rates)

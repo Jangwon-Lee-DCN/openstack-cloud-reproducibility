@@ -7,9 +7,11 @@ from governance_worker.cloudkitty import CloudKittyCollector
 
 class Client:
     def request(self, path):
-        return 200, {"dataframes": [{"period": {"begin": "2026-08-01T00:00:00Z", "end": "2026-08-01T01:00:00Z"},
-                     "usage": {"instance": [{"vol": {"qty": "2"}, "rating": {"price": "2"},
-                                               "groupby": {"project_id": "p"}}]}}]}
+        assert path.startswith("/v1/storage/dataframes?")
+        return 200, {"dataframes": [{"begin": "2026-08-01T00:00:00Z",
+                     "end": "2026-08-01T01:00:00Z", "tenant_id": "p",
+                     "resources": [{"service": "instance", "volume": "2", "rating": "2",
+                                     "desc": {"project_id": "p", "id": "vm-1"}}]}]}
 
 
 class CloudKittyTests(unittest.TestCase):

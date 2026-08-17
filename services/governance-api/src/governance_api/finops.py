@@ -78,7 +78,7 @@ def rate_usage(*, source_id: str, project_id: str, period: str, meter: str,
 
 
 def parse_cloudkitty_frames(document: dict, *, expected_project_id: str) -> list[dict]:
-    """Normalize CloudKitty v2 frames without trusting tenant IDs from callers."""
+    """Normalize CloudKitty v1/v2 frames without trusting tenant IDs."""
     frames = document.get("dataframes", document.get("results", []))
     if not isinstance(frames, list):
         raise FinOpsError("CloudKitty response has no dataframe list")
@@ -90,8 +90,30 @@ def parse_cloudkitty_frames(document: dict, *, expected_project_id: str) -> list
         if project_id and project_id != expected_project_id:
             raise FinOpsError("CloudKitty returned a cross-project dataframe")
         period = frame.get("period", {})
-        begin = period.get("begin") if isinstance(period, dict) else frame.get("begin")
-        end = period.get("end") if isinstance(period, dict) else frame.get("end")
+        begin = period.get("begin") if isinstance(period, dict) and period else frame.get("begin")
+        end = period.get("end") if isinstance(period, dict) and period else frame.get("end")
+        resources = frame.get("resources")
+        if begin and end and isinstance(resources, list):
+            for index, row in enumerate(resources):
+                if not isinstance(row, dict) or not row.get("service"):
+                    raise FinOpsError("invalid CloudKitty v1 rated resource")
+                description = row.get("desc", {})
+                if not isinstance(description, dict):
+                    raise FinOpsError("invalid CloudKitty v1 resource description")
+                row_project = description.get("project_id") or frame.get("tenant_id")
+                if row_project and row_project != expected_project_id:
+                    raise FinOpsError("CloudKitty returned a cross-project datapoint")
+                identity = hashlib.sha256(json.dumps(
+                    description, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+                result.append({
+                    "source_id": f"{begin}/{end}/{row['service']}/{identity}/{index}",
+                    "project_id": expected_project_id,
+                    "period": f"{begin}/{end}",
+                    "meter": row["service"],
+                    "quantity": str(decimal(row.get("volume", 0))),
+                    "cloudkitty_cost": str(decimal(row.get("rating", 0))),
+                })
+            continue
         usage = frame.get("usage", {})
         if not begin or not end or not isinstance(usage, dict):
             raise FinOpsError("CloudKitty dataframe is missing period or usage")
