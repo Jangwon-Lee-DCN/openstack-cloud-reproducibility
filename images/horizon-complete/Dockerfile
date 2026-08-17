@@ -86,7 +86,9 @@ RUN python3 /tmp/enhance_magnum_ui.py \
 RUN python3 /tmp/enhance_images_ui.py \
     && rm -f /tmp/enhance_images_ui.py \
     && grep -q "Platform Images" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py \
-    && grep -q "dcn_image_class" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py
+    && grep -q "dcn_image_class" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py \
+    && grep -q "template_name = 'project/images/index_split.html'" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/views.py \
+    && ! grep -q "CAPI Kubernetes" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py
 
 # Local Octavia workflow patches and self-service Identity integration are
 # copied from this repository; the VPC wheel is built from its separately

@@ -69,6 +69,24 @@ affinity=$(kubectl get service -n "$NAMESPACE" horizon-int -o jsonpath='{.spec.s
   exit 1
 }
 
+# A 200 response from the stock image table is not sufficient: require the
+# customized inspector markup and keep metadata out of the display name.
+images_html="$work_dir/images.html"
+images_status=$(curl "${curl_args[@]}" -b "$cookie" -o "$images_html" \
+  -w '%{http_code}' "$HORIZON_URL/project/images/")
+[[ "$images_status" == 200 ]] || {
+  echo "images catalogue returned HTTP $images_status" >&2
+  exit 1
+}
+grep -q 'id="image-inspector"' "$images_html" || {
+  echo "images catalogue is missing the lower detail inspector" >&2
+  exit 1
+}
+if grep -q '— CAPI Kubernetes' "$images_html"; then
+  echo "CAPI metadata leaked into the image display name" >&2
+  exit 1
+fi
+
 # These pages exercise Nova, Glance, Cinder, Designate, the VPC facade, and
 # Horizon's common project overview. Budgets are medians, so a rolling restart
 # or one transient control-plane request does not create a false regression.

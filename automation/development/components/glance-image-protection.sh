@@ -16,7 +16,9 @@ case "$operation" in
       "$root/images/horizon-complete/Dockerfile"
     grep -q 'get_template("project/images/index_split.html")' \
       "$root/deploy/scripts/verify-horizon-capabilities.sh"
-    grep -q 'CAPI Kubernetes' "$root/images/horizon-complete/enhance_images_ui.py"
+    grep -q "template_name = 'project/images/index_split.html'" \
+      "$root/images/horizon-complete/enhance_images_ui.py"
+    ! grep -q 'NEW_IMAGE_NAME' "$root/images/horizon-complete/enhance_images_ui.py"
     bash -n "$root/deploy/scripts/verify-glance-image-rbac.sh"
     bash -n "$root/deploy/scripts/reconcile-glance-image-freshness.sh"
     bash -n "$root/deploy/scripts/drill-glance-image-restore.sh"
