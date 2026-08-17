@@ -36,7 +36,7 @@ class CloudKittyRateCardContract(unittest.TestCase):
         script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
         self.assertIn("helm/packages/patched/cloudkitty-2026.1.0.tgz", script)
         self.assertIn(
-            "cfb0df843ccb9d23bb0d8e8966bddd90532c41c1260b2e96c1a962b5ae05702e",
+            "51a49cef8791ce87f852a0117c9ef60c5f06dd3d0040e5e230f5b9db95549d66",
             script,
         )
 
@@ -47,6 +47,9 @@ class CloudKittyRateCardContract(unittest.TestCase):
         self.assertIn("helm.sh/hook: post-install,post-upgrade", template)
         self.assertIn('helm.sh/hook-weight: "0"', template)
         self.assertIn('set $bootstrapJob "jobAnnotations"', template)
+        self.assertIn("before-hook-creation,hook-succeeded,hook-failed", template)
+        self.assertIn('set $bootstrapJob "backoffLimit" 0', template)
+        self.assertIn('set $bootstrapJob "activeDeadlineSeconds" 300', template)
 
     def test_dependency_jobs_are_regular_release_resources(self):
         names = (
@@ -66,6 +69,7 @@ class CloudKittyRateCardContract(unittest.TestCase):
     def test_reconciler_recreates_exact_dependency_jobs_on_upgrade(self):
         script = (ROOT / "deploy/scripts/reconcile-cloudkitty.sh").read_text()
         for name in (
+            "cloudkitty-bootstrap",
             "cloudkitty-db-init",
             "cloudkitty-db-sync",
             "cloudkitty-rabbit-init",

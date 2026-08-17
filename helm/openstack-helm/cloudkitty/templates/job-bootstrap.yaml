@@ -15,11 +15,14 @@ limitations under the License.
 {{- define "metadata.annotations.job.bootstrap" }}
 helm.sh/hook: post-install,post-upgrade
 helm.sh/hook-weight: "0"
+helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
 {{- end }}
 
 {{- if and .Values.manifests.job_bootstrap .Values.bootstrap.enabled }}
 {{- $bootstrapJob := dict "envAll" . "serviceName" "cloudkitty" "keystoneUser" .Values.bootstrap.ks_user "logConfigFile" .Values.conf.cloudkitty.DEFAULT.log_config_append -}}
 {{- $_ := set $bootstrapJob "jobAnnotations" (include "metadata.annotations.job.bootstrap" . | fromYaml) }}
+{{- $_ := set $bootstrapJob "backoffLimit" 0 }}
+{{- $_ := set $bootstrapJob "activeDeadlineSeconds" 300 }}
 {{- if .Values.pod.tolerations.cloudkitty.enabled -}}
 {{- $_ := set $bootstrapJob "tolerationsEnabled" true -}}
 {{- end -}}
