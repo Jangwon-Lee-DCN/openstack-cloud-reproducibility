@@ -33,24 +33,15 @@ def checkpoint_for_measure(measure_time: datetime) -> datetime:
     return measure_time.replace(minute=0, second=0, microsecond=0)
 
 
-def eligible_measure_time(now: datetime, *, period_hours: int = 1,
-                          wait_periods: int = 1) -> datetime:
-    """Choose a closed interval older than CloudKitty's wait window."""
-    interval_start = now - timedelta(hours=period_hours * (wait_periods + 1))
-    # A point exactly equal to the query start is backend-sensitive. Place the
-    # measure one native low-policy granule inside the closed rating interval.
-    return interval_start + timedelta(minutes=5)
+def eligible_measure_time(now: datetime) -> datetime:
+    """Choose a measure inside the resource's current active revision.
 
-
-def wait_for_metric_measures(urls: list[str], token: str, *, attempts: int = 12,
-                             delay: int = 5) -> None:
-    """Wait until Gnocchi exposes every asynchronously archived measure."""
-    for attempt in range(attempts):
-        if all(call(url, token)[1] for url in urls):
-            return
-        if attempt + 1 < attempts:
-            time.sleep(delay)
-    raise RuntimeError("Gnocchi measures did not become visible before rating reset")
+    Gnocchi's immutable ``revision_start`` is the resource creation time.  A
+    backdated measure is therefore invisible to CloudKitty's history query.
+    The acceptance-only driver processes this current interval explicitly;
+    the production scheduler and its wait window remain untouched.
+    """
+    return now
 
 
 def wait_for_metric_measures(urls: list[str], token: str, *, attempts: int = 12,
@@ -113,12 +104,10 @@ def seed():
         raise RuntimeError("acceptance state already exists; cleanup first")
     token, project_id = identity()
     resource_id = str(uuid4())
-    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
-    measure_time = eligible_measure_time(now)
+    now = datetime.now(UTC)
     _, resource = call(os.environ["GOVERNANCE_GNOCCHI_URL"] + "/v1/resource/generic", token,
         method="POST", body={"id": resource_id, "project_id": project_id,
                              "user_id": "governance-finops-acceptance",
-                             "started_at": checkpoint_for_measure(measure_time).isoformat(),
                              "metrics": {
                                  "governance.acceptance": {
                                      "archive_policy_name": RATING_ARCHIVE_POLICY},
@@ -126,6 +115,10 @@ def seed():
                                      "archive_policy_name": RATING_ARCHIVE_POLICY}}})
     metric_id = resource["metrics"]["governance.acceptance"]
     undefined_metric_id = resource["metrics"]["governance.acceptance.undefined"]
+    # Ensure the measure is strictly newer than Gnocchi's server-side
+    # resource revision_start, whose precision/order is not client-controlled.
+    time.sleep(2)
+    measure_time = eligible_measure_time(datetime.now(UTC))
     call(os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{metric_id}/measures", token,
          method="POST", body=[{"timestamp": measure_time.isoformat(), "value": 2.0}])
     call(os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{undefined_metric_id}/measures", token,
@@ -134,7 +127,7 @@ def seed():
         os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{metric_id}/measures",
         os.environ["GOVERNANCE_GNOCCHI_URL"] + f"/v1/metric/{undefined_metric_id}/measures",
     ], token)
-    period = now.strftime("%Y-%m")
+    period = measure_time.strftime("%Y-%m")
     _, budget = call("http://127.0.0.1:8080/v1/budgets", token, method="POST",
         headers={"X-Project-Id": project_id, "Idempotency-Key": f"finops-{resource_id}"},
         body={"amount": "1.000000", "period": period, "thresholds": [50, 100],
