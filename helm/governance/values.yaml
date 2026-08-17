@@ -11,6 +11,14 @@ gateway:
   namespace: development-gateway-system
 priorityClassName: dcn-development-interruptible
 webhookAllowedHosts: ""
+notifications:
+  enabled: false
+  webhookUrl: ""
+  webhookHost: ""
+  smtpHost: ""
+  smtpPort: 587
+  smtpAllowedDomains: ""
+  smtpStarttls: true
 mode: development
 providerMode: fake
 credentialRevision: "unconfigured"
