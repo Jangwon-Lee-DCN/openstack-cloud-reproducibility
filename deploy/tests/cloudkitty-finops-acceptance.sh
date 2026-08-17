@@ -2,9 +2,24 @@
 set -euo pipefail
 
 namespace=development-p1-governance-services
-pod="$(kubectl -n "$namespace" get pod -l app.kubernetes.io/name=governance-api \
-  -o jsonpath='{.items[0].metadata.name}')"
-[[ -n "$pod" ]]
+
+select_ready_pod() {
+  local target_namespace=$1 selector=$2 required
+  shift 2
+  required=$(jq -cn '$ARGS.positional' --args "$@")
+  kubectl -n "$target_namespace" get pod -l "$selector" -o json | jq -r --argjson required "$required" '
+    [.items[] | . as $pod | select(.metadata.deletionTimestamp == null) |
+      select(all($required[]; . as $name |
+        any($pod.status.containerStatuses[]?; .name == $name and .ready))) |
+      .metadata.name] | first // empty'
+}
+
+if [[ ${GOVERNANCE_FINOPS_SELECTOR_TEST:-0} == 1 ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
+pod="$(select_ready_pod "$namespace" app.kubernetes.io/name=governance-api api worker)"
+[[ -n "$pod" ]] || { echo 'no Ready non-terminating Governance pod for acceptance' >&2; exit 1; }
 
 cleanup() {
   kubectl -n "$namespace" exec "$pod" -c worker -- \
@@ -16,10 +31,7 @@ seed=$(kubectl -n "$namespace" exec "$pod" -c worker -- \
   env GOVERNANCE_FINOPS_ACCEPTANCE=seed python -m governance_worker.acceptance)
 project_id=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["project_id"])' "$seed")
 reset_timestamp=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["reset_timestamp"])' "$seed")
-processor=$(kubectl -n openstack get pod -l application=cloudkitty,component=processor -o json |
-  jq -r '[.items[] | select(.metadata.deletionTimestamp == null) |
-    select(any(.status.containerStatuses[]?; .name == "cloudkitty-processor" and .ready)) |
-    .metadata.name] | first // empty')
+processor=$(select_ready_pod openstack application=cloudkitty,component=processor cloudkitty-processor)
 [[ -n "$processor" ]] || { echo 'no Ready CloudKitty processor for acceptance reset' >&2; exit 1; }
 kubectl -n openstack exec "$processor" -c cloudkitty-processor -- python3 -c \
   'import datetime,sys; from cloudkitty import service; service.prepare_service(["finops-acceptance"], config_files=["/etc/cloudkitty/cloudkitty.conf"]); from cloudkitty.storage_state import StateManager; StateManager().set_last_processed_timestamp(sys.argv[1], datetime.datetime.fromisoformat(sys.argv[2]))' \
