@@ -22,10 +22,30 @@ class GovernanceClient:
         with self.opener.open(request, timeout=5) as response:
             return json.load(response)
 
+    def aws_forecast(self, *, period: str, price_profile_id: str,
+                     calibration_profile_id=None, budget_id=None,
+                     elapsed_fraction=None):
+        query = {"period": period, "price_profile_id": price_profile_id}
+        for key, value in (("calibration_profile_id", calibration_profile_id),
+                           ("budget_id", budget_id),
+                           ("elapsed_fraction", elapsed_fraction)):
+            if value is not None:
+                query[key] = value
+        request = Request(f"{self.endpoint}/v1/aws-cost-forecast?{urlencode(query)}",
+                          headers=self.identity)
+        with self.opener.open(request, timeout=5) as response:
+            return json.load(response)
+
 
 COLLECTIONS = (
     ("notifications", "Notifications"), ("usage", "Usage & Cost"),
     ("budgets", "Budgets"), ("certificate-policies", "Certificates"),
     ("rotation-policies", "Secret Rotation"), ("audit-events", "Audit"),
     ("tag-policies", "Tag Policies"),
+)
+
+COST_COLLECTIONS = (("usage", "Usage & Cost"), ("budgets", "Budgets"))
+ADMIN_COST_COLLECTIONS = (
+    ("aws-price-profiles", "AWS Price Profiles"),
+    ("aws-calibration-profiles", "AWS Calibration"),
 )

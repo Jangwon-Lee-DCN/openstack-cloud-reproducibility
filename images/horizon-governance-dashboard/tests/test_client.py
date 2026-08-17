@@ -1,6 +1,7 @@
 import unittest
 
-from governance_dashboard.client import COLLECTIONS, GovernanceClient
+from governance_dashboard.client import (ADMIN_COST_COLLECTIONS, COLLECTIONS,
+                                         COST_COLLECTIONS, GovernanceClient)
 
 
 class ClientContractTest(unittest.TestCase):
@@ -14,6 +15,13 @@ class ClientContractTest(unittest.TestCase):
         names = {name for name, _ in COLLECTIONS}
         self.assertTrue({"notifications", "usage", "budgets", "certificate-policies",
                          "rotation-policies", "audit-events", "tag-policies"}.issubset(names))
+        self.assertNotIn("aws-price-profiles", names)
+        self.assertNotIn("aws-calibration-profiles", names)
+
+    def test_cost_management_owns_aws_sections(self):
+        self.assertEqual({name for name, _ in COST_COLLECTIONS}, {"usage", "budgets"})
+        self.assertEqual({name for name, _ in ADMIN_COST_COLLECTIONS},
+                         {"aws-price-profiles", "aws-calibration-profiles"})
 
 
 if __name__ == "__main__":
