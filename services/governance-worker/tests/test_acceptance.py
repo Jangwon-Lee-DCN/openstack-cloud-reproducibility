@@ -43,9 +43,9 @@ class AcceptanceTransportTests(unittest.TestCase):
         self.assertEqual(sleep.call_count, 2)
 
     def test_checkpoint_starts_the_half_open_interval_containing_measure(self):
-        measure = datetime(2026, 8, 17, 7, 0, tzinfo=UTC)
+        measure = datetime(2026, 8, 17, 7, 5, tzinfo=UTC)
         checkpoint = acceptance.checkpoint_for_measure(measure)
-        self.assertEqual(checkpoint, measure)
+        self.assertEqual(checkpoint, datetime(2026, 8, 17, 7, 0, tzinfo=UTC))
         self.assertLessEqual(checkpoint, measure)
         self.assertLess(measure, checkpoint + timedelta(hours=1))
 
@@ -54,6 +54,7 @@ class AcceptanceTransportTests(unittest.TestCase):
         measure = acceptance.eligible_measure_time(now)
         checkpoint = acceptance.checkpoint_for_measure(measure)
         interval_end = checkpoint + timedelta(hours=1)
+        self.assertEqual(measure, datetime(2026, 8, 17, 7, 5, tzinfo=UTC))
         self.assertLessEqual(interval_end, now - timedelta(hours=1))
 
     @patch.object(acceptance.time, "sleep")
