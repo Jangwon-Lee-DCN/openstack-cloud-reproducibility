@@ -28,3 +28,25 @@ and the central change contract advance only for the final accepted revision.
   `network.interface.tunnel=dcn-geneve` and
   `conf.auto_bridge_add.br-ex=dcn-provider`.
 - Stop rather than applying an OVN release that maps `br-ex` to `eno2`.
+
+## Mandatory production acceptance
+
+- Production deployment is forbidden until 100% of the declared acceptance
+  scenarios for the changed user workflow pass against the exact immutable
+  image digest and rendered values that will be promoted.
+- A page returning HTTP 200, a template loading, an element existing, or Pods
+  becoming Ready is not functional acceptance. Exercise the complete user
+  action and its downstream API call, then assert the visible result and the
+  absence of error UI and server exceptions.
+- Every UI change requires an authenticated browser-equivalent E2E check for
+  the changed interaction (for example: select an image, call its detail API,
+  and render required fields). Static, unit, render, and readiness checks are
+  additional gates and cannot replace this check.
+- Run acceptance once before promotion in isolation and again against the live
+  production endpoint after rollout. Record the command, artifact digest,
+  HTTP/API result, and user-visible assertion. If any required assertion is
+  missing, ambiguous, skipped, or fails, stop and roll back; never report the
+  feature complete.
+- Do not weaken, bypass, edit around, or selectively skip a failing gate to
+  deploy. A gate defect must be fixed and the full acceptance rerun before
+  promotion.
