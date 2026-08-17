@@ -42,7 +42,7 @@ kubectl -n openstack exec "$processor" -c cloudkitty-processor -- python3 -c \
 kubectl -n "$namespace" exec "$pod" -c worker -- \
   env GOVERNANCE_FINOPS_ACCEPTANCE=setup python -m governance_worker.acceptance
 before="$(kubectl -n "$namespace" get pod "$pod" -o jsonpath='{.status.containerStatuses[?(@.name=="worker")].restartCount}')"
-kubectl -n "$namespace" exec "$pod" -c worker -- kill 1 || true
+kubectl -n "$namespace" exec "$pod" -c worker -- /bin/sh -c 'kill 1' || true
 for _ in $(seq 1 60); do
   after="$(kubectl -n "$namespace" get pod "$pod" -o jsonpath='{.status.containerStatuses[?(@.name=="worker")].restartCount}')"
   ready="$(kubectl -n "$namespace" get pod "$pod" -o jsonpath='{.status.containerStatuses[?(@.name=="worker")].ready}')"
