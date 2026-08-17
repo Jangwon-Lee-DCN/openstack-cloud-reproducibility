@@ -29,12 +29,14 @@ case "$operation" in
     # Development-only Rabbit connection: copy the already least-privilege
     # Ceilometer bus credential without decoding or printing it. This Secret is
     # namespace-local and is removed with the development namespace.
+    webhook_signing_key=$(openssl rand -hex 32)
     kubectl -n openstack get secret ceilometer-rabbitmq-user -o json |
-      jq --arg namespace "$DEVELOPMENT_NAMESPACE" '
+      jq --arg namespace "$DEVELOPMENT_NAMESPACE" --arg webhook_key "$webhook_signing_key" '
         {apiVersion:"v1",kind:"Secret",
          metadata:{name:"governance-real-integrations",namespace:$namespace},
          type:"Opaque",data:{"rabbitmq-url":((.data.RABBITMQ_CONNECTION|@base64d|
-           sub("^rabbit://";"amqp://")|sub(":15672/";":5672/"))|@base64)}}' |
+           sub("^rabbit://";"amqp://")|sub(":15672/";":5672/"))|@base64),
+           "webhook-signing-key":($webhook_key|@base64)}}' |
       kubectl apply -f - >/dev/null
     if ! kubectl -n "$DEVELOPMENT_NAMESPACE" get secret \
       governance-keystone-application-credential >/dev/null 2>&1; then
@@ -73,7 +75,7 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" rollout status statefulset/governance-postgresql --timeout=5m
     actual_images=$(kubectl -n "$DEVELOPMENT_NAMESPACE" get deployment governance-api \
       -o jsonpath='{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}')
-    [[ $(grep -c '@sha256:' <<<"$actual_images") == 2 ]] || {
+    [[ $(grep -c '@sha256:' <<<"$actual_images") == 3 ]] || {
       echo "mutable or missing image deployed: $actual_images" >&2
       exit 1
     }
@@ -101,6 +103,9 @@ case "$operation" in
     rbac_answer=$(kubectl -n "$DEVELOPMENT_NAMESPACE" auth can-i create deployments \
       --as=system:serviceaccount:"$DEVELOPMENT_NAMESPACE":default 2>/dev/null || true)
     [[ $rbac_answer == no ]]
+    kubectl -n "$DEVELOPMENT_NAMESPACE" exec deployment/governance-api -c worker -- \
+      python -m governance_worker.notification_acceptance |
+      python3 -c 'import json,sys; d=json.load(sys.stdin); assert d == {"dead":["dead",5],"retry":["delivered",2],"smtp":1,"webhook":1}'
     ;;
   *) echo 'expected deploy or verify' >&2; exit 2 ;;
 esac

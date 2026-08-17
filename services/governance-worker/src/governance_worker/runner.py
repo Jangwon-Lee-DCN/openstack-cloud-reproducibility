@@ -9,6 +9,7 @@ from governance_api.store import Store
 from governance_api.providers import ProviderError
 from .real import initialize_real_integrations
 from .cloudkitty import CloudKittyCollector
+from .delivery import NotificationEventBus, SmtpSender, WebhookSender
 from .finops import Budget, BudgetReconciler, SQLiteBudgetEvents
 from decimal import Decimal
 
@@ -60,6 +61,22 @@ class RealScheduler:
         return result
 
 
+def notification_bus(store, rabbit):
+    webhook = None
+    if os.getenv("GOVERNANCE_WEBHOOK_SIGNING_KEY"):
+        webhook = WebhookSender(
+            os.environ["GOVERNANCE_WEBHOOK_SIGNING_KEY"].encode(),
+            set(filter(None, os.getenv("GOVERNANCE_WEBHOOK_ALLOWED_HOSTS", "").split(","))),
+            allow_http_test_host=os.getenv("GOVERNANCE_WEBHOOK_HTTP_TEST_HOST", ""))
+    smtp = None
+    if os.getenv("GOVERNANCE_SMTP_HOST"):
+        smtp = SmtpSender(
+            os.environ["GOVERNANCE_SMTP_HOST"], int(os.getenv("GOVERNANCE_SMTP_PORT", "587")),
+            set(filter(None, os.getenv("GOVERNANCE_SMTP_ALLOWED_DOMAINS", "").split(","))),
+            starttls=os.getenv("GOVERNANCE_SMTP_STARTTLS", "true").lower() == "true")
+    return NotificationEventBus(rabbit, store, webhook, smtp)
+
+
 def main():
     if os.getenv("GOVERNANCE_MODE", "production") != "development":
         raise SystemExit("development boundary is required")
@@ -68,7 +85,8 @@ def main():
     integrations = initialize_real_integrations()
     store = Store(os.getenv("GOVERNANCE_DB_PATH", "/var/lib/governance/governance.db"))
     collector = CloudKittyCollector(os.environ["GOVERNANCE_CLOUDKITTY_URL"], integrations.token)
-    scheduler = RealScheduler(store, integrations.event_bus, finops=collector)
+    event_bus = notification_bus(store, integrations.event_bus)
+    scheduler = RealScheduler(store, event_bus, finops=collector)
     if os.getenv("GOVERNANCE_RUN_ONCE") == "1":
         scheduler.run_once()
         return

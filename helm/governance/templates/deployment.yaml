@@ -88,6 +88,14 @@ spec:
             - {name: GOVERNANCE_NEUTRON_URL, value: {{ .Values.providers.neutron | quote }}}
             - {name: GOVERNANCE_GLANCE_URL, value: {{ .Values.providers.glance | quote }}}
             - {name: GOVERNANCE_TEST_RESOURCE_PREFIX, value: governance-dev-}
+            - {name: GOVERNANCE_WEBHOOK_ALLOWED_HOSTS, value: {{ .Values.notifications.webhookHost | quote }} }
+            - {name: GOVERNANCE_WEBHOOK_HTTP_TEST_HOST, value: {{ .Values.notifications.webhookHost | quote }} }
+            - {name: GOVERNANCE_SMTP_HOST, value: {{ .Values.notifications.smtpHost | quote }} }
+            - {name: GOVERNANCE_SMTP_PORT, value: {{ .Values.notifications.smtpPort | quote }} }
+            - {name: GOVERNANCE_SMTP_ALLOWED_DOMAINS, value: {{ .Values.notifications.smtpAllowedDomains | quote }} }
+            - {name: GOVERNANCE_SMTP_STARTTLS, value: {{ .Values.notifications.smtpStarttls | quote }} }
+            - name: GOVERNANCE_WEBHOOK_SIGNING_KEY
+              valueFrom: {secretKeyRef: {name: governance-real-integrations, key: webhook-signing-key}}
             - name: GOVERNANCE_APPLICATION_CREDENTIAL_ID
               valueFrom: {secretKeyRef: {name: governance-keystone-application-credential, key: application-credential-id}}
             - name: GOVERNANCE_APPLICATION_CREDENTIAL_SECRET
@@ -100,6 +108,24 @@ spec:
             capabilities: {drop: [ALL]}
             readOnlyRootFilesystem: true
           volumeMounts: [{name: data, mountPath: /var/lib/governance}]
+        {{- if .Values.notifications.enabled }}
+        - name: notification-sink
+          image: "{{ .Values.workerImage.repository }}@{{ .Values.workerImage.digest }}"
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, governance_worker.notification_sink]
+          env:
+            - name: GOVERNANCE_WEBHOOK_SIGNING_KEY
+              valueFrom: {secretKeyRef: {name: governance-real-integrations, key: webhook-signing-key}}
+          ports:
+            - {name: sink-http, containerPort: 8081}
+            - {name: sink-smtp, containerPort: 8025}
+          readinessProbe: {httpGet: {path: /records, port: sink-http}, initialDelaySeconds: 2, periodSeconds: 5}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+        {{- end }}
       volumes: [{name: data, emptyDir: {}}]
 ---
 apiVersion: v1

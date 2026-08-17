@@ -17,6 +17,14 @@ providers:
   glance: http://glance-api.openstack.svc.cluster.local:9292
   postgresqlHost: governance-postgresql
   rabbitmqHost: rabbitmq.openstack.svc.cluster.local
+notifications:
+  enabled: true
+  webhookUrl: http://127.0.0.1:8081/events
+  webhookHost: "127.0.0.1"
+  smtpHost: "127.0.0.1"
+  smtpPort: 8025
+  smtpAllowedDomains: "dcn.ssu.ac.kr"
+  smtpStarttls: false
 localOpa:
   enabled: false
 canonicalEventConsumers:
