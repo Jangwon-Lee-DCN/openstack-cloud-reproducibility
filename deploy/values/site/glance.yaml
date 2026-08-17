@@ -3,8 +3,8 @@
 storage: pvc
 conf:
   policy:
-    delete_image: "(role:member or role:admin) and project_id:%(project_id)s"
-    modify_image: "(role:member or role:admin) and project_id:%(project_id)s"
+    delete_image: "((role:member or role:admin) and project_id:%(project_id)s) or (role:admin and project_id:fe9c1a5f82f440c68baf3d9c8fb40ea2)"
+    modify_image: "((role:member or role:admin) and project_id:%(project_id)s) or (role:admin and project_id:fe9c1a5f82f440c68baf3d9c8fb40ea2)"
     publicize_image: "role:admin and project_id:fe9c1a5f82f440c68baf3d9c8fb40ea2"
     communitize_image: "role:admin and project_id:fe9c1a5f82f440c68baf3d9c8fb40ea2"
   paste:
