@@ -272,3 +272,29 @@ spec:
             summary: Octavia state audit result is missing or stale
             description: The read-only Octavia/OVN state audit has not published successfully in 30 minutes.
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/octavia-state-audit.md
+    - name: glance.image-lifecycle
+      rules:
+        - alert: GlanceImageCatalogAuditFailed
+          expr: kube_job_status_failed{namespace="openstack",job_name=~"glance-image-catalog-audit-.*"} > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: Glance image catalogue drift or duplicate was detected
+            description: The hourly declared image catalogue audit failed. Review the Job log before changing image metadata.
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/docs/glance-image-lifecycle.md
+        - alert: GlanceImageCatalogAuditStale
+          expr: time() - kube_cronjob_status_last_successful_time{namespace="openstack",cronjob="glance-image-catalog-audit"} > 7200
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: Glance image catalogue audit is stale
+            description: No successful catalogue audit has completed in two hours.
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/docs/glance-image-lifecycle.md
+        - alert: GlanceImageBackupStale
+          expr: time() - kube_cronjob_status_last_successful_time{namespace="openstack",cronjob="glance-image-backup"} > 129600
+          for: 30m
+          labels: {severity: critical}
+          annotations:
+            summary: Glance image data snapshot is stale
+            description: The retained PowerStore snapshot has not completed successfully in 36 hours.
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/docs/glance-image-lifecycle.md

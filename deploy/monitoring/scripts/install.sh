@@ -12,6 +12,7 @@ for command_name in kubectl helm sops jq curl; do
 done
 
 kubectl apply -f "${ROOT}/manifests/alertmanager-webhook-audit.yaml"
+kubectl apply -f "${ROOT}/manifests/glance-image-dashboard.yaml"
 kubectl -n monitoring rollout status deployment/alertmanager-webhook-audit \
   --timeout=300s
 

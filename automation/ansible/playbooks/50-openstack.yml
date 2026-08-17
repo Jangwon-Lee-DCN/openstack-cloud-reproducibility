@@ -64,6 +64,19 @@
       register: glance_image_protection
       changed_when: "'changed=true' in glance_image_protection.stdout"
 
+    - name: Reconcile the declared Glance image catalogue
+      ansible.builtin.command: >-
+        {{ repro_repo_path }}/deploy/scripts/reconcile-glance-image-catalog.sh apply
+      args:
+        chdir: "{{ repro_repo_path }}"
+      register: glance_image_catalog
+      changed_when: "'\"changed\": 0' not in glance_image_catalog.stdout"
+
+    - name: Install the retained Glance image data snapshot schedule
+      ansible.builtin.command: >-
+        kubectl apply -f {{ repro_repo_path }}/deploy/manifests/glance-image-backup.yaml
+      changed_when: true
+
     - name: Install Designate and PowerDNS
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-designate.sh"
       args:
