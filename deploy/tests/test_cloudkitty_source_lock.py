@@ -14,6 +14,15 @@ verify = module.verify
 
 
 class SourceLockTests(unittest.TestCase):
+    def test_governance_worker_migrations_are_readable_by_runtime_user(self):
+        root = Path(__file__).parents[2]
+        dockerfile = (root / "images/governance-worker/Dockerfile").read_text()
+        self.assertIn(
+            "COPY --chown=65532:65532 --chmod=0555 "
+            "services/governance-api/migrations /app/migrations",
+            dockerfile,
+        )
+
     def repository(self, root: Path):
         subprocess.run(["git", "init", "-b", "main", str(root)], check=True, stdout=subprocess.DEVNULL)
         subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
