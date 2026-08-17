@@ -19,7 +19,7 @@ COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
 COPY enhance_images_ui.py /tmp/enhance_images_ui.py
-COPY image_catalog/index_split.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/templates/project/images/index_split.html
+COPY image_catalog/index_split.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html
 COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/platform_navigation.py
 COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
 COPY settings/0001_production_region.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py
