@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
@@ -23,6 +24,13 @@ class _Response:
 
 
 class AcceptanceTransportTests(unittest.TestCase):
+    def test_checkpoint_starts_the_half_open_interval_containing_measure(self):
+        measure = datetime(2026, 8, 17, 7, 0, tzinfo=UTC)
+        checkpoint = acceptance.checkpoint_for_measure(measure)
+        self.assertEqual(checkpoint, measure)
+        self.assertLessEqual(checkpoint, measure)
+        self.assertLess(measure, checkpoint + timedelta(hours=1))
+
     @patch.object(acceptance.time, "sleep")
     @patch.object(acceptance, "urlopen")
     def test_call_retries_transient_transport_with_a_fixed_bound(self, urlopen, sleep):
