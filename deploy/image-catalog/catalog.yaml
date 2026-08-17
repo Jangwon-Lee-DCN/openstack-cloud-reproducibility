@@ -9,6 +9,7 @@ images:
     support_status: recommended
     os_distro: ubuntu
     os_version: "22.04"
+    build_date: "2026-08-14"
   - name: ubuntu-24.04-lts-20260801
     visibility: public
     hidden: false
@@ -18,6 +19,7 @@ images:
     support_status: recommended
     os_distro: ubuntu
     os_version: "24.04"
+    build_date: "2026-08-14"
   - name: ubuntu-noble-kube-v1.34.10-260810-1105
     visibility: public
     hidden: false
@@ -28,6 +30,7 @@ images:
     os_distro: ubuntu
     os_version: "24.04"
     kube_version: v1.34.10
+    build_date: "2026-08-14"
   - name: ubuntu-noble-kube-v1.35.7-260810-1105
     visibility: public
     hidden: false
@@ -38,6 +41,7 @@ images:
     os_distro: ubuntu
     os_version: "24.04"
     kube_version: v1.35.7
+    build_date: "2026-08-14"
   - name: ubuntu-noble-kube-v1.36.3-260810-1105
     visibility: public
     hidden: false
@@ -48,6 +52,7 @@ images:
     os_distro: ubuntu
     os_version: "24.04"
     kube_version: v1.36.3
+    build_date: "2026-08-14"
   - name: amphora-x64-haproxy-ubuntu-noble-2026.1-20260816
     visibility: private
     hidden: true
@@ -57,4 +62,5 @@ images:
     support_status: recommended
     os_distro: ubuntu
     os_version: "24.04"
+    build_date: "2026-08-16"
     tags: [amphora]

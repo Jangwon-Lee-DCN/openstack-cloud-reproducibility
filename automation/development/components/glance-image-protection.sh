@@ -11,6 +11,10 @@ image=quay.io/airshipit/openstack-client@sha256:8a402a50ecf2afe14f580ad2bae17433
 
 case "$operation" in
   deploy)
+    grep -q 'CAPI Kubernetes' "$root/images/horizon-complete/enhance_images_ui.py"
+    bash -n "$root/deploy/scripts/verify-glance-image-rbac.sh"
+    bash -n "$root/deploy/scripts/reconcile-glance-image-freshness.sh"
+    bash -n "$root/deploy/scripts/drill-glance-image-restore.sh"
     kubectl -n "$DEVELOPMENT_NAMESPACE" create configmap glance-image-protection-tests \
       --from-file=glance_image_protection.py="$root/deploy/scripts/glance_image_protection.py" \
       --from-file=test_glance_image_protection.py="$root/deploy/tests/test_glance_image_protection.py" \
