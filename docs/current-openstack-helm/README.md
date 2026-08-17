@@ -7,7 +7,7 @@ foundation. It contains specifications, site inventory, version pins, Helm
 value overrides, manifests, and operational scripts.
 
 External platform dependencies are owned by the sibling
-[`prerequisites/`](../../prerequisites/README.md) workspace. Its
+[`prerequisites/`](../../prerequisites/) workspace. Its
 component matrix defines which lifecycle belongs here and which does not.
 
 The PoC foundation deployment is operational. As of 2026-08-04, the following
