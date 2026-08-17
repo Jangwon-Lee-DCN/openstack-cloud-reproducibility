@@ -147,6 +147,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \
+    && grep -q 'ADD_INSTALLED_APPS.*openstack_dashboard.service_catalog' "$local_enabled/_1380_dcn_service_catalog.py" \
     && grep -q 'baremetal-virtual' /etc/openstack-dashboard/dcn-service-catalog.yaml \
     && grep -q 'openstack_dashboard.platform_navigation' "$local_enabled/_9999_platform_navigation.py" \
     && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py" \
