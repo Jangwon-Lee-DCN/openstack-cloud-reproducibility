@@ -51,6 +51,7 @@ User.is_authenticated = True
 User.is_superuser = False
 User.authorized_tenants = []
 User.user_domain_name = token["user"]["domain"].get("name", User.domain_id)
+User.user_domain_id = User.domain_id
 User.project_name = token["project"]["name"]
 User.services_region = "seoul-ssu-1"
 User.available_services_regions = ["seoul-ssu-1"]
