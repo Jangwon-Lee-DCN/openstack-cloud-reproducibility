@@ -36,7 +36,9 @@ group = governance.get_panel_group("cost_management")
 assert group.panels == ["cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles"]
 assert not {"aws-price-profiles", "aws-calibration-profiles"} & {name for name, _ in COLLECTIONS}
 for panel in group.panels:
-    assert reverse(f"horizon:governance:{panel}:index").startswith("/horizon/")
+    assert reverse(f"horizon:governance:{panel}:index").endswith(
+        f"/governance/{panel}/"
+    )
 for view in (OverviewView, BudgetsView, ForecastView, ProfilesView):
     instance = view()
     instance.request = request
