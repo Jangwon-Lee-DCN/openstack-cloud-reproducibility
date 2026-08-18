@@ -12,6 +12,7 @@ import django
 
 django.setup()
 import openstack_dashboard.urls  # noqa: E402,F401
+from django.conf import settings  # noqa: E402
 from django.test import RequestFactory  # noqa: E402
 from django.core.exceptions import PermissionDenied  # noqa: E402
 from django.urls import reverse  # noqa: E402
@@ -23,6 +24,8 @@ from governance_dashboard.panels.aws_forecast.views import IndexView as Forecast
 from governance_dashboard.panels.cost_budgets.views import IndexView as BudgetsView  # noqa: E402
 from governance_dashboard.panels.cost_overview.views import IndexView as OverviewView  # noqa: E402
 from governance_dashboard.panels.cost_profiles.views import IndexView as ProfilesView  # noqa: E402
+
+settings.TEMPLATES[0]["DIRS"].insert(0, "/tests")
 
 
 class User:
@@ -86,7 +89,9 @@ for panel in group.panels:
     assert reverse(f"horizon:governance:{panel}:index").endswith(
         f"/governance/{panel}/"
     )
-for view in (OverviewView, BudgetsView, ForecastView):
+for view, expected in ((OverviewView, b"Cost Management"),
+                       (BudgetsView, b"Budgets"),
+                       (ForecastView, b"AWS Cost Forecast")):
     request = scoped_request()
     print(f"RENDER {view.__module__}", flush=True)
     instance = view()
@@ -100,7 +105,8 @@ for view in (OverviewView, BudgetsView, ForecastView):
     response = instance.render_to_response(context)
     response.render()
     assert response.status_code == 200
-    assert b"Cost Management" in response.content
+    assert b'id="cost-management-content"' in response.content
+    assert expected in response.content
 
 # The development application credential deliberately has member/reader roles.
 # Price & Calibration must therefore remain inaccessible through Horizon, while

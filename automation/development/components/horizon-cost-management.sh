@@ -14,6 +14,7 @@ case "$operation" in
     [[ $HORIZON_COST_IMAGE_DIGEST =~ ^sha256:[a-f0-9]{64}$ ]]
     kubectl -n "$DEVELOPMENT_NAMESPACE" create configmap horizon-cost-acceptance \
       --from-file=acceptance.py="$root/deploy/tests/horizon_cost_management_acceptance.py" \
+      --from-file=base.html="$root/deploy/tests/horizon_cost_base.html" \
       --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl -n development-gateway-system get secret development-gateway-tls \
       -o jsonpath='{.data.tls\.crt}' | base64 -d | \
