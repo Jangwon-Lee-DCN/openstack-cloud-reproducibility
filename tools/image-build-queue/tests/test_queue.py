@@ -26,6 +26,13 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_service_supplies_a_build_capable_python(self):
+        service = (ROOT / "dcn-image-build-queue.service").read_text()
+        installer = (ROOT / "install.sh").read_text()
+        self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
+        self.assertIn("-c 'import build'", installer)
+        self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
+
     def test_pueue_environment_is_allow_listed(self):
         captured = {}
 
