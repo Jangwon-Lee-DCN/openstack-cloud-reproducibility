@@ -21,7 +21,8 @@ PLATFORM_IMAGE_OWNER_IDS = (
 # promotion.  Horizon proxies the preview UI to its TLS endpoint; keeping the
 # endpoint explicit prevents an unset setting from turning every Governance
 # and Cost Management page into HTTP 500.
-GOVERNANCE_FAKE_API_ENDPOINT = (
-    "https://p1-governance-services.dev.dcn.ssu.ac.kr"
+GOVERNANCE_FAKE_API_ENDPOINT = os.environ.get(
+    "GOVERNANCE_API_ENDPOINT",
+    "https://p1-governance-services.dev.dcn.ssu.ac.kr",
 )
 GOVERNANCE_API_CA_FILE = "/etc/openstack-dashboard/governance-ca/tls.crt"

@@ -7,6 +7,7 @@ from governance_dashboard.client import (ADMIN_COST_COLLECTIONS, COLLECTIONS,
 class ClientContractTest(unittest.TestCase):
     def test_only_development_endpoint_is_accepted(self):
         GovernanceClient("https://p1-governance-services.dev.dcn.ssu.ac.kr", {})
+        GovernanceClient("http://governance-api.development-p1-governance-services.svc.cluster.local", {})
         for endpoint in ("http://localhost", "https://cloud.dcn.ssu.ac.kr"):
             with self.assertRaises(ValueError):
                 GovernanceClient(endpoint, {})

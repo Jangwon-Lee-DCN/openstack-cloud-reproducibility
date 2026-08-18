@@ -9,7 +9,10 @@ from urllib.request import HTTPSHandler, Request, build_opener, ProxyHandler
 class GovernanceClient:
     def __init__(self, endpoint: str, identity: dict[str, str], opener=None,
                  ca_file=None):
-        if not endpoint.startswith("https://") or not endpoint.endswith(".dev.dcn.ssu.ac.kr"):
+        internal = "http://governance-api.development-p1-governance-services.svc.cluster.local"
+        if endpoint != internal and (
+                not endpoint.startswith("https://") or
+                not endpoint.endswith(".dev.dcn.ssu.ac.kr")):
             raise ValueError("development fake endpoint required")
         self.endpoint = endpoint.rstrip("/")
         self.identity = identity
