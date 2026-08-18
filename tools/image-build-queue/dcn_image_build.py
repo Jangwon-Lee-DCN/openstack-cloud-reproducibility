@@ -20,6 +20,7 @@ STATE = Path(os.environ.get("DCN_IMAGE_BUILD_STATE", "/var/lib/dcn-image-build-q
 PUEUE = os.environ.get("PUEUE_BIN", "/usr/local/libexec/dcn-image-build-queue/pueue")
 CONFIG = os.environ.get("PUEUE_CONFIG_PATH", "/etc/dcn-image-build-queue/pueue.yml")
 RUNNER = os.environ.get("DCN_IMAGE_BUILD_RUNNER", "/usr/local/libexec/dcn-image-build-queue/run-image-build")
+BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 
 COMPONENTS = {
     "horizon-complete": ("horizon", ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard")),
@@ -55,7 +56,10 @@ def pueue(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "PUEUE_CONFIG_PATH": CONFIG,
     }
-    if python_binary := os.environ.get("PYTHON_BINARY"):
+    python_binary = os.environ.get("PYTHON_BINARY")
+    if not python_binary and BUILD_PYTHON_CONFIG.is_file():
+        python_binary = BUILD_PYTHON_CONFIG.read_text().strip()
+    if python_binary:
         safe_environment["PYTHON_BINARY"] = python_binary
     return run([PUEUE, "--config", CONFIG, *args], check=check, env=safe_environment)
 
