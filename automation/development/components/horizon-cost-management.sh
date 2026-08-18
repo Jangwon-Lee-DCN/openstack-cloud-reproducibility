@@ -31,13 +31,24 @@ spec:
       tolerations:
         - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
         - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      initContainers:
+        - name: prepare-secret-key-store
+          image: IMAGE_REF
+          command: [sh, -c, 'touch /state/store /state/store.lock']
+          volumeMounts: [{name: state, mountPath: /state}]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, runAsNonRoot: true, runAsUser: 65534, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: test
           image: IMAGE_REF
           command: [python3, /tests/acceptance.py]
-          volumeMounts: [{name: tests, mountPath: /tests, readOnly: true}]
+          volumeMounts:
+            - {name: tests, mountPath: /tests, readOnly: true}
+            - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/_var_lib_openstack_lib_python3.12_site-packages_openstack_dashboard_local_.secret_key_store, subPath: store}
+            - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/_var_lib_openstack_lib_python3.12_site-packages_openstack_dashboard_local_.secret_key_store.lock, subPath: store.lock}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, runAsNonRoot: true, runAsUser: 65534, seccompProfile: {type: RuntimeDefault}}
-      volumes: [{name: tests, configMap: {name: horizon-cost-acceptance}}]
+      volumes:
+        - {name: tests, configMap: {name: horizon-cost-acceptance}}
+        - {name: state, emptyDir: {}}
 EOF
     ;;
   verify)
