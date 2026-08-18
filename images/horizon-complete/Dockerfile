@@ -121,7 +121,7 @@ COPY project-selfservice/enabled/_2850_admin_project_operations.py /var/lib/open
 RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/enabled \
     && local_enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled \
     && sed -i "s/^PANEL_GROUP = 'network'$/PANEL_GROUP = 'vpc'/" "$local_enabled/_1482_project_load_balancer_panel.py" \
-    && rm -f "$enabled/_1410_network_panel_group.py" "$enabled/_1420_project_network_topology_panel.py" \
+    && rm -f "$enabled/_1420_project_network_topology_panel.py" \
        "$enabled/_1480_security_groups_panel.py" "$enabled/_1490_project_floating_ips_panel.py" \
        "$enabled/_1500_project_trunks_panel.py" "$enabled/_1510_project_network_qos_panel.py" \
        "$enabled/_1520_project_floating_ip_portforwardings_panel.py" \
