@@ -18,6 +18,7 @@ from django.conf import settings  # noqa: E402
 from django.test import Client, RequestFactory  # noqa: E402
 from django.urls import reverse  # noqa: E402
 from horizon import Horizon  # noqa: E402
+from horizon.exceptions import NotAuthorized  # noqa: E402
 from openstack_auth import utils as auth_utils  # noqa: E402
 from governance_dashboard.client import COLLECTIONS  # noqa: E402
 from governance_dashboard.cost import client_for, is_cost_admin  # noqa: E402
@@ -105,7 +106,7 @@ for panel in group.panels:
     assert reverse(f"horizon:governance:{panel}:index").endswith(
         f"/governance/{panel}/"
     )
-browser = Client(raise_request_exception=False)
+browser = Client()
 for panel, expected in (("cost_overview", b"Cost Management"),
                         ("cost_budgets", b"Budgets"),
                         ("aws_cost_forecast", b"AWS Cost Forecast")):
@@ -121,10 +122,13 @@ for panel, expected in (("cost_overview", b"Cost Management"),
 # its backing collections are still exercised with the real scoped token.
 request = scoped_request()
 assert not is_cost_admin(request)
-profiles_response = browser.get(
-    reverse("horizon:governance:cost_profiles:index"),
-    HTTP_HOST="cloud.dcn.ssu.ac.kr")
-assert profiles_response.status_code == 403
+try:
+    browser.get(reverse("horizon:governance:cost_profiles:index"),
+                HTTP_HOST="cloud.dcn.ssu.ac.kr")
+except NotAuthorized:
+    pass
+else:
+    raise AssertionError("member unexpectedly opened Price & Calibration")
 client = client_for(request)
 for collection in ("aws-price-profiles", "aws-calibration-profiles"):
     assert "items" in client.list(collection)
