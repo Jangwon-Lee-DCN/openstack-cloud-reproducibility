@@ -99,7 +99,7 @@ for name in (
 project = Horizon.get_dashboard("project")
 assert list(project.get_panel_groups()) == [
     "compute", "vpc", "volumes", "share", "object_store",
-    "container_infra", "dns", "observability", "default",
+    "container_infra", "dns", "observability", "cost_management", "default",
 ]
 assert project.get_panel_group("share").panels == [
     "shares", "share_snapshots", "share_networks",
@@ -107,18 +107,17 @@ assert project.get_panel_group("share").panels == [
 assert project.get_panel_group("observability").panels == [
     "cloud_metrics", "cloud_alarms",
 ]
+assert project.get_panel_group("cost_management").panels == [
+    "cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles",
+]
+assert str(project.get_panel_group("cost_management").name) == "Cost Management"
+for panel in ("cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles"):
+    assert reverse(f"horizon:project:{panel}:index").startswith("/horizon/")
 assert "network_operations" in project.get_panel_group("vpc").panels
 assert reverse("horizon:project:network_operations:index").startswith("/horizon/")
 assert str(project.get_panel_group("observability").name) == "Monitoring & Alarms"
 assert str(project.get_panel("cloud_metrics").name) == "Metric Coverage"
 assert str(project.get_panel("cloud_s3").name) == "S3 Access & Credentials"
-governance = Horizon.get_dashboard("governance")
-assert governance.get_panel_group("cost_management").panels == [
-    "cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles",
-]
-assert str(governance.get_panel_group("cost_management").name) == "Cost Management"
-for panel in ("cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles"):
-    assert reverse(f"horizon:governance:{panel}:index").startswith("/horizon/")
 identity = Horizon.get_dashboard("identity")
 assert str(identity.name) == "Identity & Access"
 assert str(identity.get_panel("projects").name) == "Projects & Members"
