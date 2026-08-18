@@ -122,7 +122,6 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && local_enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled \
     && sed -i "s/^PANEL_GROUP = 'network'$/PANEL_GROUP = 'vpc'/" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && rm -f "$enabled/_1410_network_panel_group.py" "$enabled/_1420_project_network_topology_panel.py" \
-       "$enabled/_1430_project_network_panel.py" "$enabled/_1440_project_routers_panel.py" \
        "$enabled/_1480_security_groups_panel.py" "$enabled/_1490_project_floating_ips_panel.py" \
        "$enabled/_1500_project_trunks_panel.py" "$enabled/_1510_project_network_qos_panel.py" \
        "$enabled/_1520_project_floating_ip_portforwardings_panel.py" \
@@ -159,6 +158,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \
+    && grep -q 'ADD_INSTALLED_APPS.*dcn_core_orchestration' "$local_enabled/_2210_core_orchestration.py" \
     && grep -q 'ADD_INSTALLED_APPS.*openstack_dashboard.service_catalog' "$local_enabled/_1380_dcn_service_catalog.py" \
     && grep -q 'baremetal-virtual' /etc/openstack-dashboard/dcn-service-catalog.yaml \
     && grep -q 'openstack_dashboard.platform_navigation' "$local_enabled/_9999_platform_navigation.py" \
