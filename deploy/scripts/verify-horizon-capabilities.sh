@@ -119,6 +119,8 @@ assert reverse("horizon:project:network_operations:index").startswith("/horizon/
 assert str(project.get_panel_group("observability").name) == "Monitoring & Alarms"
 assert str(project.get_panel("cloud_metrics").name) == "Metric Coverage"
 assert str(project.get_panel("cloud_s3").name) == "S3 Access & Credentials"
+admin = Horizon.get_dashboard("admin")
+assert "trunks" not in [panel.slug for panel in admin.get_panels()]
 governance = Horizon.get_dashboard("governance")
 assert governance.get_panel_group("cost_management").panels == [
     "cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles",
