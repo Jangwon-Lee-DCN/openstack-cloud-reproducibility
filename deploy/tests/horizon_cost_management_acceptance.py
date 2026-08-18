@@ -1,5 +1,7 @@
 import os
 import json
+import sys
+import types
 import urllib.request
 import urllib.error
 
@@ -13,7 +15,6 @@ import django
 django.setup()
 import openstack_dashboard.urls  # noqa: E402,F401
 from django.conf import settings  # noqa: E402
-from django.contrib.auth import middleware as auth_middleware  # noqa: E402
 from django.test import Client, RequestFactory  # noqa: E402
 from django.urls import reverse  # noqa: E402
 from horizon import Horizon  # noqa: E402
@@ -77,7 +78,23 @@ request = scoped_request()
 # session backend.  This isolated Job has no Horizon session database, so bind
 # the policy helper to the already verified, real Keystone token principal.
 auth_utils.get_user = lambda scoped: scoped.user
-auth_middleware.get_user = lambda scoped: User()
+
+
+class ScopedUserMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, scoped):
+        scoped.user = User()
+        scoped.session = {}
+        scoped.horizon = {}
+        return self.get_response(scoped)
+
+
+acceptance_auth = types.ModuleType("acceptance_auth")
+acceptance_auth.ScopedUserMiddleware = ScopedUserMiddleware
+sys.modules["acceptance_auth"] = acceptance_auth
+settings.MIDDLEWARE = ["acceptance_auth.ScopedUserMiddleware"]
 project = Horizon.get_dashboard("project")
 governance = Horizon.get_dashboard("governance")
 assert "cost_management" not in list(project.get_panel_groups())
