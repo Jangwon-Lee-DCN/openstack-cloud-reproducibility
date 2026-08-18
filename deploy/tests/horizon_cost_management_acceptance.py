@@ -45,11 +45,16 @@ User.domain_id = token["user"]["domain"]["id"]
 User.project_id = token["project"]["id"]
 User.id = token["user"]["id"]
 User.roles = token["roles"]
+User.username = token["user"]["name"]
+User.is_authenticated = True
+User.is_superuser = False
+User.authorized_tenants = []
 
 
 factory = RequestFactory()
 request = factory.get("/")
 request.user = User()
+request.session = {}
 project = Horizon.get_dashboard("project")
 governance = Horizon.get_dashboard("governance")
 assert "cost_management" not in list(project.get_panel_groups())
