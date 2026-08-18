@@ -43,7 +43,7 @@ spec:
           command: [python3, /tests/acceptance.py]
           volumeMounts:
             - {name: tests, mountPath: /tests, readOnly: true}
-            - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/_var_lib_openstack_lib_python3.12_site-packages_openstack_dashboard_local_.secret_key_store, subPath: store}
+            - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/.secret_key_store, subPath: store}
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/_var_lib_openstack_lib_python3.12_site-packages_openstack_dashboard_local_.secret_key_store.lock, subPath: store.lock}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, runAsNonRoot: true, runAsUser: 65534, seccompProfile: {type: RuntimeDefault}}
       volumes:
