@@ -129,6 +129,8 @@ _hide_panels(
     project,
     (
         "load_balancer",
+        "networks",
+        "routers",
         "security_services",
         "share_groups",
         "share_group_snapshots",
