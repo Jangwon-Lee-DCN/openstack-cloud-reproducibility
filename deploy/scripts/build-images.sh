@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Once the shared queue is installed, direct invocations can race with other
+# sessions and overwrite a newer source tag. The queue runner supplies the
+# request UUID. Fresh rebuild hosts without the service retain the bootstrap
+# path, and an operator can stop the service before an explicitly reviewed
+# recovery build.
+if systemctl is-active --quiet dcn-image-build-queue.service 2>/dev/null &&
+   [[ -z ${DCN_IMAGE_BUILD_QUEUE_TASK:-} ]]; then
+  echo "direct image builds are disabled while dcn-image-build-queue.service is active" >&2
+  echo "submit the build with dcn-image-build; do not stop or bypass the queue for routine work" >&2
+  exit 2
+fi
+
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 REGISTRY=${REGISTRY:-registry.dcn.ssu.ac.kr/openstack}

@@ -1,0 +1,37 @@
+[Unit]
+Description=DCN serialized image build queue
+Documentation=https://github.com/Nukesor/pueue
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@BUILD_USER@
+Group=@BUILD_GROUP@
+UMask=0007
+Environment=PUEUE_CONFIG_PATH=/etc/dcn-image-build-queue/pueue.yml
+Environment=DCN_IMAGE_BUILD_STATE=/var/lib/dcn-image-build-queue
+ExecStart=/usr/local/libexec/dcn-image-build-queue/pueued --config /etc/dcn-image-build-queue/pueue.yml
+ExecStartPost=/usr/local/libexec/dcn-image-build-queue/init-groups
+Restart=on-failure
+RestartSec=2s
+RuntimeDirectory=dcn-image-build-queue
+RuntimeDirectoryMode=0770
+StateDirectory=dcn-image-build-queue
+StateDirectoryMode=0770
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=read-only
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dcn-image-build-queue /run/dcn-image-build-queue -/@BUILD_HOME@/.kube/cache -/@BUILD_HOME@/.kube/http-cache
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
