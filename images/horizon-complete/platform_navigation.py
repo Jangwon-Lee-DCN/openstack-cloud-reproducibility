@@ -138,6 +138,10 @@ _hide_panels(
         "resource_locks",
     ),
 )
+# The stock Network and Router panels remain enabled during Horizon discovery
+# solely because Admin views reuse their template providers. Remove their now
+# empty legacy navigation group after unregistering the panels.
+project._panel_groups.pop("network", None)
 
 identity = horizon.get_dashboard("identity")
 identity.name = "Identity & Access"
