@@ -55,6 +55,8 @@ def pueue(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "PUEUE_CONFIG_PATH": CONFIG,
     }
+    if python_binary := os.environ.get("PYTHON_BINARY"):
+        safe_environment["PYTHON_BINARY"] = python_binary
     return run([PUEUE, "--config", CONFIG, *args], check=check, env=safe_environment)
 
 
