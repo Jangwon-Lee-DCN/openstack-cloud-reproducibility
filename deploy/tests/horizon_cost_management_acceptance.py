@@ -22,6 +22,7 @@ from governance_dashboard.client import COLLECTIONS  # noqa: E402
 from governance_dashboard.cost import client_for, is_cost_admin  # noqa: E402
 
 settings.TEMPLATES[0]["DIRS"].insert(0, "/tests")
+settings.SECRET_KEY = "development-horizon-cost-acceptance-only"
 
 
 class User:
