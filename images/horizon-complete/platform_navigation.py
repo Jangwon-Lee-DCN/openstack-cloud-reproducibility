@@ -168,3 +168,9 @@ _order_panels(
 admin = horizon.get_dashboard("admin")
 _rename_panel(admin, "cloud_telemetry_health", "Telemetry Service Health")
 _rename_group(admin, "share", "Shared File Storage")
+# This deployment deliberately uses project-scoped administration. Horizon's
+# stock Admin/Trunks panel requires a system-scoped Network token and therefore
+# can only return HTTP 403 for every supported interactive persona. Keep the
+# project VPC/ENI workflow as the user-facing contract and do not advertise a
+# dead system-scope panel.
+_hide_panels(admin, ("trunks",))
