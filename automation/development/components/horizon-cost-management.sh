@@ -71,6 +71,7 @@ spec:
     metadata: {labels: {app: horizon-cost-acceptance}}
     spec:
       restartPolicy: Never
+      securityContext: {fsGroup: 65534, fsGroupChangePolicy: OnRootMismatch}
       priorityClassName: dcn-development-interruptible
       nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
       tolerations:
@@ -85,7 +86,12 @@ spec:
       containers:
         - name: test
           image: IMAGE_REF
-          command: [python3, /tests/acceptance.py]
+          command: [sh, -ec]
+          args:
+            - |
+              python3 -m django collectstatic --noinput --settings=openstack_dashboard.settings
+              python3 -m django compress --force --settings=openstack_dashboard.settings
+              exec python3 /tests/acceptance.py
           env:
             - {name: APP_CRED_ID, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: application-credential-id}}}
             - {name: APP_CRED_SECRET, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: application-credential-secret}}}
@@ -96,16 +102,18 @@ spec:
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/.secret_key_store, subPath: store}
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/_var_lib_openstack_lib_python3.12_site-packages_openstack_dashboard_local_.secret_key_store.lock, subPath: store.lock}
             - {name: governance-ca, mountPath: /etc/openstack-dashboard/governance-ca, readOnly: true}
+            - {name: static, mountPath: /var/www/html}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, runAsNonRoot: true, runAsUser: 65534, seccompProfile: {type: RuntimeDefault}}
       volumes:
         - {name: tests, configMap: {name: horizon-cost-acceptance}}
         - {name: state, emptyDir: {}}
         - {name: governance-ca, configMap: {name: governance-api-ca}}
+        - {name: static, emptyDir: {}}
 EOF
     ;;
   verify)
     kubectl -n "$DEVELOPMENT_NAMESPACE" wait --for=condition=complete job/horizon-cost-acceptance --timeout=5m
-    kubectl -n "$DEVELOPMENT_NAMESPACE" logs job/horizon-cost-acceptance | grep -q '^PASS authenticated-equivalent'
+    kubectl -n "$DEVELOPMENT_NAMESPACE" logs job/horizon-cost-acceptance | grep -q '^PASS member HTML views, admin denial, and real Governance API collections$'
     ;;
   rollback)
     kubectl -n "$DEVELOPMENT_NAMESPACE" delete job horizon-cost-acceptance --ignore-not-found --wait=true
