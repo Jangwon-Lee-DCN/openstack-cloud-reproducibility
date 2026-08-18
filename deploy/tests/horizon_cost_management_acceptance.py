@@ -29,7 +29,7 @@ payload = json.dumps({"auth": {"identity": {"methods": ["application_credential"
     "application_credential": {"id": os.environ["APP_CRED_ID"],
                                "secret": os.environ["APP_CRED_SECRET"]}}}}).encode()
 token_request = urllib.request.Request(
-    "https://cloud.dcn.ssu.ac.kr/identity/v3/auth/tokens", data=payload,
+    os.environ["AUTH_URL"].rstrip("/") + "/auth/tokens", data=payload,
     headers={"Content-Type": "application/json"})
 with urllib.request.urlopen(token_request, timeout=10) as response:
     token_id = response.headers["X-Subject-Token"]

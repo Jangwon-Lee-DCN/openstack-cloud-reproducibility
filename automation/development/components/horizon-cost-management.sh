@@ -22,6 +22,19 @@ case "$operation" in
     kubectl -n development-p1-governance-services get secret governance-keystone-application-credential -o json | \
       jq --arg ns "$DEVELOPMENT_NAMESPACE" '.metadata={name:"governance-acceptance-identity",namespace:$ns}|del(.metadata.creationTimestamp,.metadata.resourceVersion,.metadata.uid,.metadata.managedFields)' | \
       kubectl apply -f - >/dev/null
+    kubectl apply -f - >/dev/null <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-keystone-token, namespace: $DEVELOPMENT_NAMESPACE}
+spec:
+  podSelector: {matchLabels: {app: horizon-cost-acceptance}}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: openstack}}
+          podSelector: {matchLabels: {application: keystone, component: api}}
+      ports: [{protocol: TCP, port: 5000}]
+EOF
     kubectl -n "$DEVELOPMENT_NAMESPACE" delete job horizon-cost-acceptance --ignore-not-found --wait=true >/dev/null
     sed "s|IMAGE_REF|registry.dcn.ssu.ac.kr/openstack/horizon@${HORIZON_COST_IMAGE_DIGEST}|" <<'EOF' | kubectl apply -f - >/dev/null
 apiVersion: batch/v1
@@ -51,6 +64,7 @@ spec:
           env:
             - {name: APP_CRED_ID, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: application-credential-id}}}
             - {name: APP_CRED_SECRET, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: application-credential-secret}}}
+            - {name: AUTH_URL, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: auth-url}}}
           volumeMounts:
             - {name: tests, mountPath: /tests, readOnly: true}
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/.secret_key_store, subPath: store}
