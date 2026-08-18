@@ -5,6 +5,7 @@ from governance_dashboard.client import GovernanceClient
 
 def client_for(request):
     identity = {
+        "X-Auth-Token": request.user.token.id,
         "X-Domain-Id": request.user.domain_id,
         "X-Project-Id": request.user.project_id,
         "X-User-Id": request.user.id,

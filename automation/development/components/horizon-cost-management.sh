@@ -19,6 +19,9 @@ case "$operation" in
       -o jsonpath='{.data.tls\.crt}' | base64 -d | \
       kubectl -n "$DEVELOPMENT_NAMESPACE" create configmap governance-api-ca \
         --from-file=tls.crt=/dev/stdin --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+    kubectl -n development-p1-governance-services get secret governance-keystone-application-credential -o json | \
+      jq --arg ns "$DEVELOPMENT_NAMESPACE" '.metadata={name:"governance-acceptance-identity",namespace:$ns}|del(.metadata.creationTimestamp,.metadata.resourceVersion,.metadata.uid,.metadata.managedFields)' | \
+      kubectl apply -f - >/dev/null
     kubectl -n "$DEVELOPMENT_NAMESPACE" delete job horizon-cost-acceptance --ignore-not-found --wait=true >/dev/null
     sed "s|IMAGE_REF|registry.dcn.ssu.ac.kr/openstack/horizon@${HORIZON_COST_IMAGE_DIGEST}|" <<'EOF' | kubectl apply -f - >/dev/null
 apiVersion: batch/v1
@@ -45,6 +48,9 @@ spec:
         - name: test
           image: IMAGE_REF
           command: [python3, /tests/acceptance.py]
+          env:
+            - {name: APP_CRED_ID, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: application-credential-id}}}
+            - {name: APP_CRED_SECRET, valueFrom: {secretKeyRef: {name: governance-acceptance-identity, key: application-credential-secret}}}
           volumeMounts:
             - {name: tests, mountPath: /tests, readOnly: true}
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/.secret_key_store, subPath: store}

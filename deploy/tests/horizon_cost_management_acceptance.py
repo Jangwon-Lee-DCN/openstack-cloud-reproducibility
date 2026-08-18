@@ -1,4 +1,6 @@
 import os
+import json
+import urllib.request
 
 import pymysql
 
@@ -20,10 +22,23 @@ from governance_dashboard.panels.cost_profiles.views import IndexView as Profile
 
 
 class User:
-    domain_id = "default"
-    project_id = "00000000-0000-4000-8000-000000000001"
-    id = "00000000-0000-4000-8000-000000000002"
-    roles = [{"name": "admin"}, {"name": "member"}]
+    pass
+
+
+payload = json.dumps({"auth": {"identity": {"methods": ["application_credential"],
+    "application_credential": {"id": os.environ["APP_CRED_ID"],
+                               "secret": os.environ["APP_CRED_SECRET"]}}}}).encode()
+token_request = urllib.request.Request(
+    "https://cloud.dcn.ssu.ac.kr/identity/v3/auth/tokens", data=payload,
+    headers={"Content-Type": "application/json"})
+with urllib.request.urlopen(token_request, timeout=10) as response:
+    token_id = response.headers["X-Subject-Token"]
+    token = json.load(response)["token"]
+User.token = type("Token", (), {"id": token_id})()
+User.domain_id = token["user"]["domain"]["id"]
+User.project_id = token["project"]["id"]
+User.id = token["user"]["id"]
+User.roles = token["roles"]
 
 
 factory = RequestFactory()
