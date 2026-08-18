@@ -16,7 +16,7 @@ spec:
         object.metadata.name != 'horizon' ||
         object.spec.template.spec.containers.exists(c,
           c.name == 'horizon' &&
-          c.image == 'registry.dcn.ssu.ac.kr/openstack/horizon:source-4830a6fdb18c@sha256:4d7c739a1409d437e9e6ed878ec2391209780a48c314bbb260cd326235c46e70')
+          c.image == 'registry.dcn.ssu.ac.kr/openstack/horizon:source-imgapi-c739dd5@sha256:2c528a221617616cca2ab5d889195583ffc26d1cc545aedfd249bcea4f8d5f95')
       message: Horizon may only run the production-approved immutable image digest.
 ---
 apiVersion: admissionregistration.k8s.io/v1
