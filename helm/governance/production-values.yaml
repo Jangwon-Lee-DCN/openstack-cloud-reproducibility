@@ -30,6 +30,9 @@ notifications: {enabled: false}
 localOpa: {enabled: false}
 persistence:
   enabled: true
-  storageClassName: powerstore-rwo-single-path
+  # The production Pod is controller-pinned. PowerStore CSI client topology is
+  # intentionally Compute-only, so controller state uses the retained local
+  # class and is protected by the platform backup/restore workflow.
+  storageClassName: dcn-local-rwo
   apiSize: 2Gi
   postgresqlSize: 8Gi
