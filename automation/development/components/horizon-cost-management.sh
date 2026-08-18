@@ -34,7 +34,7 @@ spec:
       initContainers:
         - name: prepare-secret-key-store
           image: IMAGE_REF
-          command: [sh, -c, 'touch /state/store /state/store.lock']
+          command: [sh, -c, 'touch /state/store /state/store.lock && chmod 0600 /state/store /state/store.lock']
           volumeMounts: [{name: state, mountPath: /state}]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, runAsNonRoot: true, runAsUser: 65534, seccompProfile: {type: RuntimeDefault}}
       containers:
