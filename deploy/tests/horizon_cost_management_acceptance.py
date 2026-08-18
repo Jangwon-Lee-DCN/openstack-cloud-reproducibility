@@ -13,17 +13,13 @@ import django
 django.setup()
 import openstack_dashboard.urls  # noqa: E402,F401
 from django.conf import settings  # noqa: E402
-from django.test import RequestFactory  # noqa: E402
-from django.core.exceptions import PermissionDenied  # noqa: E402
+from django.contrib.auth import middleware as auth_middleware  # noqa: E402
+from django.test import Client, RequestFactory  # noqa: E402
 from django.urls import reverse  # noqa: E402
 from horizon import Horizon  # noqa: E402
 from openstack_auth import utils as auth_utils  # noqa: E402
 from governance_dashboard.client import COLLECTIONS  # noqa: E402
 from governance_dashboard.cost import client_for, is_cost_admin  # noqa: E402
-from governance_dashboard.panels.aws_forecast.views import IndexView as ForecastView  # noqa: E402
-from governance_dashboard.panels.cost_budgets.views import IndexView as BudgetsView  # noqa: E402
-from governance_dashboard.panels.cost_overview.views import IndexView as OverviewView  # noqa: E402
-from governance_dashboard.panels.cost_profiles.views import IndexView as ProfilesView  # noqa: E402
 
 settings.TEMPLATES[0]["DIRS"].insert(0, "/tests")
 
@@ -79,6 +75,7 @@ request = scoped_request()
 # session backend.  This isolated Job has no Horizon session database, so bind
 # the policy helper to the already verified, real Keystone token principal.
 auth_utils.get_user = lambda scoped: scoped.user
+auth_middleware.get_user = lambda scoped: User()
 project = Horizon.get_dashboard("project")
 governance = Horizon.get_dashboard("governance")
 assert "cost_management" not in list(project.get_panel_groups())
@@ -89,21 +86,13 @@ for panel in group.panels:
     assert reverse(f"horizon:governance:{panel}:index").endswith(
         f"/governance/{panel}/"
     )
-for view, expected in ((OverviewView, b"Cost Management"),
-                       (BudgetsView, b"Budgets"),
-                       (ForecastView, b"AWS Cost Forecast")):
-    request = scoped_request()
-    print(f"RENDER {view.__module__}", flush=True)
-    instance = view()
-    instance.request = request
-    try:
-        context = instance.get_context_data()
-    except urllib.error.HTTPError as error:
-        print(error.read().decode("utf-8", "replace"))
-        raise
-    assert context is not None
-    response = instance.render_to_response(context)
-    response.render()
+browser = Client(raise_request_exception=False)
+for panel, expected in (("cost_overview", b"Cost Management"),
+                        ("cost_budgets", b"Budgets"),
+                        ("aws_cost_forecast", b"AWS Cost Forecast")):
+    url = reverse(f"horizon:governance:{panel}:index")
+    print(f"GET {url}", flush=True)
+    response = browser.get(url)
     assert response.status_code == 200
     assert b'id="cost-management-content"' in response.content
     assert expected in response.content
@@ -113,16 +102,10 @@ for view, expected in ((OverviewView, b"Cost Management"),
 # its backing collections are still exercised with the real scoped token.
 request = scoped_request()
 assert not is_cost_admin(request)
-profiles = ProfilesView()
-profiles.request = request
-try:
-    profiles.get_context_data()
-except PermissionDenied:
-    pass
-else:
-    raise AssertionError("member unexpectedly opened Price & Calibration")
+profiles_response = browser.get(reverse("horizon:governance:cost_profiles:index"))
+assert profiles_response.status_code == 403
 client = client_for(request)
 for collection in ("aws-price-profiles", "aws-calibration-profiles"):
     assert "items" in client.list(collection)
 
-print("PASS member HTML views, admin denial, and real Governance API collections")
+print("PASS authenticated HTTP views, admin denial, and real Governance API collections")

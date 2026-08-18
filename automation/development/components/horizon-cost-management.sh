@@ -114,7 +114,7 @@ EOF
     ;;
   verify)
     kubectl -n "$DEVELOPMENT_NAMESPACE" wait --for=condition=complete job/horizon-cost-acceptance --timeout=5m
-    kubectl -n "$DEVELOPMENT_NAMESPACE" logs job/horizon-cost-acceptance | grep -q '^PASS member HTML views, admin denial, and real Governance API collections$'
+    kubectl -n "$DEVELOPMENT_NAMESPACE" logs job/horizon-cost-acceptance | grep -q '^PASS authenticated HTTP views, admin denial, and real Governance API collections$'
     ;;
   rollback)
     kubectl -n "$DEVELOPMENT_NAMESPACE" delete job horizon-cost-acceptance --ignore-not-found --wait=true
