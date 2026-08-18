@@ -93,7 +93,7 @@ for panel, expected in (("cost_overview", b"Cost Management"),
                         ("aws_cost_forecast", b"AWS Cost Forecast")):
     url = reverse(f"horizon:governance:{panel}:index")
     print(f"GET {url}", flush=True)
-    response = browser.get(url)
+    response = browser.get(url, HTTP_HOST="cloud.dcn.ssu.ac.kr")
     assert response.status_code == 200
     assert b'id="cost-management-content"' in response.content
     assert expected in response.content
@@ -103,7 +103,9 @@ for panel, expected in (("cost_overview", b"Cost Management"),
 # its backing collections are still exercised with the real scoped token.
 request = scoped_request()
 assert not is_cost_admin(request)
-profiles_response = browser.get(reverse("horizon:governance:cost_profiles:index"))
+profiles_response = browser.get(
+    reverse("horizon:governance:cost_profiles:index"),
+    HTTP_HOST="cloud.dcn.ssu.ac.kr")
 assert profiles_response.status_code == 403
 client = client_for(request)
 for collection in ("aws-price-profiles", "aws-calibration-profiles"):
