@@ -28,8 +28,11 @@ class User:
 payload = json.dumps({"auth": {"identity": {"methods": ["application_credential"],
     "application_credential": {"id": os.environ["APP_CRED_ID"],
                                "secret": os.environ["APP_CRED_SECRET"]}}}}).encode()
+auth_url = os.environ["AUTH_URL"].rstrip("/")
+if not auth_url.endswith("/v3"):
+    auth_url += "/v3"
 token_request = urllib.request.Request(
-    os.environ["AUTH_URL"].rstrip("/") + "/auth/tokens", data=payload,
+    auth_url + "/auth/tokens", data=payload,
     headers={"Content-Type": "application/json"})
 with urllib.request.urlopen(token_request, timeout=10) as response:
     token_id = response.headers["X-Subject-Token"]
