@@ -58,11 +58,18 @@ User.is_system_user = False
 
 
 factory = RequestFactory()
-request = factory.get("/")
-request.user = User()
-request._cached_user = request.user
-request.session = {}
-request.horizon = {}
+
+
+def scoped_request():
+    scoped = factory.get("/")
+    scoped.user = User()
+    scoped._cached_user = scoped.user
+    scoped.session = {}
+    scoped.horizon = {}
+    return scoped
+
+
+request = scoped_request()
 project = Horizon.get_dashboard("project")
 governance = Horizon.get_dashboard("governance")
 assert "cost_management" not in list(project.get_panel_groups())
@@ -74,6 +81,8 @@ for panel in group.panels:
         f"/governance/{panel}/"
     )
 for view in (OverviewView, BudgetsView, ForecastView):
+    request = scoped_request()
+    print(f"RENDER {view.__module__}", flush=True)
     instance = view()
     instance.request = request
     try:
@@ -90,6 +99,7 @@ for view in (OverviewView, BudgetsView, ForecastView):
 # The development application credential deliberately has member/reader roles.
 # Price & Calibration must therefore remain inaccessible through Horizon, while
 # its backing collections are still exercised with the real scoped token.
+request = scoped_request()
 assert not is_cost_admin(request)
 profiles = ProfilesView()
 profiles.request = request
