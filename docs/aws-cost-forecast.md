@@ -45,7 +45,7 @@ credentials must not be stored in profile bodies.
 ## Horizon placement
 
 AWS comparison data is intentionally absent from `Governance > Overview`.
-Project users access it under `Governance > Cost Management`, with separate
+Project users access it under `Project > Cost Management`, with separate
 Overview, Budgets and AWS Cost Forecast panels. `Price & Calibration` is shown
 only to `admin` or `system_reader` roles; its view enforces the same check even
 when addressed directly.
