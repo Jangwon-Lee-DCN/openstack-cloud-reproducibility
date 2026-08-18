@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
+from contextlib import redirect_stdout
+from io import StringIO
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,6 +74,32 @@ class QueueTests(unittest.TestCase):
         task = {"status": {"Done": {"result": "Success"}}}
         with mock.patch.object(queue, "pueue_task", return_value=task):
             self.assertEqual(queue.effective_status(request), "succeeded")
+
+    def test_queue_view_defaults_to_active_requests(self):
+        requests = [
+            {"task_id": 2, "group": "horizon", "component": "horizon-complete", "request_id": "active-request", "status": "running"},
+            {"task_id": 1, "group": "keystone", "component": "keystone-oidc", "request_id": "done-request", "status": "succeeded"},
+        ]
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(queue, "STATE", Path(temporary)), \
+                mock.patch.object(queue, "effective_status", side_effect=lambda request: request["status"]):
+            request_dir = Path(temporary) / "requests"
+            request_dir.mkdir()
+            for index, request in enumerate(requests):
+                (request_dir / f"{index}.json").write_text(json.dumps(request))
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(queue.queue_view(), 0)
+        self.assertIn("horizon-complete", output.getvalue())
+        self.assertNotIn("keystone-oidc", output.getvalue())
+
+    def test_queue_view_reports_an_empty_queue(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(queue, "STATE", Path(temporary)):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(queue.queue_view(), 0)
+        self.assertEqual(output.getvalue(), "Image build queue is empty.\n")
 
     def test_runner_returns_exact_immutable_digest(self):
         with tempfile.TemporaryDirectory() as temporary:
