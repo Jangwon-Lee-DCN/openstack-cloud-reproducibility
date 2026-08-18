@@ -10,7 +10,11 @@ def client_for(request):
         "X-User-Id": request.user.id,
         "X-Roles": ",".join(role["name"] for role in request.user.roles),
     }
-    return GovernanceClient(settings.GOVERNANCE_FAKE_API_ENDPOINT, identity)
+    return GovernanceClient(
+        settings.GOVERNANCE_FAKE_API_ENDPOINT,
+        identity,
+        ca_file=getattr(settings, "GOVERNANCE_API_CA_FILE", None),
+    )
 
 
 def is_cost_admin(request):

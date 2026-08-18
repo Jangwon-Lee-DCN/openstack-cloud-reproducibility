@@ -15,6 +15,10 @@ case "$operation" in
     kubectl -n "$DEVELOPMENT_NAMESPACE" create configmap horizon-cost-acceptance \
       --from-file=acceptance.py="$root/deploy/tests/horizon_cost_management_acceptance.py" \
       --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+    kubectl -n development-gateway-system get secret development-gateway-tls \
+      -o jsonpath='{.data.tls\.crt}' | base64 -d | \
+      kubectl -n "$DEVELOPMENT_NAMESPACE" create configmap governance-api-ca \
+        --from-file=tls.crt=/dev/stdin --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl -n "$DEVELOPMENT_NAMESPACE" delete job horizon-cost-acceptance --ignore-not-found --wait=true >/dev/null
     sed "s|IMAGE_REF|registry.dcn.ssu.ac.kr/openstack/horizon@${HORIZON_COST_IMAGE_DIGEST}|" <<'EOF' | kubectl apply -f - >/dev/null
 apiVersion: batch/v1
@@ -45,10 +49,12 @@ spec:
             - {name: tests, mountPath: /tests, readOnly: true}
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/.secret_key_store, subPath: store}
             - {name: state, mountPath: /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/_var_lib_openstack_lib_python3.12_site-packages_openstack_dashboard_local_.secret_key_store.lock, subPath: store.lock}
+            - {name: governance-ca, mountPath: /etc/openstack-dashboard/governance-ca, readOnly: true}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, runAsNonRoot: true, runAsUser: 65534, seccompProfile: {type: RuntimeDefault}}
       volumes:
         - {name: tests, configMap: {name: horizon-cost-acceptance}}
         - {name: state, emptyDir: {}}
+        - {name: governance-ca, configMap: {name: governance-api-ca}}
 EOF
     ;;
   verify)

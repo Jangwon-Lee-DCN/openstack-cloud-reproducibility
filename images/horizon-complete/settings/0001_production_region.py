@@ -24,3 +24,4 @@ PLATFORM_IMAGE_OWNER_IDS = (
 GOVERNANCE_FAKE_API_ENDPOINT = (
     "https://p1-governance-services.dev.dcn.ssu.ac.kr"
 )
+GOVERNANCE_API_CA_FILE = "/etc/openstack-dashboard/governance-ca/tls.crt"
