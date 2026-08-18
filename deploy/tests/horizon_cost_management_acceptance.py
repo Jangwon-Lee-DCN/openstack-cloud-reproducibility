@@ -117,6 +117,17 @@ for panel, expected in (("cost_overview", b"Cost Management"),
     assert b'id="cost-management-content"' in response.content
     assert expected in response.content
 
+# Horizon may leave domain_id unset after reconstructing a project-scoped
+# Keystone session.  This is the production regression that previously placed
+# a None value in an HTTP header and returned a dashboard 500.
+User.domain_id = None
+response = browser.get(
+    reverse("horizon:governance:cost_overview:index"),
+    HTTP_HOST="cloud.dcn.ssu.ac.kr",
+)
+assert response.status_code == 200
+assert b'id="cost-management-content"' in response.content
+
 # The development application credential deliberately has member/reader roles.
 # Price & Calibration must therefore remain inaccessible through Horizon, while
 # its backing collections are still exercised with the real scoped token.
