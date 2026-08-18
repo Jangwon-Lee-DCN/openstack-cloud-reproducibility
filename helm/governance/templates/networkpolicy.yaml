@@ -5,9 +5,11 @@ spec:
   podSelector: {matchLabels: {app.kubernetes.io/name: governance-api}}
   policyTypes: [Ingress, Egress]
   ingress:
+{{- range .Values.ingressNamespaces }}
     - from:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: development-gateway-system}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ . | quote }}}}
       ports: [{port: 8080, protocol: TCP}]
+{{- end }}
 {{- range .Values.canonicalEventConsumers }}
     - from:
         - namespaceSelector:

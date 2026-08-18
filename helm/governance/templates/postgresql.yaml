@@ -18,10 +18,8 @@ spec:
     metadata: {labels: {app.kubernetes.io/name: governance-postgresql}}
     spec:
       priorityClassName: {{ .Values.priorityClassName }}
-      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
-      tolerations:
-        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
-        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
       securityContext: {runAsNonRoot: true, runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: postgresql
@@ -42,7 +40,12 @@ spec:
             - {name: runtime, mountPath: /opt/bitnami/postgresql/tmp, subPath: pg-tmp}
             - {name: dshm, mountPath: /dev/shm}
       volumes:
-        - {name: data, emptyDir: {}}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim: {claimName: governance-postgresql-data}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
         - {name: runtime, emptyDir: {}}
         - {name: dshm, emptyDir: {medium: Memory}}
 ---
@@ -52,3 +55,13 @@ metadata: {name: governance-postgresql}
 spec:
   selector: {app.kubernetes.io/name: governance-postgresql}
   ports: [{name: postgresql, port: 5432}]
+{{- if .Values.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: governance-postgresql-data}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+  resources: {requests: {storage: {{ .Values.persistence.postgresqlSize | quote }}}}
+{{- end }}

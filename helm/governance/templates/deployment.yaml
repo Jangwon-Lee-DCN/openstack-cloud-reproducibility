@@ -25,10 +25,8 @@ spec:
     spec:
       priorityClassName: {{ .Values.priorityClassName }}
       automountServiceAccountToken: false
-      nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
-      tolerations:
-        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
-        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: api
@@ -128,7 +126,13 @@ spec:
             capabilities: {drop: [ALL]}
             readOnlyRootFilesystem: true
         {{- end }}
-      volumes: [{name: data, emptyDir: {}}]
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim: {claimName: governance-api-data}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -143,3 +147,13 @@ metadata: {name: governance-api}
 spec:
   maxUnavailable: 1
   selector: {matchLabels: {app.kubernetes.io/name: governance-api}}
+{{- if .Values.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: governance-api-data}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+  resources: {requests: {storage: {{ .Values.persistence.apiSize | quote }}}}
+{{- end }}

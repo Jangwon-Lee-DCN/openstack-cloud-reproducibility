@@ -17,12 +17,10 @@ PLATFORM_IMAGE_OWNER_IDS = (
     "fe9c1a5f82f440c68baf3d9c8fb40ea2",
 )
 
-# Track B remains an isolated development service until its production
-# promotion.  Horizon proxies the preview UI to its TLS endpoint; keeping the
-# endpoint explicit prevents an unset setting from turning every Governance
-# and Cost Management page into HTTP 500.
+# The production default is the namespace-local Governance API.  Development
+# overrides it explicitly with its isolated endpoint.
 GOVERNANCE_FAKE_API_ENDPOINT = os.environ.get(
     "GOVERNANCE_API_ENDPOINT",
-    "https://p1-governance-services.dev.dcn.ssu.ac.kr",
+    "http://governance-api.governance-system.svc.cluster.local",
 )
 GOVERNANCE_API_CA_FILE = "/etc/openstack-dashboard/governance-ca/tls.crt"

@@ -1,0 +1,35 @@
+replicaCount: 1
+host: governance.internal.dcn.ssu.ac.kr
+gateway: {enabled: false}
+priorityClassName: system-cluster-critical
+nodeSelector: {openstack-control-plane: enabled}
+tolerations:
+  - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+ingressNamespaces: [openstack]
+# The currently accepted immutable API/worker use this value as the managed
+# runtime gate; isolation, persistence and real-provider selection are defined
+# independently below for the production namespace.
+mode: development
+providerMode: real
+providers:
+  keystone: http://keystone-api.openstack.svc.cluster.local:5000
+  opa: http://opa-pilot.vpc-control-plane-system.svc.cluster.local:8181
+  gnocchi: http://gnocchi-api.openstack.svc.cluster.local:8041
+  cloudkitty: http://cloudkitty-api.openstack.svc.cluster.local:8089
+  loki: http://loki-gateway.monitoring.svc.cluster.local
+  barbican: http://barbican-api.openstack.svc.cluster.local:9311
+  designate: http://designate-api.openstack.svc.cluster.local:9001
+  octavia: http://octavia-api.openstack.svc.cluster.local:9876
+  nova: http://nova-api.openstack.svc.cluster.local:8774
+  cinder: http://cinder-api.openstack.svc.cluster.local:8776
+  neutron: http://neutron-server.openstack.svc.cluster.local:9696
+  glance: http://glance-api.openstack.svc.cluster.local:9292
+  postgresqlHost: governance-postgresql
+  rabbitmqHost: rabbitmq.openstack.svc.cluster.local
+notifications: {enabled: false}
+localOpa: {enabled: false}
+persistence:
+  enabled: true
+  storageClassName: powerstore-rwo-single-path
+  apiSize: 2Gi
+  postgresqlSize: 8Gi

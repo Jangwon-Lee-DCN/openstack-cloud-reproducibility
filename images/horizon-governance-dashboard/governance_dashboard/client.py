@@ -9,15 +9,23 @@ from urllib.request import HTTPSHandler, Request, build_opener, ProxyHandler
 class GovernanceClient:
     def __init__(self, endpoint: str, identity: dict[str, str], opener=None,
                  ca_file=None):
-        internal = "http://governance-api.development-p1-governance-services.svc.cluster.local"
-        if endpoint != internal and (
+        internal = {
+            "http://governance-api.development-p1-governance-services.svc.cluster.local",
+            "http://governance-api.governance-system.svc.cluster.local",
+        }
+        if endpoint not in internal and (
                 not endpoint.startswith("https://") or
                 not endpoint.endswith(".dev.dcn.ssu.ac.kr")):
-            raise ValueError("development fake endpoint required")
+            raise ValueError("managed governance endpoint required")
         self.endpoint = endpoint.rstrip("/")
         self.identity = identity
-        context = ssl.create_default_context(cafile=ca_file)
-        self.opener = opener or build_opener(ProxyHandler({}), HTTPSHandler(context=context))
+        if opener is not None:
+            self.opener = opener
+        elif endpoint.startswith("https://"):
+            context = ssl.create_default_context(cafile=ca_file)
+            self.opener = build_opener(ProxyHandler({}), HTTPSHandler(context=context))
+        else:
+            self.opener = build_opener(ProxyHandler({}))
 
     def list(self, collection: str, *, limit=50, cursor=None):
         query = {"limit": limit}
