@@ -60,6 +60,7 @@ User.is_system_user = False
 factory = RequestFactory()
 request = factory.get("/")
 request.user = User()
+request._cached_user = request.user
 request.session = {}
 request.horizon = {}
 project = Horizon.get_dashboard("project")
