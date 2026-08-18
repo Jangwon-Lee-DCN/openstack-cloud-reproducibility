@@ -18,7 +18,15 @@ class GovernanceClient:
                 not endpoint.endswith(".dev.dcn.ssu.ac.kr")):
             raise ValueError("managed governance endpoint required")
         self.endpoint = endpoint.rstrip("/")
-        self.identity = identity
+        # Horizon legitimately leaves domain_id unset for project-scoped
+        # sessions (and project_id unset for domain-scoped sessions).  urllib
+        # rejects None header values before making the request, so forward only
+        # concrete identity attributes.  The Governance API remains responsible
+        # for rejecting a request that lacks a required scope.
+        self.identity = {
+            key: str(value) for key, value in identity.items()
+            if value is not None
+        }
         if opener is not None:
             self.opener = opener
         elif endpoint.startswith("https://"):
