@@ -11,10 +11,8 @@ gateway:
   name: development-gateway
   namespace: development-gateway-system
 priorityClassName: dcn-development-interruptible
-nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
-tolerations:
-  - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
-  - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+nodeSelector: {}
+tolerations: []
 ingressNamespaces:
   - development-gateway-system
 webhookAllowedHosts: ""

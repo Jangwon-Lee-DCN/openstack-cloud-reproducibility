@@ -1,5 +1,9 @@
 # This overlay is consumed only by automation/development/components/p1-governance-services.sh.
 replicaCount: 1
+nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+tolerations:
+  - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+  - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
 host: p1-governance-services.dev.dcn.ssu.ac.kr
 webhookAllowedHosts: hooks.dev.dcn.ssu.ac.kr
 providerMode: real
