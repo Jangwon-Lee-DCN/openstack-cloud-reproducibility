@@ -1,6 +1,7 @@
 import os
 import json
 import urllib.request
+import urllib.error
 
 import pymysql
 
@@ -60,6 +61,10 @@ for panel in group.panels:
 for view in (OverviewView, BudgetsView, ForecastView, ProfilesView):
     instance = view()
     instance.request = request
-    context = instance.get_context_data()
+    try:
+        context = instance.get_context_data()
+    except urllib.error.HTTPError as error:
+        print(error.read().decode("utf-8", "replace"))
+        raise
     assert context is not None
 print("PASS authenticated-equivalent hierarchy and real Governance API views")
