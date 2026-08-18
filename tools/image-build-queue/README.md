@@ -68,6 +68,8 @@ prints the immutable image reference on the final line.
 
 ```bash
 dcn-image-build health
+dcn-image-build queue
+dcn-image-build queue --all
 dcn-image-build list
 dcn-image-build status REQUEST_OR_TASK_ID
 dcn-image-build wait REQUEST_OR_TASK_ID
@@ -75,6 +77,10 @@ dcn-image-build log REQUEST_OR_TASK_ID
 dcn-image-build cancel REQUEST_OR_TASK_ID
 systemctl status dcn-image-build-queue.service
 ```
+
+`queue` is the operator-friendly view: by default it shows only queued and
+running builds. Use `queue --all` when completed and failed history is needed.
+`list` remains the machine-readable JSON-lines interface.
 
 Do not call the bundled Pueue client directly for routine builds. The wrapper
 provides source validation, environment scrubbing, deduplication, and digest
