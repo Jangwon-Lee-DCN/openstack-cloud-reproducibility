@@ -1,0 +1,33 @@
+client:
+  restart_in_place: false
+  read_local_logs: true
+  show_confirmation_questions: false
+  edit_mode: toml
+  show_expanded_aliases: false
+  dark_mode: false
+  max_status_lines: 20
+  status_time_format: '%H:%M:%S'
+  status_datetime_format: '%Y-%m-%d %H:%M:%S'
+daemon:
+  pause_group_on_failure: false
+  pause_all_on_failure: false
+  compress_state_file: false
+  callback: null
+  env_vars:
+    PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  callback_log_lines: 20
+  shell_command: null
+shared:
+  pueue_directory: /var/lib/dcn-image-build-queue/pueue
+  runtime_directory: /run/dcn-image-build-queue
+  alias_file: /etc/dcn-image-build-queue/pueue_aliases.yml
+  use_unix_socket: true
+  unix_socket_path: /run/dcn-image-build-queue/pueue.socket
+  unix_socket_permissions: 432
+  host: 127.0.0.1
+  port: '6924'
+  pid_path: /run/dcn-image-build-queue/pueue.pid
+  daemon_cert: null
+  daemon_key: null
+  shared_secret_path: null
+profiles: {}
