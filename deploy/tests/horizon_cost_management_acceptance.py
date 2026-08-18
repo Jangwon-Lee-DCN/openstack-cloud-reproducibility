@@ -16,6 +16,7 @@ from django.test import RequestFactory  # noqa: E402
 from django.core.exceptions import PermissionDenied  # noqa: E402
 from django.urls import reverse  # noqa: E402
 from horizon import Horizon  # noqa: E402
+from openstack_auth import utils as auth_utils  # noqa: E402
 from governance_dashboard.client import COLLECTIONS  # noqa: E402
 from governance_dashboard.cost import client_for, is_cost_admin  # noqa: E402
 from governance_dashboard.panels.aws_forecast.views import IndexView as ForecastView  # noqa: E402
@@ -70,6 +71,10 @@ def scoped_request():
 
 
 request = scoped_request()
+# A normal browser request reconstructs this Keystone user through Horizon's
+# session backend.  This isolated Job has no Horizon session database, so bind
+# the policy helper to the already verified, real Keystone token principal.
+auth_utils.get_user = lambda scoped: scoped.user
 project = Horizon.get_dashboard("project")
 governance = Horizon.get_dashboard("governance")
 assert "cost_management" not in list(project.get_panel_groups())
