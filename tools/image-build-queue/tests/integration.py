@@ -138,7 +138,10 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
                 env_names = {entry.split("=", 1)[0] for entry in envs} if isinstance(envs, list) else set(envs)
                 env_names.discard("")
                 env_names = {name for name in env_names if name.strip()}
-                unexpected = env_names - {"HOME", "LANG", "LC_ALL", "PATH", "PUEUE_CONFIG_PATH", "PUEUE_GROUP", "PUEUE_WORKER_ID"}
+                unexpected = env_names - {
+                    "HOME", "LANG", "LC_ALL", "PATH", "PUEUE_CONFIG_PATH",
+                    "PUEUE_GROUP", "PUEUE_WORKER_ID", "PYTHON_BINARY",
+                }
                 if unexpected:
                     raise RuntimeError(f"submission environment leaked into Pueue state: {sorted(unexpected)}; raw={envs!r}")
             command([str(pueue), "-c", str(config), "pause", "--group", "keystone"])

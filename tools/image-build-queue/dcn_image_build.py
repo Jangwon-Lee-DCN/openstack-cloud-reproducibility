@@ -237,6 +237,38 @@ def health() -> int:
     return 0
 
 
+def queue_view(*, include_finished: bool = False) -> int:
+    """Print a stable, human-readable view without exposing raw Pueue state."""
+    requests = []
+    for path in request_files():
+        request = json.loads(path.read_text())
+        request["status"] = effective_status(request)
+        requests.append(request)
+    requests.sort(key=lambda item: int(item.get("task_id", -1)))
+    if not include_finished:
+        requests = [item for item in requests if item["status"] not in {"succeeded", "failed", "killed"}]
+    if not requests:
+        print("Image build queue is empty.")
+        return 0
+
+    columns = ("TASK", "GROUP", "COMPONENT", "STATUS", "REQUEST")
+    rows = [
+        (
+            str(item.get("task_id", "-")),
+            item.get("group", "-"),
+            item.get("component", "-"),
+            item["status"],
+            item.get("request_id", "-")[:12],
+        )
+        for item in requests
+    ]
+    widths = [max(len(columns[index]), *(len(row[index]) for row in rows)) for index in range(len(columns))]
+    print("  ".join(value.ljust(widths[index]) for index, value in enumerate(columns)))
+    for row in rows:
+        print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="dcn-image-build")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -251,6 +283,8 @@ def main() -> int:
         if command == "wait":
             command_parser.add_argument("--quiet", action="store_true")
     sub.add_parser("list")
+    queue_parser = sub.add_parser("queue", help="show queued and running image builds")
+    queue_parser.add_argument("--all", action="store_true", help="include completed and failed builds")
     sub.add_parser("health")
     args = parser.parse_args()
     if args.command == "submit":
@@ -268,6 +302,8 @@ def main() -> int:
             request = json.loads(path.read_text())
             print(json.dumps({**request, "status": effective_status(request)}, sort_keys=True))
         return 0
+    if args.command == "queue":
+        return queue_view(include_finished=args.all)
     return health()
 
 
