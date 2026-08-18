@@ -47,6 +47,8 @@ install -m 0755 "$root/dcn_image_build.py" /usr/local/libexec/dcn-image-build-qu
 install -m 0755 "$root/run_image_build.py" /usr/local/libexec/dcn-image-build-queue/run-image-build
 install -m 0755 "$root/init-groups" /usr/local/libexec/dcn-image-build-queue/init-groups
 install -m 0644 "$root/pueue.yml" /etc/dcn-image-build-queue/pueue.yml
+printf '%s\n' "$build_python" >"$stage/build-python"
+install -m 0644 "$stage/build-python" /etc/dcn-image-build-queue/build-python
 sed -e "s#@BUILD_USER@#$build_user#g" -e "s#@BUILD_GROUP@#$build_group#g" \
   -e "s#@BUILD_HOME@#$build_home#g" -e "s#@BUILD_PYTHON@#$build_python#g" \
   "$root/dcn-image-build-queue.service" >"$stage/dcn-image-build-queue.service"

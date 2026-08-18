@@ -51,6 +51,22 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(captured["PUEUE_CONFIG_PATH"], queue.CONFIG)
         self.assertEqual(captured["PYTHON_BINARY"], "/opt/dcn-build/bin/python")
 
+    def test_pueue_reads_build_python_when_submitter_environment_is_empty(self):
+        captured = {}
+
+        def fake_run(args, **kwargs):
+            captured.update(kwargs["env"])
+            return subprocess.CompletedProcess(args, 0, "{}", "")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "build-python"
+            config.write_text("/opt/dcn-build/bin/python\n")
+            with mock.patch.dict(os.environ, {}, clear=True), \
+                    mock.patch.object(queue, "BUILD_PYTHON_CONFIG", config), \
+                    mock.patch.object(queue, "run", fake_run):
+                queue.pueue("status", "--json")
+        self.assertEqual(captured["PYTHON_BINARY"], "/opt/dcn-build/bin/python")
+
     def test_pueue_v4_done_status_is_normalized(self):
         request = {"task_id": 7, "status": "running"}
         task = {"status": {"Done": {"result": "Success"}}}
