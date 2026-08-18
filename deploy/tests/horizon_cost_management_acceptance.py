@@ -13,9 +13,11 @@ import django
 django.setup()
 import openstack_dashboard.urls  # noqa: E402,F401
 from django.test import RequestFactory  # noqa: E402
+from django.core.exceptions import PermissionDenied  # noqa: E402
 from django.urls import reverse  # noqa: E402
 from horizon import Horizon  # noqa: E402
 from governance_dashboard.client import COLLECTIONS  # noqa: E402
+from governance_dashboard.cost import client_for, is_cost_admin  # noqa: E402
 from governance_dashboard.panels.aws_forecast.views import IndexView as ForecastView  # noqa: E402
 from governance_dashboard.panels.cost_budgets.views import IndexView as BudgetsView  # noqa: E402
 from governance_dashboard.panels.cost_overview.views import IndexView as OverviewView  # noqa: E402
@@ -58,7 +60,7 @@ for panel in group.panels:
     assert reverse(f"horizon:governance:{panel}:index").endswith(
         f"/governance/{panel}/"
     )
-for view in (OverviewView, BudgetsView, ForecastView, ProfilesView):
+for view in (OverviewView, BudgetsView, ForecastView):
     instance = view()
     instance.request = request
     try:
@@ -67,4 +69,25 @@ for view in (OverviewView, BudgetsView, ForecastView, ProfilesView):
         print(error.read().decode("utf-8", "replace"))
         raise
     assert context is not None
-print("PASS authenticated-equivalent hierarchy and real Governance API views")
+    response = instance.render_to_response(context)
+    response.render()
+    assert response.status_code == 200
+    assert b"Cost Management" in response.content
+
+# The development application credential deliberately has member/reader roles.
+# Price & Calibration must therefore remain inaccessible through Horizon, while
+# its backing collections are still exercised with the real scoped token.
+assert not is_cost_admin(request)
+profiles = ProfilesView()
+profiles.request = request
+try:
+    profiles.get_context_data()
+except PermissionDenied:
+    pass
+else:
+    raise AssertionError("member unexpectedly opened Price & Calibration")
+client = client_for(request)
+for collection in ("aws-price-profiles", "aws-calibration-profiles"):
+    assert "items" in client.list(collection)
+
+print("PASS member HTML views, admin denial, and real Governance API collections")
