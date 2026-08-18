@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import json
+import ssl
 from urllib.parse import urlencode
-from urllib.request import Request, build_opener, ProxyHandler
+from urllib.request import HTTPSHandler, Request, build_opener, ProxyHandler
 
 
 class GovernanceClient:
-    def __init__(self, endpoint: str, identity: dict[str, str], opener=None):
-        if not endpoint.startswith("https://") or not endpoint.endswith(".dev.dcn.ssu.ac.kr"):
+    def __init__(self, endpoint: str, identity: dict[str, str], opener=None,
+                 ca_file=None):
+        internal = "http://governance-api.development-p1-governance-services.svc.cluster.local"
+        if endpoint != internal and (
+                not endpoint.startswith("https://") or
+                not endpoint.endswith(".dev.dcn.ssu.ac.kr")):
             raise ValueError("development fake endpoint required")
         self.endpoint = endpoint.rstrip("/")
         self.identity = identity
-        self.opener = opener or build_opener(ProxyHandler({}))
+        context = ssl.create_default_context(cafile=ca_file)
+        self.opener = opener or build_opener(ProxyHandler({}), HTTPSHandler(context=context))
 
     def list(self, collection: str, *, limit=50, cursor=None):
         query = {"limit": limit}

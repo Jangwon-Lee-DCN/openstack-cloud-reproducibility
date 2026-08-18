@@ -32,11 +32,11 @@ COPY track-a/_2210_core_orchestration.py /var/lib/openstack/lib/python3.12/site-
 COPY track-b/governance_dashboard/ /var/lib/openstack/lib/python3.12/site-packages/governance_dashboard/
 COPY track-b/governance_dashboard/enabled/_3100_governance.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3100_governance.py
 COPY track-b/governance_dashboard/enabled/_3110_governance_overview.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3110_governance_overview.py
-COPY track-b/governance_dashboard/enabled/_1650_project_cost_management.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1650_project_cost_management.py
-COPY track-b/governance_dashboard/enabled/_1651_project_cost_overview.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1651_project_cost_overview.py
-COPY track-b/governance_dashboard/enabled/_1652_project_cost_budgets.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1652_project_cost_budgets.py
-COPY track-b/governance_dashboard/enabled/_1653_project_aws_forecast.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1653_project_aws_forecast.py
-COPY track-b/governance_dashboard/enabled/_1654_project_cost_profiles.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1654_project_cost_profiles.py
+COPY track-b/governance_dashboard/enabled/_3120_governance_cost_management.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3120_governance_cost_management.py
+COPY track-b/governance_dashboard/enabled/_3121_governance_cost_overview.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3121_governance_cost_overview.py
+COPY track-b/governance_dashboard/enabled/_3122_governance_cost_budgets.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3122_governance_cost_budgets.py
+COPY track-b/governance_dashboard/enabled/_3123_governance_aws_forecast.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3123_governance_aws_forecast.py
+COPY track-b/governance_dashboard/enabled/_3124_governance_cost_profiles.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3124_governance_cost_profiles.py
 COPY track-c/dcn_resilience_dashboard/ /var/lib/openstack/lib/python3.12/site-packages/dcn_resilience_dashboard/
 COPY track-c/dcn_resilience_dashboard/enabled/_2030_resilience.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2030_resilience.py
 COPY track-c/dcn_resilience_dashboard/enabled/_2040_resilience_operations.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_2040_resilience_operations.py
@@ -147,13 +147,14 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_2210_core_orchestration.py" \
     && test -f "$local_enabled/_3100_governance.py" \
     && test -f "$local_enabled/_3110_governance_overview.py" \
-    && test -f "$local_enabled/_1650_project_cost_management.py" \
-    && test -f "$local_enabled/_1651_project_cost_overview.py" \
-    && test -f "$local_enabled/_1652_project_cost_budgets.py" \
-    && test -f "$local_enabled/_1653_project_aws_forecast.py" \
-    && test -f "$local_enabled/_1654_project_cost_profiles.py" \
+    && test -f "$local_enabled/_3120_governance_cost_management.py" \
+    && test -f "$local_enabled/_3121_governance_cost_overview.py" \
+    && test -f "$local_enabled/_3122_governance_cost_budgets.py" \
+    && test -f "$local_enabled/_3123_governance_aws_forecast.py" \
+    && test -f "$local_enabled/_3124_governance_cost_profiles.py" \
     && test -f "$local_enabled/_9999_platform_navigation.py" \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
+    && grep -q 'GOVERNANCE_FAKE_API_ENDPOINT' /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py \
     && test -f /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/identity/projects/tabs.py \
     && grep -q "PANEL_GROUP = 'vpc'" "$local_enabled/_1482_project_load_balancer_panel.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
