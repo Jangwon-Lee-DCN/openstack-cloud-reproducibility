@@ -61,6 +61,7 @@ factory = RequestFactory()
 request = factory.get("/")
 request.user = User()
 request.session = {}
+request.horizon = {}
 project = Horizon.get_dashboard("project")
 governance = Horizon.get_dashboard("governance")
 assert "cost_management" not in list(project.get_panel_groups())
