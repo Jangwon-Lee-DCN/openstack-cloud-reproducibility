@@ -11,6 +11,7 @@ Group=@BUILD_GROUP@
 UMask=0007
 Environment=PUEUE_CONFIG_PATH=/etc/dcn-image-build-queue/pueue.yml
 Environment=DCN_IMAGE_BUILD_STATE=/var/lib/dcn-image-build-queue
+Environment=PYTHON_BINARY=@BUILD_PYTHON@
 ExecStart=/usr/local/libexec/dcn-image-build-queue/pueued --config /etc/dcn-image-build-queue/pueue.yml
 ExecStartPost=/usr/local/libexec/dcn-image-build-queue/init-groups
 Restart=on-failure
