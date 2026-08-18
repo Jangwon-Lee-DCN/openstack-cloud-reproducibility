@@ -40,11 +40,16 @@ class QueueTests(unittest.TestCase):
             captured.update(kwargs["env"])
             return subprocess.CompletedProcess(args, 0, "{}", "")
 
-        with mock.patch.dict(os.environ, {"GH_TOKEN": "must-not-leak", "SOPS_AGE_KEY_FILE": "/secret"}), mock.patch.object(queue, "run", fake_run):
+        with mock.patch.dict(os.environ, {
+            "GH_TOKEN": "must-not-leak",
+            "SOPS_AGE_KEY_FILE": "/secret",
+            "PYTHON_BINARY": "/opt/dcn-build/bin/python",
+        }), mock.patch.object(queue, "run", fake_run):
             queue.pueue("status", "--json")
         self.assertNotIn("GH_TOKEN", captured)
         self.assertNotIn("SOPS_AGE_KEY_FILE", captured)
         self.assertEqual(captured["PUEUE_CONFIG_PATH"], queue.CONFIG)
+        self.assertEqual(captured["PYTHON_BINARY"], "/opt/dcn-build/bin/python")
 
     def test_pueue_v4_done_status_is_normalized(self):
         request = {"task_id": 7, "status": "running"}
