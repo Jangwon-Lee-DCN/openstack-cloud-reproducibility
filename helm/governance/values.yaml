@@ -7,9 +7,16 @@ workerImage:
 replicaCount: 1
 host: p1-governance-services.dev.dcn.ssu.ac.kr
 gateway:
+  enabled: true
   name: development-gateway
   namespace: development-gateway-system
 priorityClassName: dcn-development-interruptible
+nodeSelector: {dcn.ssu.ac.kr/workload-class: development}
+tolerations:
+  - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}
+  - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+ingressNamespaces:
+  - development-gateway-system
 webhookAllowedHosts: ""
 notifications:
   enabled: false
@@ -42,6 +49,11 @@ providers:
   rabbitmqHost: ""
 postgresql:
   image: docker.io/bitnamilegacy/postgresql@sha256:926356130b77d5742d8ce605b258d35db9b62f2f8fd1601f9dbaef0c8a710a8d
+persistence:
+  enabled: false
+  storageClassName: ""
+  apiSize: 2Gi
+  postgresqlSize: 8Gi
 resources:
   requests: {cpu: 50m, memory: 64Mi}
   limits: {cpu: 500m, memory: 256Mi}

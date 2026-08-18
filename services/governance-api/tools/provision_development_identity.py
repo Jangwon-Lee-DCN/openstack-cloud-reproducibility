@@ -54,9 +54,10 @@ def b64(value):
 
 
 def rotate_application_credential(base, admin_token, user, password, project, domain):
+    credential_name = os.environ.get("GOVERNANCE_IDENTITY_NAME", "governance-development")
     _, existing = call(f"{base}/users/{user['id']}/application_credentials", admin_token)
     for credential in existing.get("application_credentials", []):
-        if credential.get("name") == "governance-development":
+        if credential.get("name") == credential_name:
             call(f"{base}/users/{user['id']}/application_credentials/{credential['id']}",
                  admin_token, "DELETE")
     # Deleting an application credential records a user revocation event. Get
@@ -64,8 +65,9 @@ def rotate_application_credential(base, admin_token, user, password, project, do
     # token used for replacement creation cannot be invalidated mid-rotation.
     user_token, _ = password_token(base, user["name"], password, project["name"], domain)
     _, created = call(f"{base}/users/{user['id']}/application_credentials", user_token, "POST",
-                      {"application_credential": {"name": "governance-development",
-                       "description": "Track B development-only provider probes", "unrestricted": False}})
+                      {"application_credential": {"name": credential_name,
+                       "description": os.environ.get("GOVERNANCE_IDENTITY_DESCRIPTION", "Track B provider access"),
+                       "unrestricted": False}})
     return created["application_credential"]
 
 
@@ -78,12 +80,14 @@ def main():
                                     decode(source, "OS_PROJECT_NAME"), domain)
     _, domains = call(f"{base}/domains?{urlencode({'name': domain})}", admin_token)
     domain_id = domains["domains"][0]["id"]
-    project = one_or_create(base, admin_token, "projects", "name", "governance-development",
-                            {"name": "governance-development", "domain_id": domain_id,
-                             "description": "Track B isolated real-integration acceptance", "enabled": True})
+    identity_name = os.environ.get("GOVERNANCE_IDENTITY_NAME", "governance-development")
+    project = one_or_create(base, admin_token, "projects", "name", identity_name,
+                            {"name": identity_name, "domain_id": domain_id,
+                             "description": os.environ.get("GOVERNANCE_IDENTITY_DESCRIPTION", "Track B provider access"),
+                             "enabled": True})
     password = secrets.token_urlsafe(32)
-    user = one_or_create(base, admin_token, "users", "name", "governance-development",
-                         {"name": "governance-development", "domain_id": domain_id,
+    user = one_or_create(base, admin_token, "users", "name", identity_name,
+                         {"name": identity_name, "domain_id": domain_id,
                           "default_project_id": project["id"], "password": password, "enabled": True})
     # Rotate the bootstrap password on every reprovision; it is never persisted.
     call(f"{base}/users/{user['id']}", admin_token, "PATCH", {"user": {"password": password}})
@@ -101,7 +105,7 @@ def main():
     credential = rotate_application_credential(base, admin_token, user, password, project, domain)
     output = {"apiVersion": "v1", "kind": "Secret",
               "metadata": {"name": "governance-keystone-application-credential",
-                           "namespace": os.environ["DEVELOPMENT_NAMESPACE"]},
+                           "namespace": os.environ.get("GOVERNANCE_NAMESPACE", os.environ.get("DEVELOPMENT_NAMESPACE"))},
               "type": "Opaque", "data": {
                   "auth-url": b64(os.environ["GOVERNANCE_KEYSTONE_SERVICE_URL"]),
                   "application-credential-id": b64(credential["id"]),
