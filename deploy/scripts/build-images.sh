@@ -160,7 +160,7 @@ build_horizon_complete() {
   (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   horizon_context="$WORK_DIR/horizon-complete"
-  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings" "$horizon_context/service_catalog" "$horizon_context/image_catalog" "$horizon_context/track-a" "$horizon_context/track-b" "$horizon_context/track-c"
+  mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings" "$horizon_context/service_catalog" "$horizon_context/image_catalog" "$horizon_context/track-b"
   cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
   cp "$REPO_ROOT/images/horizon-complete/enhance_images_ui.py" "$horizon_context/enhance_images_ui.py"
   cp "$REPO_ROOT/images/horizon-complete/image_catalog/index_split.html" "$horizon_context/image_catalog/index_split.html"
@@ -178,10 +178,7 @@ build_horizon_complete() {
   cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
   cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
   cp -a "$REPO_ROOT/images/horizon-magnum-dashboard/overlay" "$horizon_context/magnum-ui/overlay"
-  cp -a "$REPO_ROOT/images/horizon-core-orchestration-dashboard/dcn_core_orchestration" "$horizon_context/track-a/"
-  cp "$REPO_ROOT/images/horizon-core-orchestration-dashboard/enabled/_2210_core_orchestration.py" "$horizon_context/track-a/"
   cp -a "$REPO_ROOT/images/horizon-governance-dashboard/governance_dashboard" "$horizon_context/track-b/"
-  cp -a "$REPO_ROOT/services/resilience/horizon/dcn_resilience_dashboard" "$horizon_context/track-c/"
   build_context horizon-complete "$horizon_context" "$REGISTRY/horizon:source-$BUILD_ID"
 }
 
