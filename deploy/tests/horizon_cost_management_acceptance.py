@@ -23,6 +23,7 @@ from governance_dashboard.cost import client_for, is_cost_admin  # noqa: E402
 
 settings.TEMPLATES[0]["DIRS"].insert(0, "/tests")
 settings.SECRET_KEY = "development-horizon-cost-acceptance-only"
+settings.ALLOWED_HOSTS = ["cloud.dcn.ssu.ac.kr"]
 
 
 class User:
