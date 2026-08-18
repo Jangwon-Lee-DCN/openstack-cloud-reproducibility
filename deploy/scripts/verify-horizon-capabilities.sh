@@ -10,7 +10,7 @@ test "$(kubectl -n "$NAMESPACE" get pods -l "$selector" -o jsonpath='{range .ite
 for pod in $(kubectl -n "$NAMESPACE" get pods -l "$selector" -o name); do
   kubectl -n "$NAMESPACE" exec "$pod" -- sh -c '
     set -eu
-    python3 -c "import manila_ui, manilaclient, masakaridashboard, cloud_telemetry_dashboard, cloud_s3_dashboard"
+    python3 -c "import manila_ui, manilaclient, masakaridashboard, cloud_telemetry_dashboard, cloud_s3_dashboard, dcn_core_orchestration"
     root=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard
     for file in _1330_project_backups_panel.py _9010_manila_project_add_shares_panel_to_share_panel_group.py _50_masakaridashboard.py _1610_project_metrics.py _1620_project_alarms.py _2610_admin_telemetry_health.py _1930_project_s3.py; do
       test -f "$root/local/enabled/$file" -o -f "$root/enabled/$file"
@@ -61,6 +61,7 @@ assert "label=_(\"Cost center\")" not in vpc_launch
 for app in (
     "cloud_telemetry_dashboard",
     "cloud_s3_dashboard",
+    "dcn_core_orchestration",
     "openstack_dashboard.service_catalog",
 ):
     assert app in settings.INSTALLED_APPS
@@ -72,6 +73,9 @@ for template in (
     "cloud_s3_dashboard/index.html",
     "cloud_s3_dashboard/create_bucket.html",
     "cloud_s3_dashboard/credential_created.html",
+    "core_orchestration/index.html",
+    "project/networks/_network_ips.html",
+    "project/routers/create.html",
     "service_catalog/index.html",
 ):
     get_template(template)
@@ -89,6 +93,9 @@ for name in (
     "horizon:project:cloud_metrics:index",
     "horizon:project:cloud_alarms:index",
     "horizon:project:cloud_s3:index",
+    "horizon:project:core_orchestration:index",
+    "horizon:admin:networks:index",
+    "horizon:admin:routers:create",
     "horizon:admin:cloud_telemetry_health:index",
     "horizon:admin:project_operations:index",
     "horizon:project:shares:index",
@@ -112,6 +119,8 @@ assert reverse("horizon:project:network_operations:index").startswith("/horizon/
 assert str(project.get_panel_group("observability").name) == "Monitoring & Alarms"
 assert str(project.get_panel("cloud_metrics").name) == "Metric Coverage"
 assert str(project.get_panel("cloud_s3").name) == "S3 Access & Credentials"
+admin = Horizon.get_dashboard("admin")
+assert "trunks" not in [panel.slug for panel in admin.get_panels()]
 governance = Horizon.get_dashboard("governance")
 assert governance.get_panel_group("cost_management").panels == [
     "cost_overview", "cost_budgets", "aws_cost_forecast", "cost_profiles",
