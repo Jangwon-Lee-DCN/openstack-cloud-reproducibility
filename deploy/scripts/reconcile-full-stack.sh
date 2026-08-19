@@ -178,6 +178,13 @@ install_release() {
   esac
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
+  if [[ "$release" == "ironic" && "${ENABLE_IRONIC_PHYSICAL_PROVISIONING:-0}" == "1" ]]; then
+    # A failed post-upgrade image-bootstrap hook from the former control-only
+    # values is not owned by Helm and otherwise blocks wait_release forever.
+    # IPA images are checksum-managed by ensure-ironic-agent-images.sh now.
+    kubectl -n "$NAMESPACE" delete job ironic-bootstrap \
+      --ignore-not-found --wait=true
+  fi
   # Helm renders the Fernet repository as a read-only Secret volume. Restore
   # the permission-safe emptyDir + sync sidecar before waiting for Keystone's
   # rollout, otherwise its init container cannot chmod the Secret mount.
