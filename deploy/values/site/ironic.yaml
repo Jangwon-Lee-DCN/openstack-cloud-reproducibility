@@ -57,7 +57,9 @@ conductor:
     enabled: true
 bootstrap:
   image:
-    enabled: true
+    # Phase 64 registers checksum-pinned artifacts before Helm so a chart hook
+    # never depends on workload-Pod Internet egress.
+    enabled: false
   object_store:
     enabled: false
 dependencies:
@@ -103,4 +105,4 @@ manifests:
   ingress_api: false
   service_ingress_api: false
   job_manage_cleaning_network: false
-  job_bootstrap: true
+  job_bootstrap: false

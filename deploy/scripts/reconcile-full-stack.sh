@@ -84,6 +84,17 @@ for item in json.load(sys.stdin).get("items", []):
 }
 
 install_release() {
+  if [[ "$1" == "ironic" && "${ENABLE_IRONIC_PHYSICAL_PROVISIONING:-0}" == "1" ]]; then
+    "$REPO_ROOT/deploy/scripts/ensure-ironic-agent-images.sh"
+    conductor_node=$(kubectl -n "$NAMESPACE" get pod ironic-conductor-0 \
+      -o jsonpath='{.spec.nodeName}' 2>/dev/null || true)
+    conductor_ready=$(kubectl -n "$NAMESPACE" get pod ironic-conductor-0 \
+      -o jsonpath='{range .status.conditions[?(@.type=="Ready")]}{.status}{end}' 2>/dev/null || true)
+    if [[ "$conductor_node" != "dcn-1a-controller-0" || "$conductor_ready" != "True" ]]; then
+      kubectl -n "$NAMESPACE" delete pod ironic-conductor-0 \
+        --ignore-not-found --wait=true
+    fi
+  fi
   if [[ "$1" == "octavia" ]]; then
     "$REPO_ROOT/deploy/scripts/reconcile-octavia.sh"
     return
