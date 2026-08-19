@@ -9,6 +9,8 @@ kubectl -n "$namespace" wait --for=condition=ready pod/ironic-conductor-0 --time
 test "$(kubectl -n "$namespace" get statefulset ironic-conductor -o jsonpath='{.spec.replicas}')" = 1
 kubectl -n "$namespace" exec ironic-conductor-0 -c ironic-conductor -- \
   ip -4 address show dev "$device" | grep -F "inet $expected_address"
+kubectl -n "$namespace" exec ironic-conductor-0 -c ironic-conductor -- \
+  sh -ec 'test "$(sha256sum /var/lib/ironic/boot-tools/mkisofs | awk '\''{print $1}'\'')" = 9bacc5951ca0767701cfd8e6b47537f199977e51a6e943f4edfdcf9d639d99d2; command -v mkisofs'
 kubectl -n "$namespace" exec ironic-conductor-0 -c ironic-conductor-pxe -- \
   sh -ec "grep -q ':0045 ' /proc/net/udp /proc/net/udp6"
 kubectl -n "$namespace" exec ironic-conductor-0 -c ironic-conductor-http -- \
