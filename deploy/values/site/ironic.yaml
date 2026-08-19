@@ -1,4 +1,5 @@
-# Control-only Ironic PoC. No PXE, HTTP boot, cleaning network, or image bootstrap.
+# Physical provisioning uses the dedicated dcn-ironic0 VLAN. DHCP remains
+# site-owned; Ironic owns TFTP/iPXE and HTTP boot artifacts.
 images:
   tags:
     ironic_manage_cleaning_network: quay.io/airshipit/openstack-client:2026.1-ubuntu_noble
@@ -25,6 +26,11 @@ conf:
       ldlinux_c32: /var/lib/ironic/boot-tools/ldlinux.c32
     api:
       workers: 4
+    conductor:
+      api_url: https://internal.cloud.dcn.ssu.ac.kr/baremetal
+      automated_clean: false
+    deploy:
+      http_url: http://10.64.111.2:8080
     pxe:
       # Temporary PoC exception for the self-signed internal Gateway CA.
       # Production IPA images must trust the institutional CA instead.
@@ -40,14 +46,14 @@ conf:
       endpoint_override: https://internal.cloud.dcn.ssu.ac.kr/baremetal
 conductor:
   pxe:
-    enabled: false
+    enabled: true
   http:
     # Required by redfish-virtual-media. This exposes only the generated boot
     # artifacts on TCP/8080; PXE/TFTP and DHCP remain disabled.
     enabled: true
 bootstrap:
   image:
-    enabled: false
+    enabled: true
   object_store:
     enabled: false
 dependencies:
@@ -62,7 +68,7 @@ pod:
       enabled: true
   replicas:
     api: 2
-    conductor: 2
+    conductor: 1
   lifecycle:
     disruption_budget:
       api:
@@ -71,7 +77,7 @@ network:
   pxe:
     # Use the stable additive fabric interface shared by every conductor
     # candidate; never bind provisioning services to the installer DHCP NIC.
-    device: dcn-control0
+    device: dcn-ironic0
 endpoints:
   identity:
     auth:
@@ -93,4 +99,4 @@ manifests:
   ingress_api: false
   service_ingress_api: false
   job_manage_cleaning_network: false
-  job_bootstrap: false
+  job_bootstrap: true
