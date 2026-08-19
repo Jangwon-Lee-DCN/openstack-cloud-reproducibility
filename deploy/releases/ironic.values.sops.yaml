@@ -12,6 +12,8 @@ conf:
     ironic:
         api:
             workers: ENC[AES256_GCM,data:DA==,iv:TpGc/Hht2O/3n47SfCiW69caczgllapgFYX3K96MOfc=,tag:r/ks2bqhrvQwuwmUq+YipQ==,type:int]
+        dhcp:
+            dhcp_provider: ENC[AES256_GCM,data:SFLGHg==,iv:zW2cQ3G7AHoUjmGGejuLOWziBuJO3o3rHwzs/CA5Xms=,tag:r/bIYTUKDsYxeLC+ANtRsw==,type:str]
 dependencies:
     static:
         api:
@@ -106,7 +108,7 @@ sops:
             atT1YpS4LEr4CFxiRRjARFBM6Q/glR+Lq6Qx5VvjkfiHbjjIvTa3sA==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1cjaxalqu6gs9mev9w0u537793ql5t0gy3a6d9qn0265s49k9ss6q7flh4j
-    lastmodified: "2026-07-30T14:53:21Z"
-    mac: ENC[AES256_GCM,data:07fMI/yvCZUZS/ad5SCyVFdsRQbH+ahuEIxihsJuQtiOUUUiY7VSQhQpn9NNG05ei4Zk3zBVWDgSN4/OK3p6jo9f8YR8/AzwFIPgIQhHbWj8qrn1JzYas8kQ61nMNxQOJJ9i2TTPO+UNVy1ddJOBjetqOKf/ansptiC4n3knwUw=,iv:LDWi20prCnJK3fAnci5qaW2EPGkWlkG/CHjx5Gr9RDw=,tag:klEFUMdI5C4wHZb2L4OGwQ==,type:str]
+    lastmodified: "2026-08-19T13:25:58Z"
+    mac: ENC[AES256_GCM,data:t0pSehPXGWO7V+Qol0ck86uRptdhgbOMviNt/CbL3LifNv6j7aAD0GAtUld8E4hbpy5hcSwhaLDOe8A94023gkadbAfMLOvx2Jb1ikujxyoKE9GDaMNsvGtqB40hQQz9vnTue6EMd12DlZ3oOHc0x2PchRTOQC/J2Ueb+EgWUQo=,iv:Ggaa9HtXwe1nIGTy6COZI9NAkf0eoCmYZGnsMCmCgNU=,tag:m9HElVlR9qGd7hrfxkaC0w==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3
