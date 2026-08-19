@@ -26,7 +26,7 @@ kubectl -n "$namespace" delete pod "$pod" --ignore-not-found --wait=true >/dev/n
 cleanup() { kubectl -n "$namespace" delete pod "$pod" --ignore-not-found --wait=false >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 kubectl -n "$namespace" run "$pod" --restart=Never --image="$client_image" \
-  --overrides='{"spec":{"containers":[{"name":"'$pod'","image":"'$client_image'","command":["sleep","900"],"envFrom":[{"secretRef":{"name":"ironic-keystone-user"}}]}]}}' \
+  --overrides='{"spec":{"containers":[{"name":"'$pod'","image":"'$client_image'","command":["sleep","900"],"envFrom":[{"secretRef":{"name":"ironic-keystone-admin"}}]}]}}' \
   --command -- sleep 900 >/dev/null
 kubectl -n "$namespace" wait --for=condition=Ready pod/"$pod" --timeout=120s >/dev/null
 
