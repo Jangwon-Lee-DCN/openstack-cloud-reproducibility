@@ -16,6 +16,10 @@ images:
     ironic_conductor: quay.io/airshipit/ironic:2026.1-ubuntu_noble
     ironic_pxe: quay.io/airshipit/ironic:2026.1-ubuntu_noble
     ironic_pxe_init: quay.io/airshipit/ironic:2026.1-ubuntu_noble
+labels:
+  conductor:
+    node_selector_key: kubernetes.io/hostname
+    node_selector_value: dcn-1a-controller-0
 conf:
   ironic:
     DEFAULT:
