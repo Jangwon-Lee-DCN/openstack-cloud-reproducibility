@@ -40,7 +40,8 @@ openstack flavor set bm.virtual.preview \
   --property trait:CUSTOM_DCN_VIRTUAL_REDFISH=required
 
 ensure_flavor gpu.passthrough.preview 8192 40 4
-openstack flavor set --private gpu.passthrough.preview
+# Nova does not support changing an existing flavor's visibility. Fail closed
+# below if an operator-created flavor with this reserved name is public.
 for stale_property in \
   resources:CUSTOM_GPU \
   trait:CUSTOM_DCN_GPU_PASSTHROUGH_PREVIEW \

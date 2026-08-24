@@ -26,6 +26,12 @@ class GPUImageContractTest(unittest.TestCase):
         self.assertIn('f"{name}={version}"', script)
         self.assertIn("qemu-img check", script)
 
+    def test_flavor_reconcile_fails_closed_on_visibility(self):
+        script = (ROOT / "scripts/reconcile-preview-service-catalog.sh").read_text()
+        self.assertNotIn("flavor set --private", script)
+        self.assertIn("'Is Public'", script)
+        self.assertIn("gpu_access", script)
+
 
 if __name__ == "__main__":
     unittest.main()
