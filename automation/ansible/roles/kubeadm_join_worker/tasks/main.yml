@@ -5,9 +5,31 @@
     regexp: "\\s{{ kubernetes_api_fqdn | regex_escape }}(?:\\s|$)"
     line: "{{ hostvars[groups['control_plane'][0]].node_ip | default(hostvars[groups['control_plane'][0]].ansible_host) }} {{ kubernetes_api_fqdn }}"
 
+- name: Create an ephemeral worker token for a worker-only limited run
+  ansible.builtin.command: >-
+    kubeadm token create --ttl 2h --print-join-command
+    --kubeconfig /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  register: delegated_worker_join
+  changed_when: false
+  when: hostvars[groups['control_plane'][0]].kubeadm_join_command is not defined
+  no_log: true
+
+- name: Resolve the effective direct-control-plane join command
+  ansible.builtin.set_fact:
+    effective_kubeadm_join_command: >-
+      {{ (hostvars[groups['control_plane'][0]].kubeadm_join_command |
+          default(delegated_worker_join.stdout)) |
+         regex_replace(
+           '^kubeadm join [^ ]+',
+           'kubeadm join ' ~
+           (hostvars[groups['control_plane'][0]].node_ip |
+            default(hostvars[groups['control_plane'][0]].ansible_host)) ~ ':6443') }}
+  no_log: true
+
 - name: Join Kubernetes worker node
   ansible.builtin.command: >-
-    {{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}
+    {{ effective_kubeadm_join_command }}
     --node-name {{ inventory_hostname }}
     --cri-socket {{ kubernetes_cri_socket | default('unix:///var/run/crio/crio.sock') }}
   args:
