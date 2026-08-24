@@ -51,8 +51,8 @@ conf:
       # legacy policy is required to allow the documented no-affinity fallback.
       device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"}]'
       alias: |-
-        {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"legacy","live_migratable":"no"}
-        alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"legacy","live_migratable":"no"}
+        {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"legacy"}
+        alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"legacy"}
     filter_scheduler:
       enabled_filters:
         - ComputeFilter
