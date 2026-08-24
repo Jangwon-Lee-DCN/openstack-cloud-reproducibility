@@ -1,0 +1,11 @@
+---
+- name: Rebuild initramfs for GPU passthrough
+  ansible.builtin.command: update-initramfs -u -k all
+  changed_when: true
+  listen: gpu passthrough changed
+
+- name: Reboot GPU host for deterministic VFIO binding
+  ansible.builtin.reboot:
+    reboot_timeout: 900
+  when: gpu_passthrough_reboot | bool
+  listen: gpu passthrough changed

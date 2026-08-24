@@ -1,0 +1,15 @@
+---
+- name: Configure approved GPU nodes for Nova PCI passthrough
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: 1
+  pre_tasks:
+    - name: Refuse a non-GPU target
+      ansible.builtin.assert:
+        that:
+          - "'gpu' in (node_roles | default([]))"
+          - gpu_passthrough_enabled | default(false) | bool
+        fail_msg: Phase 67 must be limited to an explicitly approved GPU host.
+  roles:
+    - gpu_vfio_passthrough
