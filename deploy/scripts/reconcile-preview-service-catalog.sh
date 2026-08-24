@@ -40,6 +40,7 @@ openstack flavor set bm.virtual.preview \
   --property trait:CUSTOM_DCN_VIRTUAL_REDFISH=required
 
 ensure_flavor gpu.passthrough.preview 8192 40 4
+openstack flavor set --private gpu.passthrough.preview
 for stale_property in \
   resources:CUSTOM_GPU \
   trait:CUSTOM_DCN_GPU_PASSTHROUGH_PREVIEW \
@@ -50,5 +51,19 @@ for stale_property in \
 done
 openstack flavor set gpu.passthrough.preview \
   --property 'pci_passthrough:alias=rtx3090ti:1,rtx3090ti-audio:1'
+
+# A previously public or broadly granted Preview flavor must not retain access.
+# Keep only the explicitly configured administrator project.
+admin_project_id=$(openstack project show -f value -c id "$admin_project")
+while read -r project_id; do
+  [[ -z "$project_id" || "$project_id" == "$admin_project_id" ]] && continue
+  openstack flavor unset --project "$project_id" gpu.passthrough.preview
+done < <(openstack flavor access list -f value -c 'Project ID' gpu.passthrough.preview)
+
+[[ $(openstack flavor show -f value -c 'Is Public' gpu.passthrough.preview) == False ]]
+mapfile -t gpu_access < <(openstack flavor access list -f value -c 'Project ID' gpu.passthrough.preview)
+[[ ${#gpu_access[@]} -eq 1 && ${gpu_access[0]} == "$admin_project_id" ]]
+[[ $(openstack flavor show -f json gpu.passthrough.preview | jq -r '.properties["pci_passthrough:alias"]') == \
+  'rtx3090ti:1,rtx3090ti-audio:1' ]]
 
 echo "private Preview flavors reconciled for project $admin_project"
