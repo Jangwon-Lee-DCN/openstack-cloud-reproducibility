@@ -7,5 +7,7 @@
 - name: Reboot GPU host for deterministic VFIO binding
   ansible.builtin.reboot:
     reboot_timeout: 900
-  when: gpu_passthrough_reboot | bool
+  when:
+    - gpu_passthrough_reboot | bool
+    - not ansible_check_mode
   listen: gpu passthrough changed

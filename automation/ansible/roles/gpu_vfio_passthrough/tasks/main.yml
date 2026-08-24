@@ -14,6 +14,7 @@
     test "$(cat /sys/bus/pci/devices/0000:{{ item.address }}/device)" = "0x{{ item.product_id }}"
   args:
     executable: /bin/bash
+  check_mode: false
   loop: "{{ gpu_passthrough_devices }}"
   loop_control:
     label: "{{ item.address }} {{ item.vendor_id }}:{{ item.product_id }}"
@@ -72,6 +73,7 @@
   register: gpu_vfio_drivers
   changed_when: false
   failed_when: not gpu_vfio_drivers.stdout.endswith('/vfio-pci')
+  when: not ansible_check_mode
 
 - name: Verify all approved functions share one non-empty IOMMU group
   ansible.builtin.shell: |
@@ -84,3 +86,4 @@
   register: gpu_iommu_groups
   changed_when: false
   failed_when: gpu_iommu_groups.stdout_lines | length != 1
+  when: not ansible_check_mode
