@@ -36,6 +36,9 @@ COMPONENTS = {
     "keycloak": ("platform-images", ("reproducibility",)),
     "project-facade": ("platform-images", ("reproducibility",)),
     "loki-tenant-gateway": ("platform-images", ("reproducibility",)),
+    "nova-extended-compute": ("nova", ("reproducibility", "nova_extended_compute")),
+    "flyt-adapter": ("platform-images", ("reproducibility", "flyt_adapter")),
+    "flyt-cluster-manager": ("platform-images", ("reproducibility", "flyt_managed_runtime")),
 }
 
 

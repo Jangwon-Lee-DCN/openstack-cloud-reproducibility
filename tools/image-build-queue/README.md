@@ -78,6 +78,26 @@ dcn-image-build cancel REQUEST_OR_TASK_ID
 systemctl status dcn-image-build-queue.service
 ```
 
+FLYT control-plane images use the same queue and require every source revision:
+
+```bash
+dcn-image-build submit --component flyt-adapter \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source flyt_adapter=/path/to/openstack-flyt-adapter@FULL_SHA --wait
+
+dcn-image-build submit --component flyt-cluster-manager \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source flyt_managed_runtime=/path/to/flyt-managed-runtime@FULL_SHA --wait
+```
+
+The downstream Nova image is built from its own source authority:
+
+```bash
+dcn-image-build submit --component nova-extended-compute \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source nova_extended_compute=/path/to/nova-extended-compute@FULL_SHA --wait
+```
+
 `queue` is the operator-friendly view: by default it shows only queued and
 running builds. Use `queue --all` when completed and failed history is needed.
 `list` remains the machine-readable JSON-lines interface.
