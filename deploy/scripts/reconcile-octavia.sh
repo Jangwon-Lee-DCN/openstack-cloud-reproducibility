@@ -29,6 +29,10 @@ test -n "${nb_remotes}" && test -n "${sb_remotes}"
 # before copying its CA into the OpenStack namespace.
 "${ROOT_DIR}/prerequisites/networking/openstack-internal-gateway/scripts/install.sh"
 
+# DaemonSets follow the declared network-node label. Reconcile their Neutron
+# management ports before Helm starts a Pod on a newly joined node.
+"${ROOT_DIR}/deploy/scripts/reconcile-octavia-node-ports.sh"
+
 sops -d "${AMPHORA_CERTS}" | kubectl apply -f -
 kubectl -n openstack-internal-gateway-system get secret \
   openstack-internal-ca -o json |
