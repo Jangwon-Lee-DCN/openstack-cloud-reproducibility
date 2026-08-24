@@ -1,0 +1,86 @@
+---
+- name: Require an explicit GPU PCI device contract
+  ansible.builtin.assert:
+    that:
+      - gpu_passthrough_devices | length > 0
+      - gpu_passthrough_devices | selectattr('address', 'defined') | list | length == gpu_passthrough_devices | length
+      - gpu_passthrough_devices | selectattr('vendor_id', 'defined') | list | length == gpu_passthrough_devices | length
+      - gpu_passthrough_devices | selectattr('product_id', 'defined') | list | length == gpu_passthrough_devices | length
+
+- name: Verify declared PCI identities before changing driver binding
+  ansible.builtin.shell: |
+    set -eu
+    test "$(cat /sys/bus/pci/devices/0000:{{ item.address }}/vendor)" = "0x{{ item.vendor_id }}"
+    test "$(cat /sys/bus/pci/devices/0000:{{ item.address }}/device)" = "0x{{ item.product_id }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ gpu_passthrough_devices }}"
+  loop_control:
+    label: "{{ item.address }} {{ item.vendor_id }}:{{ item.product_id }}"
+  register: gpu_pci_identity
+  changed_when: false
+
+- name: Load VFIO modules during normal boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/dcn-gpu-vfio.conf
+    mode: "0644"
+    content: |
+      vfio
+      vfio_iommu_type1
+      vfio_pci
+  notify: gpu passthrough changed
+
+- name: Include VFIO modules in the initramfs
+  ansible.builtin.blockinfile:
+    path: /etc/initramfs-tools/modules
+    create: true
+    mode: "0644"
+    marker: "# {mark} DCN GPU VFIO"
+    block: |
+      vfio
+      vfio_iommu_type1
+      vfio_pci
+  notify: gpu passthrough changed
+
+- name: Render the approved VFIO device identifiers
+  ansible.builtin.set_fact:
+    gpu_vfio_device_id_list: >-
+      {{ (gpu_vfio_device_id_list | default([])) +
+         [item.vendor_id ~ ':' ~ item.product_id] }}
+  loop: "{{ gpu_passthrough_devices }}"
+  loop_control:
+    label: "{{ item.vendor_id }}:{{ item.product_id }}"
+
+- name: Bind only the approved GPU functions to vfio-pci
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/dcn-gpu-vfio.conf
+    mode: "0644"
+    content: |
+      # Managed by the gpu_vfio_passthrough role.
+      options vfio-pci ids={{ gpu_vfio_device_id_list | join(',') }} disable_vga=1
+      softdep nvidia pre: vfio-pci
+      softdep snd_hda_intel pre: vfio-pci
+  notify: gpu passthrough changed
+
+- name: Apply initramfs and reboot before validation
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify every approved function is bound to vfio-pci
+  ansible.builtin.command: >-
+    readlink -f /sys/bus/pci/devices/0000:{{ item.address }}/driver
+  loop: "{{ gpu_passthrough_devices }}"
+  register: gpu_vfio_drivers
+  changed_when: false
+  failed_when: not gpu_vfio_drivers.stdout.endswith('/vfio-pci')
+
+- name: Verify all approved functions share one non-empty IOMMU group
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for address in {{ gpu_passthrough_devices | map(attribute='address') | join(' ') }}; do
+      basename "$(readlink /sys/bus/pci/devices/0000:$address/iommu_group)"
+    done | sort -u
+  args:
+    executable: /bin/bash
+  register: gpu_iommu_groups
+  changed_when: false
+  failed_when: gpu_iommu_groups.stdout_lines | length != 1

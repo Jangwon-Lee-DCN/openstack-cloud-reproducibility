@@ -46,6 +46,25 @@ ovs_chart="$root/helm/packages/upstream/openvswitch-2026.1.0.tgz"
 
 grep -q 'openstack-compute-node=enabled' "$role_tasks"
 grep -q 'openvswitch=enabled' "$role_tasks"
+grep -q 'Phase 67 must be limited to an explicitly approved GPU host' \
+  "$ansible_root/playbooks/67-gpu-vfio-passthrough.yml"
+grep -q '/etc/initramfs-tools/modules' \
+  "$ansible_root/roles/gpu_vfio_passthrough/tasks/main.yml"
+grep -q 'pci_passthrough:alias=rtx3090ti:1,rtx3090ti-audio:1' \
+  "$root/deploy/scripts/reconcile-preview-service-catalog.sh"
+python3 - "$root/deploy/values/site/nova.yaml" <<'PY'
+import sys
+import yaml
+
+nova = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["conf"]["nova"]
+pci = nova["pci"]
+assert pci["report_in_placement"] is False
+assert len(pci["device_spec"]) == 2
+assert len(pci["alias"]) == 2
+filters = nova["filter_scheduler"]["enabled_filters"]
+assert "NUMATopologyFilter" in filters
+assert "PciPassthroughFilter" in filters
+PY
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
   awk '/node_selector_key: openstack-compute-node/{found=1} END{exit !found}'
 tar -xOf "$ovn_chart" --wildcards '*/values.yaml' | \

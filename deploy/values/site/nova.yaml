@@ -40,6 +40,25 @@ conf:
       enforce_scope: false
     libvirt:
       images_type: qcow2
+    # The Rack 1 GPU host exposes one complete RTX 3090 Ti IOMMU group.  Both
+    # the display and HDMI-audio functions must be requested together.
+    pci:
+      report_in_placement: false
+      device_spec:
+        - '{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"}'
+        - '{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"}'
+      alias:
+        - '{"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"required","live_migratable":"no"}'
+        - '{"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"required","live_migratable":"no"}'
+    filter_scheduler:
+      enabled_filters:
+        - ComputeFilter
+        - ComputeCapabilitiesFilter
+        - ImagePropertiesFilter
+        - NUMATopologyFilter
+        - PciPassthroughFilter
+        - ServerGroupAntiAffinityFilter
+        - ServerGroupAffinityFilter
 endpoints:
   identity:
     auth:
