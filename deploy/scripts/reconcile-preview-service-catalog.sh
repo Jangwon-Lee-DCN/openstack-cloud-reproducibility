@@ -40,12 +40,15 @@ openstack flavor set bm.virtual.preview \
   --property trait:CUSTOM_DCN_VIRTUAL_REDFISH=required
 
 ensure_flavor gpu.passthrough.preview 8192 40 4
-openstack flavor unset gpu.passthrough.preview \
-  --property resources:CUSTOM_GPU \
-  --property trait:CUSTOM_DCN_GPU_PASSTHROUGH_PREVIEW 2>/dev/null || true
+for stale_property in \
+  resources:CUSTOM_GPU \
+  trait:CUSTOM_DCN_GPU_PASSTHROUGH_PREVIEW \
+  hw:cpu_policy \
+  hw:numa_nodes; do
+  openstack flavor unset gpu.passthrough.preview \
+    --property "$stale_property" 2>/dev/null || true
+done
 openstack flavor set gpu.passthrough.preview \
-  --property 'pci_passthrough:alias=rtx3090ti:1,rtx3090ti-audio:1' \
-  --property hw:cpu_policy=dedicated \
-  --property hw:numa_nodes=1
+  --property 'pci_passthrough:alias=rtx3090ti:1,rtx3090ti-audio:1'
 
 echo "private Preview flavors reconciled for project $admin_project"

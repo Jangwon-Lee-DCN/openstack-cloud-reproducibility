@@ -52,6 +52,8 @@ grep -q '/etc/initramfs-tools/modules' \
   "$ansible_root/roles/gpu_vfio_passthrough/tasks/main.yml"
 grep -q 'pci_passthrough:alias=rtx3090ti:1,rtx3090ti-audio:1' \
   "$root/deploy/scripts/reconcile-preview-service-catalog.sh"
+! grep -q -- '--property hw:cpu_policy=dedicated' \
+  "$root/deploy/scripts/reconcile-preview-service-catalog.sh"
 python3 - "$root/deploy/values/site/nova.yaml" <<'PY'
 import sys
 import yaml
