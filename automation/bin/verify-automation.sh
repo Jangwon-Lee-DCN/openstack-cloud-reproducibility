@@ -4,7 +4,7 @@ set -euo pipefail
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 ansible_root="$root/automation/ansible"
 
-for command in ansible-playbook ansible-lint awk grep tar yamllint; do
+for command in ansible-playbook ansible-lint awk grep helm tar yamllint; do
   command -v "$command" >/dev/null || {
     echo "missing automation validation command: $command" >&2
     exit 1
@@ -59,12 +59,24 @@ import yaml
 nova = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["conf"]["nova"]
 pci = nova["pci"]
 assert pci["report_in_placement"] is False
-assert len(pci["device_spec"]) == 2
-assert len(pci["alias"]) == 2
+device_specs = __import__("json").loads(pci["device_spec"])
+assert len(device_specs) == 2
+assert pci["alias"].count("alias = ") == 1
 filters = nova["filter_scheduler"]["enabled_filters"]
 assert "NUMATopologyFilter" in filters
 assert "PciPassthroughFilter" in filters
 PY
+helm template nova "$nova_chart" -f "$root/deploy/values/site/nova.yaml" | \
+  python3 -c '
+import base64, json, sys, yaml
+objects = list(yaml.safe_load_all(sys.stdin))
+secret = next(x for x in objects if x and x.get("kind") == "Secret" and x.get("metadata", {}).get("name") == "nova-etc")
+config = base64.b64decode(secret["data"]["nova.conf"]).decode()
+assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
+assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
+device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
+assert len(json.loads(device_line.split(" = ", 1)[1])) == 2
+'
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
   awk '/node_selector_key: openstack-compute-node/{found=1} END{exit !found}'
 tar -xOf "$ovn_chart" --wildcards '*/values.yaml' | \
