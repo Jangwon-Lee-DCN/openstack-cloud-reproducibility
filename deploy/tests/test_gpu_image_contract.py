@@ -29,7 +29,8 @@ class GPUImageContractTest(unittest.TestCase):
     def test_flavor_reconcile_fails_closed_on_visibility(self):
         script = (ROOT / "scripts/reconcile-preview-service-catalog.sh").read_text()
         self.assertNotIn("flavor set --private", script)
-        self.assertIn("'Is Public'", script)
+        self.assertIn('os-flavor-access:is_public', script)
+        self.assertNotIn("-c 'Is Public'", script)
         self.assertIn("os-flavor-access", script)
         self.assertNotIn("flavor unset --project", script)
         self.assertIn('"removeTenantAccess"', script)
