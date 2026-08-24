@@ -30,9 +30,10 @@ class GPUImageContractTest(unittest.TestCase):
         script = (ROOT / "scripts/reconcile-preview-service-catalog.sh").read_text()
         self.assertNotIn("flavor set --private", script)
         self.assertIn("'Is Public'", script)
-        self.assertIn("gpu_access", script)
+        self.assertIn("os-flavor-access", script)
         self.assertNotIn("flavor unset --project", script)
         self.assertIn('"removeTenantAccess"', script)
+        self.assertNotIn("flavor access list", script)
 
 
 if __name__ == "__main__":
