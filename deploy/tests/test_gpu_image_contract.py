@@ -31,6 +31,8 @@ class GPUImageContractTest(unittest.TestCase):
         self.assertNotIn("flavor set --private", script)
         self.assertIn("'Is Public'", script)
         self.assertIn("gpu_access", script)
+        self.assertNotIn("flavor unset --project", script)
+        self.assertIn('"removeTenantAccess"', script)
 
 
 if __name__ == "__main__":

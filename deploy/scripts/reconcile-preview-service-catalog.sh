@@ -56,10 +56,27 @@ openstack flavor set gpu.passthrough.preview \
 # A previously public or broadly granted Preview flavor must not retain access.
 # Keep only the explicitly configured administrator project.
 admin_project_id=$(openstack project show -f value -c id "$admin_project")
+gpu_flavor_id=$(openstack flavor show -f value -c id gpu.passthrough.preview)
+compute_endpoint=$(openstack endpoint list --service nova --interface internal \
+  --region "${OS_REGION_NAME:?}" -f value -c URL | head -n1)
+token=$(openstack token issue -f value -c id)
 while read -r project_id; do
   [[ -z "$project_id" || "$project_id" == "$admin_project_id" ]] && continue
-  openstack flavor unset --project "$project_id" gpu.passthrough.preview
+  python3 - "$compute_endpoint" "$token" "$gpu_flavor_id" "$project_id" <<'PY'
+import json, sys, urllib.request
+endpoint, token, flavor_id, project_id = sys.argv[1:]
+request = urllib.request.Request(
+    endpoint.rstrip("/") + "/flavors/" + flavor_id + "/action",
+    data=json.dumps({"removeTenantAccess": {"tenant": project_id}}).encode(),
+    headers={"Content-Type": "application/json", "X-Auth-Token": token},
+    method="POST",
+)
+with urllib.request.urlopen(request, timeout=60) as response:
+    if response.status not in (200, 202):
+        raise SystemExit(f"unexpected Nova flavor-access response: {response.status}")
+PY
 done < <(openstack flavor access list -f value -c 'Project ID' gpu.passthrough.preview)
+unset token
 
 [[ $(openstack flavor show -f value -c 'Is Public' gpu.passthrough.preview) == False ]]
 mapfile -t gpu_access < <(openstack flavor access list -f value -c 'Project ID' gpu.passthrough.preview)
