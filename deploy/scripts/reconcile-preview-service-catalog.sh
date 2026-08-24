@@ -60,27 +60,32 @@ gpu_flavor_id=$(openstack flavor show -f value -c id gpu.passthrough.preview)
 compute_endpoint=$(openstack endpoint list --service nova --interface internal \
   --region "${OS_REGION_NAME:?}" -f value -c URL | head -n1)
 token=$(openstack token issue -f value -c id)
-while read -r project_id; do
-  [[ -z "$project_id" || "$project_id" == "$admin_project_id" ]] && continue
-  python3 - "$compute_endpoint" "$token" "$gpu_flavor_id" "$project_id" <<'PY'
+python3 - "$compute_endpoint" "$token" "$gpu_flavor_id" "$admin_project_id" <<'PY'
 import json, sys, urllib.request
-endpoint, token, flavor_id, project_id = sys.argv[1:]
-request = urllib.request.Request(
-    endpoint.rstrip("/") + "/flavors/" + flavor_id + "/action",
-    data=json.dumps({"removeTenantAccess": {"tenant": project_id}}).encode(),
-    headers={"Content-Type": "application/json", "X-Auth-Token": token},
-    method="POST",
-)
-with urllib.request.urlopen(request, timeout=60) as response:
-    if response.status not in (200, 202):
-        raise SystemExit(f"unexpected Nova flavor-access response: {response.status}")
+endpoint, token, flavor_id, admin_project_id = sys.argv[1:]
+url = endpoint.rstrip("/") + "/flavors/" + flavor_id + "/os-flavor-access"
+headers = {"Content-Type": "application/json", "X-Auth-Token": token}
+
+def access_ids():
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
+        return {item["tenant_id"] for item in json.load(response)["flavor_access"]}
+
+for project_id in access_ids() - {admin_project_id}:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps({"removeTenantAccess": {"tenant": project_id}}).encode(),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        if response.status not in (200, 202):
+            raise SystemExit(f"unexpected Nova flavor-access response: {response.status}")
+if access_ids() != {admin_project_id}:
+    raise SystemExit("GPU flavor access is not restricted to the administrator project")
 PY
-done < <(openstack flavor access list -f value -c 'Project ID' gpu.passthrough.preview)
 unset token
 
 [[ $(openstack flavor show -f value -c 'Is Public' gpu.passthrough.preview) == False ]]
-mapfile -t gpu_access < <(openstack flavor access list -f value -c 'Project ID' gpu.passthrough.preview)
-[[ ${#gpu_access[@]} -eq 1 && ${gpu_access[0]} == "$admin_project_id" ]]
 [[ $(openstack flavor show -f json gpu.passthrough.preview | jq -r '.properties["pci_passthrough:alias"]') == \
   'rtx3090ti:1,rtx3090ti-audio:1' ]]
 
