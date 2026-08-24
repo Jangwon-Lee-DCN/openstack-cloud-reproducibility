@@ -30,11 +30,11 @@ spec:
             - |
               for node in ${nodes}; do
                 for role in health-manager worker; do
-                  port="octavia-${role}-port-${node}"
-                  if openstack port show "${port}" >/dev/null 2>&1; then
+                  port="octavia-\${role}-port-\${node}"
+                  if openstack port show "\${port}" >/dev/null 2>&1; then
                     continue
                   fi
-                  if [[ "${role}" == health-manager ]]; then
+                  if [[ "\${role}" == health-manager ]]; then
                     security_group=lb-health-mgr-sec-grp
                     device_owner=Octavia:health-mgr
                   else
@@ -43,10 +43,10 @@ spec:
                   fi
                   openstack port create \
                     --network lb-mgmt-net \
-                    --security-group "${security_group}" \
-                    --device-owner "${device_owner}" \
-                    --host "${node}" \
-                    "${port}" >/dev/null
+                    --security-group "\${security_group}" \
+                    --device-owner "\${device_owner}" \
+                    --host "\${node}" \
+                    "\${port}" >/dev/null
                 done
               done
 EOF
