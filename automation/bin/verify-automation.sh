@@ -65,6 +65,7 @@ device_specs = __import__("json").loads(pci["device_spec"])
 assert len(device_specs) == 2
 assert pci["alias"].count("alias = ") == 1
 assert pci["alias"].count('"numa_policy":"legacy"') == 2
+assert "live_migratable" not in pci["alias"]
 filters = nova["filter_scheduler"]["enabled_filters"]
 assert "NUMATopologyFilter" in filters
 assert "PciPassthroughFilter" in filters
