@@ -23,6 +23,7 @@ yamllint -d \
   playbooks roles inventory/production inventory/poc-two-node
 
 bash -n bin/*.sh ../bin/*.sh ../lab/*.sh
+python3 "$root/deploy/tests/test_gpu_image_contract.py"
 bin/verify-expansion-contract.sh
 
 set +e

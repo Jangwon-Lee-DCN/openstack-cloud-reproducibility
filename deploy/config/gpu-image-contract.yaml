@@ -1,0 +1,26 @@
+schema: dcn.ssu.ac.kr/gpu-image/v1
+name: ubuntu-24.04-nvidia-580-cuda-12.0
+visibility: private
+protected: true
+base:
+  distribution: ubuntu
+  release: "24.04"
+  architecture: x86_64
+packages:
+  nvidia-driver-580-server: 580.173.02-0ubuntu0.24.04.1
+  nvidia-utils-580-server: 580.173.02-0ubuntu0.24.04.1
+  nvidia-cuda-toolkit: 12.0.140~12.0.1-4build4
+properties:
+  os_distro: ubuntu
+  os_version: "24.04"
+  architecture: x86_64
+  hw_firmware_type: uefi
+  os_secure_boot: disabled
+  dcn_gpu_model: rtx3090ti
+  dcn_gpu_driver: "580.173.02"
+  dcn_cuda_version: "12.0"
+  dcn_gpu_validation: unbooted
+publication_gate:
+  require_guest_vm: true
+  required_commands: [lspci, nvidia-smi, cuda-sample]
+  allow_project_access_before_guest_validation: false
