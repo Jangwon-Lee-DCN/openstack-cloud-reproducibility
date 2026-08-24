@@ -85,8 +85,9 @@ if access_ids() != {admin_project_id}:
 PY
 unset token
 
-[[ $(openstack flavor show -f value -c 'Is Public' gpu.passthrough.preview) == False ]]
-[[ $(openstack flavor show -f json gpu.passthrough.preview | jq -r '.properties["pci_passthrough:alias"]') == \
+gpu_flavor_json=$(openstack flavor show -f json gpu.passthrough.preview)
+[[ $(jq -r '."os-flavor-access:is_public"' <<<"$gpu_flavor_json") == false ]]
+[[ $(jq -r '.properties["pci_passthrough:alias"]' <<<"$gpu_flavor_json") == \
   'rtx3090ti:1,rtx3090ti-audio:1' ]]
 
 echo "private Preview flavors reconciled for project $admin_project"
