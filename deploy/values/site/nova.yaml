@@ -47,10 +47,12 @@ conf:
       # helm-toolkit joins YAML lists with commas, which is invalid for Nova's
       # MultiStrOpt JSON parser. device_spec officially accepts one JSON list;
       # alias requires repeated INI keys, rendered here as a trusted scalar.
+      # The single-NUMA-node GPU host reports PCI numa_node=-1, so Nova's
+      # legacy policy is required to allow the documented no-affinity fallback.
       device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"}]'
       alias: |-
-        {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"required","live_migratable":"no"}
-        alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"required","live_migratable":"no"}
+        {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"legacy","live_migratable":"no"}
+        alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"legacy","live_migratable":"no"}
     filter_scheduler:
       enabled_filters:
         - ComputeFilter
