@@ -25,6 +25,9 @@ VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
+FLYT_ADAPTER_REPO=${FLYT_ADAPTER_REPO:-$REPO_ROOT/../openstack-flyt-adapter}
+FLYT_MANAGED_RUNTIME_REPO=${FLYT_MANAGED_RUNTIME_REPO:-$REPO_ROOT/../flyt-managed-runtime}
+NOVA_EXTENDED_COMPUTE_REPO=${NOVA_EXTENDED_COMPUTE_REPO:-$REPO_ROOT/../nova-extended-compute}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -199,6 +202,38 @@ build_loki_tenant_gateway() {
   build_context loki-tenant-gateway "$context" "$REGISTRY/loki-tenant-gateway:source-$BUILD_ID"
 }
 selected loki-tenant-gateway && build_loki_tenant_gateway
+
+build_nova_extended_compute() {
+  local context="$WORK_DIR/nova-extended-compute-source"
+  git -C "$NOVA_EXTENDED_COMPUTE_REPO" diff --quiet &&
+    git -C "$NOVA_EXTENDED_COMPUTE_REPO" diff --cached --quiet || {
+      echo "refusing to build dirty Nova source: $NOVA_EXTENDED_COMPUTE_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  git -C "$NOVA_EXTENDED_COMPUTE_REPO" archive HEAD | tar -x -C "$context"
+  cp "$REPO_ROOT/images/nova-extended-compute/Dockerfile" \
+    "$REPO_ROOT/images/nova-extended-compute/verify_installed.py" "$context/"
+  build_context nova-extended-compute "$context" "$REGISTRY/nova-extended-compute:source-$BUILD_ID"
+}
+selected nova-extended-compute && build_nova_extended_compute
+
+build_git_dockerfile() {
+  local component=$1 repository=$2 subdirectory=$3 image_name=$4 context="$WORK_DIR/$component-source"
+  git -C "$repository" diff --quiet && git -C "$repository" diff --cached --quiet || {
+    echo "refusing to build $component from dirty source: $repository" >&2
+    exit 1
+  }
+  mkdir -p "$context"
+  git -C "$repository" archive HEAD | tar -x -C "$context"
+  if [[ -n "$subdirectory" ]]; then
+    context="$context/$subdirectory"
+  fi
+  build_context "$component" "$context" "$REGISTRY/$image_name:source-$BUILD_ID"
+}
+
+selected flyt-adapter && build_git_dockerfile flyt-adapter "$FLYT_ADAPTER_REPO" "" flyt-adapter
+selected flyt-cluster-manager && build_git_dockerfile flyt-cluster-manager "$FLYT_MANAGED_RUNTIME_REPO" control-managers flyt-cluster-manager
 
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context
