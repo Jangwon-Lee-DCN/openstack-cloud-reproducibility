@@ -18,6 +18,16 @@ pod:
         min_available: 1
 images:
   tags:
+    nova: &nova_image registry.dcn.ssu.ac.kr/openstack/nova-extended-compute:source-862f2f63a6afc78ee703@sha256:6d92b55e745b6781db327ee5ae5ce36ddab4190a5b8a01b627f2ec71ce932780
+    nova_api: *nova_image
+    nova_cell_setup: *nova_image
+    nova_compute: *nova_image
+    nova_compute_ssh: *nova_image
+    nova_conductor: *nova_image
+    nova_db_sync: *nova_image
+    nova_novncproxy: *nova_image
+    nova_novncproxy_assets: *nova_image
+    nova_scheduler: *nova_image
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
   ceph:
@@ -35,6 +45,19 @@ conf:
     "os_compute_api:servers:detail:get_all_tenants": "role:admin or role:monitoring"
     "os_compute_api:os-simple-tenant-usage:list": "role:admin or role:monitoring"
   nova:
+    flyt:
+      enabled: true
+      adapter_endpoint: http://flyt-adapter.flyt-system.svc.cluster.local:8080
+      timeout: 60
+    api:
+      vendordata_providers: StaticJSON,DynamicJSON
+      vendordata_dynamic_targets: cloud-init@http://flyt-adapter.flyt-system.svc.cluster.local:8080/v1/nova/vendor-data
+      vendordata_dynamic_connect_timeout: 5
+      vendordata_dynamic_read_timeout: 5
+      vendordata_dynamic_failure_fatal: true
+    vendordata_dynamic_auth:
+      auth_type: admin_token
+      endpoint: http://flyt-adapter.flyt-system.svc.cluster.local:8080
     oslo_policy:
       enforce_new_defaults: true
       enforce_scope: false
@@ -57,6 +80,7 @@ conf:
       enabled_filters:
         - ComputeFilter
         - ComputeCapabilitiesFilter
+        - AggregateInstanceExtraSpecsFilter
         - ImagePropertiesFilter
         - NUMATopologyFilter
         - PciPassthroughFilter

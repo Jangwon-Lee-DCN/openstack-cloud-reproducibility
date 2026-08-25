@@ -36,6 +36,14 @@ COMPONENTS = {
     "keycloak": ("platform-images", ("reproducibility",)),
     "project-facade": ("platform-images", ("reproducibility",)),
     "loki-tenant-gateway": ("platform-images", ("reproducibility",)),
+    "openstack-flyt-adapter": ("flyt", ("reproducibility", "flyt_adapter")),
+    "flyt-cluster-manager": ("flyt", ("reproducibility", "flyt_runtime")),
+    "flyt-gpu-cell": ("flyt", ("reproducibility", "flyt_runtime")),
+    "flyt-client-package": ("flyt", ("reproducibility", "flyt_runtime")),
+    "flyt-cuda-devel-base": ("flyt", ("reproducibility",)),
+    "flyt-cuda-runtime-base": ("flyt", ("reproducibility",)),
+    "flyt-mongodb": ("flyt", ("reproducibility",)),
+    "nova-extended-compute": ("nova", ("reproducibility", "nova_extended_compute")),
 }
 
 
@@ -215,9 +223,17 @@ def logs(identifier: str) -> int:
 
 def cancel(identifier: str) -> int:
     path, request = load_request(identifier)
-    result = pueue("kill", str(request["task_id"]), check=False)
-    request.update({"status": "killed"})
-    atomic_json(path, request)
+    task = pueue_task(request["task_id"])
+    raw_status = task.get("status") if task else None
+    queued = isinstance(raw_status, dict) and any(
+        str(key).lower() == "queued" for key in raw_status
+    )
+    result = pueue("remove" if queued else "kill", str(request["task_id"]), check=False)
+    if result.returncode == 0:
+        request.update({"status": "killed"})
+        atomic_json(path, request)
+    else:
+        sys.stderr.write(result.stderr)
     return result.returncode
 
 

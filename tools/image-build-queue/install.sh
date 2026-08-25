@@ -56,6 +56,7 @@ install -m 0644 "$stage/dcn-image-build-queue.service" /etc/systemd/system/dcn-i
 ln -sfn /usr/local/libexec/dcn-image-build-queue/dcn-image-build /usr/local/bin/dcn-image-build
 
 systemctl daemon-reload
-systemctl enable --now dcn-image-build-queue.service
+systemctl enable dcn-image-build-queue.service
+systemctl restart dcn-image-build-queue.service
 systemctl is-active --quiet dcn-image-build-queue.service
 /usr/local/bin/dcn-image-build health

@@ -12,7 +12,7 @@ for _ in $(seq 1 100); do
 done
 "$PUEUE" --config "$CONFIG" status --json >/dev/null
 
-for group in horizon nova neutron keystone octavia magnum platform-images; do
+for group in horizon nova neutron keystone octavia magnum platform-images flyt; do
   "$PUEUE" --config "$CONFIG" group --json | python3 -c \
     'import json,sys; raise SystemExit(0 if sys.argv[1] in json.load(sys.stdin) else 1)' "$group" ||
     "$PUEUE" --config "$CONFIG" group add --parallel 1 "$group"

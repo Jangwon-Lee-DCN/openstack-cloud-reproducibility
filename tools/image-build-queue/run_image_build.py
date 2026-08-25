@@ -55,6 +55,9 @@ def execute(path: Path) -> int:
             "s3_dashboard": "S3_DASHBOARD_REPO",
             "magnum_gitops": "MAGNUM_GITOPS_REPO",
             "vpc_control_plane": "VPC_CONTROL_PLANE_REPO",
+            "flyt_adapter": "FLYT_ADAPTER_REPO",
+            "flyt_runtime": "FLYT_RUNTIME_REPO",
+            "nova_extended_compute": "NOVA_EXTENDED_COMPUTE_REPO",
         }
         for name, variable in mappings.items():
             if name in checkouts:

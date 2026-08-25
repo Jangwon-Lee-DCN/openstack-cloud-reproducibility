@@ -1,0 +1,33 @@
+schema: 1
+allocation_backend: dra-full-gpu-v1
+gpu_operator:
+  chart:
+    repository: https://helm.ngc.nvidia.com/nvidia
+    name: gpu-operator
+    version: v26.7.0
+    sha256: 6d1b282d74288be206c66dfe49073b7c85c209e92826c27f6507429055e2e102
+  images:
+    operator:
+      repository: nvcr.io/nvidia/gpu-operator
+      version: v26.7.0
+      digest: sha256:ddba086bb593713ad6f3b207fd0f9b16eb8910134bb656cb1a2e2ae1b5092400
+    node_feature_discovery:
+      repository: registry.k8s.io/nfd/node-feature-discovery
+      version: v0.19.0
+      digest: sha256:2fa1c99ad09bdf2c8ad97706a4ad2fd548c84d5ecd70ba32a6152c667b96c4d2
+    dra_driver:
+      repository: nvcr.io/nvidia/dra-driver-nvidia-gpu
+      version: v0.5.0
+      digest: sha256:9b46984c0eb18def60e2b9817b874275f4b5b08d12d491de4f1a7b91b51d706c
+  values:
+    clusterPolicyDeployCR: false
+    gpuClusterDeployCR: true
+    driverEnabled: false
+    computeDomainsEnabled: false
+    dcgmEnabled: false
+    dcgmExporterEnabled: false
+gpu_cell:
+  product_name: NVIDIA GeForce RTX 3090 Ti
+  device_class: gpu.nvidia.com
+  physical_profile: nvidia-rtx3090ti-whole-mps
+  logical_profile: flyt-nvidia-rtx3090ti-mps-shared-v1

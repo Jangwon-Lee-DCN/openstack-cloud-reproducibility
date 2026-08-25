@@ -7,6 +7,7 @@ BUILD_IMAGES=${BUILD_IMAGES:-0}
 VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
 START_AT=${START_AT:-mariadb}
 ONLY_RELEASE=${ONLY_RELEASE:-}
+EXTRA_VALUES_FILE=${EXTRA_VALUES_FILE:-}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
 for command in kubectl helm sops python3 sha256sum curl; do
@@ -109,6 +110,13 @@ install_release() {
     kubectl delete job -n "$NAMESPACE" \
       prometheus-openstack-exporter-ks-user --ignore-not-found --wait=true
   fi
+  if [[ "$1" == "nova" ]]; then
+    # Named one-shot Job Pod templates are immutable across image/config updates.
+    kubectl delete job -n "$NAMESPACE" \
+      nova-cell-setup nova-db-init nova-db-sync nova-ks-endpoints \
+      nova-ks-service nova-ks-user nova-rabbit-init \
+      --ignore-not-found --wait=true
+  fi
   local release=$1 package snapshot values_file secrets_file expected actual values
   package=$(release_field "$release" package)
   snapshot=$(release_field "$release" valuesSnapshot)
@@ -139,6 +147,10 @@ install_release() {
   # lets production replace old PoC storage choices retained in SOPS locks.
   if [[ -f "$REPO_ROOT/deploy/values/site/$release.yaml" && "$values_file" != "deploy/values/site/$release.yaml" ]]; then
     value_args+=( -f "$REPO_ROOT/deploy/values/site/$release.yaml" )
+  fi
+  if [[ -n "$EXTRA_VALUES_FILE" ]]; then
+    [[ -f "$EXTRA_VALUES_FILE" ]] || { echo "EXTRA_VALUES_FILE does not exist" >&2; exit 1; }
+    value_args+=( -f "$EXTRA_VALUES_FILE" )
   fi
   if [[ "$release" == neutron ]] && kubectl -n openstack get deployment vpc-metadata-attestor >/dev/null 2>&1; then
     value_args+=( -f "$REPO_ROOT/deploy/values/features/neutron-vpc-identity.yaml" )

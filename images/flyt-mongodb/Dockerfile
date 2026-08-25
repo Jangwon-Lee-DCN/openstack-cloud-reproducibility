@@ -1,0 +1,1 @@
+FROM docker.io/library/mongo:8.0.14-noble@sha256:05b417e0f4e6c30f4d5bf8ef47cdb846ba377b366277b925493d4c42339eb533

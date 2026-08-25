@@ -1,0 +1,119 @@
+schema: 1
+namespace: flyt-system
+gpu_node: dcn-1a-compute-2
+control_plane_nodes: [dcn-1b-controller-1, dcn-1c-controller-1]
+active_control_plane_node: dcn-1b-controller-1
+gpu_cell:
+  # NVIDIA DRA injects the allocated device through CDI on the default runtime.
+  # Set this only at sites that actually install a matching RuntimeClass.
+  runtime_class_name: ""
+  host_network: true
+adapter_storage_class_name: dcn-local-rwo
+mongodb_storage_class_name: powerstore-rwo-single-path
+placement_aggregate_name: https://dcn.ssu.ac.kr/placement/aggregates/flyt-nvidia-rtx3090ti-mps-shared-v1
+
+openstack_internal_endpoints:
+  nova: http://nova-api.openstack.svc.cluster.local:8774/v2.1
+  glance: http://glance-api.openstack.svc.cluster.local:9292
+  placement: http://placement-api.openstack.svc.cluster.local:8778
+  neutron: http://neutron-server.openstack.svc.cluster.local:9696
+
+images:
+  nova: registry.dcn.ssu.ac.kr/openstack/nova-extended-compute:source-862f2f63a6afc78ee703@sha256:6d92b55e745b6781db327ee5ae5ce36ddab4190a5b8a01b627f2ec71ce932780
+  adapter: registry.dcn.ssu.ac.kr/openstack/openstack-flyt-adapter:source-3cf1f84259253e75c62e@sha256:9336fd75c815bd9d77ef4d9eae5aa248a13cc3aa657b47deb32cef72e565fcea
+  client_package: registry.dcn.ssu.ac.kr/openstack/flyt-client-package:source-eb8d6ef0985d3eb947eb@sha256:0fe3a77f8d6d6b483c556d3332938163c07eaf8a896f21ca31c81f1e9c7c7097
+  cluster_manager: registry.dcn.ssu.ac.kr/openstack/flyt-cluster-manager:source-d6d015e6b6a09dca64f3@sha256:9c274881d9bd93b0fde53a271b23ae11eabfea32504299a00fa193189ca31c70
+  gpu_cell: registry.dcn.ssu.ac.kr/openstack/flyt-gpu-cell:source-3dae06f9a6f217eeedec@sha256:c52f323b79980d333c7793547d080400bfe867318ff847821d1c61ff8fd157b8
+  mongodb: registry.dcn.ssu.ac.kr/openstack/flyt-mongodb:source-cd7b86acb3e2e14167b3@sha256:b0fc2fabbe5fcc91ca604c8c02422859fae5feea111be02ce41ac7597e2eed73
+
+service_network:
+  subnet_pool_name: dcn-public-rack-prefixes-v4
+  dns_nameservers: [10.65.20.12, 10.66.20.12]
+  router_name: flyt-service-router
+  endpoint_ip: 10.64.40.222
+  rack_gateways:
+    - {name: rack-1, node: dcn-1a-compute-2, listen_ip: 10.64.40.222, availability_zones: [nova, rack-1]}
+    - {name: rack-2, node: dcn-1b-compute-0, listen_ip: 10.65.40.222, availability_zones: [rack-2]}
+    - {name: rack-3, node: dcn-1c-compute-0, listen_ip: 10.66.40.222, availability_zones: [rack-3]}
+  security_group_name: flyt-service-endpoint-only
+  networks:
+    - availability_zones: [nova, rack-1]
+      network_name: public-rack-1
+      network_id: 23f9a5d1-ea81-4094-b9c9-44de851f2bf6
+      subnet_name: flyt-service-rack-1
+      cidr: 10.64.40.192/27
+      gateway_ip: 10.64.40.193
+      allocation_pools: [{start: 10.64.40.194, end: 10.64.40.220}]
+    - availability_zones: [rack-2]
+      network_name: public-rack-2
+      network_id: d728dfe8-2713-4659-b354-980a191fb6f4
+      subnet_name: flyt-service-rack-2
+      cidr: 10.65.40.192/27
+      gateway_ip: 10.65.40.193
+      allocation_pools: [{start: 10.65.40.194, end: 10.65.40.220}]
+    - availability_zones: [rack-3]
+      network_name: public-rack-3
+      network_id: 101512ed-f4b2-4fb0-ade6-0ef0c3a7dac9
+      subnet_name: flyt-service-rack-3
+      cidr: 10.66.40.192/27
+      gateway_ip: 10.66.40.193
+      allocation_pools: [{start: 10.66.40.194, end: 10.66.40.220}]
+
+acceptance_network:
+  name: flyt-mps-acceptance
+  subnet_name: flyt-mps-acceptance
+  cidr: 192.168.251.0/24
+
+acceptance:
+  placements:
+    ubuntu-22.04: {host: dcn-1a-compute-2, availability_zone: rack-1, topology: gpu-node}
+    ubuntu-24.04: {host: dcn-1b-compute-0, availability_zone: rack-2, topology: cross-rack}
+
+client_package:
+  hostname: cloud.dcn.ssu.ac.kr
+  path_prefix: /flyt-client
+  url: https://cloud.dcn.ssu.ac.kr:12403/flyt-client/flyt-client.tar.gz
+  resolve_address: 10.64.40.222
+  proxy_port: 12403
+  origin_address: 10.67.10.6
+  # Dedicated service NICs remain deny-by-default. These are the immutable
+  # HTTPS ingress VIPs from which an approved client package may be fetched.
+  egress_cidrs: [10.67.10.6/32]
+  content_digest: sha256:076c575b9d7fdd913278ba538b1d5bfa0331adf0bcb1ceb1429dba5af0a5845f
+
+profile:
+  id: flyt-nvidia-rtx3090ti-mps-shared-v1
+  cell_profile: nvidia-rtx3090ti-whole-mps
+  device_class: gpu.nvidia.com
+  expected_product_name: NVIDIA GeForce RTX 3090 Ti
+  selectors:
+    - "device.attributes['gpu.nvidia.com'].productName.lowerAscii().matches('^.*rtx 3090 ti.*$')"
+  logical_capacity: 2
+  acceptance_quota: 2
+  compute_units: 16
+  memory_mb: 8192
+
+flavor:
+  name: gpu.remote.nvidia.rtx3090ti.mps.shared
+  vcpus: 4
+  ram_mb: 8192
+  disk_gb: 30
+  extra_specs:
+    flyt:enabled: "true"
+    flyt:profile: flyt-nvidia-rtx3090ti-mps-shared-v1
+    flyt:network_mode: dedicated
+    flyt:network_class: service
+    resources:CUSTOM_FLYT_NVIDIA_RTX3090TI_MPS_SHARED_V1: "1"
+    trait:CUSTOM_FLYT_REMOTE_GPU: required
+
+approved_images:
+  - id: f0efb1fd-2ce6-4efc-bca6-75fce91ddb58
+    checksum: 6872c179992bd5960f809a2200b8eb72a1c05170e1365c525f05042bbebdf66697ab97a422d16c2d1580eb069f7c583832d340ce2ff5519aa8cc351299edfe85
+    injection_schema: v1
+    os_family: ubuntu-22.04
+    compatibility: cuda-12.8-cricket-v1
+  - id: 92b0bf42-24b6-46f4-930d-24a8db6833c8
+    checksum: 84c23d281ef67199d0956a94eb9db2aa96174313518fd4d85f83fa9dd6065ca0159d398399c47022508123eee57bea254778e59ec9decebd2747cc8c121962e7
+    injection_schema: v1
+    os_family: ubuntu-24.04
+    compatibility: cuda-12.8-cricket-v1

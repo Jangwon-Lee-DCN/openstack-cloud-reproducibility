@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import yaml
 from unittest import mock
 from contextlib import redirect_stdout
 from io import StringIO
@@ -28,12 +29,120 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_flyt_gpu_runtime_locks_chart_and_images(self):
+        contract = yaml.safe_load(
+            (ROOT.parents[1] / "deploy/config/flyt-gpu-runtime.yaml").read_text()
+        )
+        chart = contract["gpu_operator"]["chart"]
+        self.assertRegex(chart["sha256"], r"^[0-9a-f]{64}$")
+        for image in contract["gpu_operator"]["images"].values():
+            self.assertRegex(image["digest"], r"^sha256:[0-9a-f]{64}$")
+        self.assertEqual("dra-full-gpu-v1", contract["allocation_backend"])
+    def test_flyt_components_require_exact_external_sources(self):
+        self.assertEqual(
+            ("flyt", ("reproducibility", "flyt_adapter")),
+            queue.COMPONENTS["openstack-flyt-adapter"],
+        )
+        self.assertEqual(
+            ("flyt", ("reproducibility", "flyt_runtime")),
+            queue.COMPONENTS["flyt-cluster-manager"],
+        )
+        self.assertEqual(
+            ("flyt", ("reproducibility", "flyt_runtime")),
+            queue.COMPONENTS["flyt-gpu-cell"],
+        )
+        self.assertEqual(
+            ("flyt", ("reproducibility", "flyt_runtime")),
+            queue.COMPONENTS["flyt-client-package"],
+        )
+        self.assertEqual(
+            ("flyt", ("reproducibility",)),
+            queue.COMPONENTS["flyt-cuda-devel-base"],
+        )
+        self.assertEqual(
+            ("flyt", ("reproducibility",)),
+            queue.COMPONENTS["flyt-cuda-runtime-base"],
+        )
+        self.assertEqual(
+            ("flyt", ("reproducibility",)),
+            queue.COMPONENTS["flyt-mongodb"],
+        )
+        self.assertEqual(
+            ("nova", ("reproducibility", "nova_extended_compute")),
+            queue.COMPONENTS["nova-extended-compute"],
+        )
+
     def test_service_supplies_a_build_capable_python(self):
         service = (ROOT / "dcn-image-build-queue.service").read_text()
         installer = (ROOT / "install.sh").read_text()
         self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
+
+    def test_installer_restarts_existing_service_to_initialize_new_groups(self):
+        installer = (ROOT / "install.sh").read_text()
+        self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
+        self.assertNotIn("enable --now dcn-image-build-queue.service", installer)
+
+    def test_git_image_name_default_is_not_captured_from_a_previous_loop(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("component=$1\n  repository=$2", build_script)
+        self.assertIn("image_name=${4:-$component}", build_script)
+        self.assertNotIn("local component=$1 repository=$2 dockerfile=$3 image_name=", build_script)
+
+    def test_flyt_builds_use_the_isolated_development_utility_node(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("$name == flyt-* || $name == openstack-flyt-adapter", build_script)
+        self.assertIn("node_selector_key=dcn.ssu.ac.kr/workload-class", build_script)
+        self.assertIn("node-role.kubernetes.io/utility", build_script)
+
+    def test_kaniko_uses_the_internal_harbor_layer_cache(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("- --cache=true", build_script)
+        self.assertIn("- --cache-copy-layers=true", build_script)
+        self.assertIn("- --cache-run-layers=true", build_script)
+        self.assertIn("- --cache-repo=$REGISTRY/build-cache", build_script)
+
+    def test_large_source_contexts_are_split_across_configmaps(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("split -b 700000 -d -a 3", build_script)
+        self.assertIn("/busybox/cat /archive/part-* | /busybox/tar xzf -", build_script)
+        self.assertIn("dcn.ssu.ac.kr/build-job=$job", build_script)
+
+    def test_flyt_cuda_consumers_use_immutable_harbor_mirrors(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn(
+            "FLYT_CUDA_DEVEL_IMAGE=${FLYT_CUDA_DEVEL_IMAGE:-registry.dcn.ssu.ac.kr/",
+            build_script,
+        )
+        self.assertIn(
+            "FLYT_CUDA_RUNTIME_IMAGE=${FLYT_CUDA_RUNTIME_IMAGE:-registry.dcn.ssu.ac.kr/",
+            build_script,
+        )
+        self.assertIn('"CUDA_DEVEL_IMAGE=$FLYT_CUDA_DEVEL_IMAGE"', build_script)
+        self.assertIn('"CUDA_RUNTIME_IMAGE=$FLYT_CUDA_RUNTIME_IMAGE"', build_script)
+        self.assertIn('"CUDA_IMAGE=$FLYT_CUDA_DEVEL_IMAGE"', build_script)
+        self.assertIn("- --build-arg=$build_arg", build_script)
+
+    def test_cuda_builds_have_a_scoped_timeout_for_large_layers(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("local build_timeout_seconds=1800", build_script)
+        self.assertIn(
+            "[[ $name == flyt-gpu-cell || $name == flyt-client-package || "
+            "$name == flyt-cuda-*-base ]] "
+            "&& build_timeout_seconds=7200",
+            build_script,
+        )
+        self.assertIn("deadline=$((SECONDS + build_timeout_seconds))", build_script)
+
+    def test_failed_or_timed_out_build_removes_its_disposable_job(self):
+        build_script = (ROOT.parents[1] / "deploy/scripts/build-images.sh").read_text()
+        self.assertEqual(
+            2,
+            build_script.count(
+                'kubectl delete job -n "$NAMESPACE" "$job" --wait=false'
+            ),
+        )
 
     def test_pueue_environment_is_allow_listed(self):
         captured = {}
@@ -74,6 +183,28 @@ class QueueTests(unittest.TestCase):
         task = {"status": {"Done": {"result": "Success"}}}
         with mock.patch.object(queue, "pueue_task", return_value=task):
             self.assertEqual(queue.effective_status(request), "succeeded")
+
+    def test_cancel_removes_a_queued_task(self):
+        request = {"task_id": 7, "status": "queued"}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "request.json"
+            path.write_text(json.dumps(request))
+            with mock.patch.object(queue, "load_request", return_value=(path, request)), \
+                    mock.patch.object(queue, "pueue_task", return_value={"status": {"Queued": {}}}), \
+                    mock.patch.object(queue, "pueue", return_value=subprocess.CompletedProcess([], 0, "", "")) as pueue:
+                self.assertEqual(queue.cancel("7"), 0)
+        pueue.assert_called_once_with("remove", "7", check=False)
+
+    def test_failed_cancel_does_not_claim_the_task_was_killed(self):
+        request = {"task_id": 7, "status": "queued"}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "request.json"
+            path.write_text(json.dumps(request))
+            with mock.patch.object(queue, "load_request", return_value=(path, request)), \
+                    mock.patch.object(queue, "pueue_task", return_value={"status": {"Queued": {}}}), \
+                    mock.patch.object(queue, "pueue", return_value=subprocess.CompletedProcess([], 1, "", "failed\n")):
+                self.assertEqual(queue.cancel("7"), 1)
+            self.assertEqual(json.loads(path.read_text())["status"], "queued")
 
     def test_queue_view_defaults_to_active_requests(self):
         requests = [
