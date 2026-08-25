@@ -25,6 +25,9 @@ VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
+FLYT_ADAPTER_REPO=${FLYT_ADAPTER_REPO:-$REPO_ROOT/../openstack-flyt-adapter}
+FLYT_RUNTIME_REPO=${FLYT_RUNTIME_REPO:-$REPO_ROOT/../flyt-managed-runtime}
+NOVA_EXTENDED_COMPUTE_REPO=${NOVA_EXTENDED_COMPUTE_REPO:-$REPO_ROOT/../nova-extended-compute}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -34,6 +37,8 @@ fi
 # Space-separated source component names. Empty means the complete rebuild.
 BUILD_COMPONENTS=${BUILD_COMPONENTS:-}
 KANIKO_IMAGE=gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+FLYT_CUDA_DEVEL_IMAGE=${FLYT_CUDA_DEVEL_IMAGE:-registry.dcn.ssu.ac.kr/openstack/flyt-cuda-devel-base:source-73db77d35fe6baf4df28@sha256:fb3d5c3a534cda4a650e74b03c3fefc0e72ab009d249d9259a300423e651a2b1}
+FLYT_CUDA_RUNTIME_IMAGE=${FLYT_CUDA_RUNTIME_IMAGE:-registry.dcn.ssu.ac.kr/openstack/flyt-cuda-runtime-base:source-4238192031f98965ddcb@sha256:9c803a0f42e95cb6fe28f184903101be1e63e5a83dd7d65da613e9c01e2128a1}
 
 for command in kubectl sops git tar sha256sum go; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
@@ -67,16 +72,44 @@ selected() {
 }
 
 build_context() {
-  local name=$1 context=$2 image=$3 job safe_build_id
+  local name=$1 context=$2 image=$3 job safe_build_id node_selector_key node_selector_value build_tolerations kaniko_build_args=''
+  shift 3
+  local build_arg
+  for build_arg in "$@"; do
+    [[ $build_arg =~ ^[A-Z][A-Z0-9_]*=[-A-Za-z0-9_./:@]+$ ]] || {
+      echo "invalid container build argument: $build_arg" >&2
+      exit 2
+    }
+    kaniko_build_args+="            - --build-arg=$build_arg"$'\n'
+  done
+  if [[ $name == flyt-* || $name == openstack-flyt-adapter ]]; then
+    node_selector_key=dcn.ssu.ac.kr/workload-class
+    node_selector_value=development
+    build_tolerations='        - {key: node-role.kubernetes.io/utility, operator: Equal, value: "true", effect: NoSchedule}
+        - {key: dcn.ssu.ac.kr/workload-class, operator: Equal, value: development, effect: NoSchedule}'
+  else
+    node_selector_key=openstack-control-plane
+    node_selector_value=enabled
+    build_tolerations='        - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}'
+  fi
   safe_build_id=$(printf '%s' "$BUILD_ID" | tr -cs 'a-zA-Z0-9-' '-' | tr 'A-Z' 'a-z' | cut -c1-20)
   job="source-rebuild-${name}-${safe_build_id}"
-  local archive="$WORK_DIR/${name}.tar.gz" digest
+  local archive="$WORK_DIR/${name}.tar.gz" digest archive_parts="$WORK_DIR/${name}-parts"
+  local archive_sources='' part part_name part_index=0
   tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
   kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
-  # A binary build context can exceed the 256 KiB annotation limit added by
-  # `kubectl apply`. Recreate this disposable, job-scoped ConfigMap directly.
-  kubectl delete configmap "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
-  kubectl create configmap "$job" -n "$NAMESPACE" --from-file=context.tar.gz="$archive"
+  # ConfigMaps have a hard request-size ceiling. Split large deterministic
+  # contexts and project the chunks into one volume for the init container.
+  kubectl delete configmap -n "$NAMESPACE" -l "dcn.ssu.ac.kr/build-job=$job" --ignore-not-found >/dev/null
+  mkdir -p "$archive_parts"
+  split -b 700000 -d -a 3 "$archive" "$archive_parts/part-"
+  for part in "$archive_parts"/part-*; do
+    part_name="$job-context-$part_index"
+    kubectl create configmap "$part_name" -n "$NAMESPACE" --from-file="$(basename "$part")=$part" >/dev/null
+    kubectl label configmap "$part_name" -n "$NAMESPACE" "dcn.ssu.ac.kr/build-job=$job" >/dev/null
+    archive_sources+="            - configMap: {name: $part_name}"$'\n'
+    part_index=$((part_index + 1))
+  done
   kubectl apply -f - <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -94,13 +127,13 @@ spec:
       hostAliases:
         - ip: "$REGISTRY_IP"
           hostnames: ["$REGISTRY_HOST"]
-      nodeSelector: {openstack-control-plane: enabled}
+      nodeSelector: {$node_selector_key: $node_selector_value}
       tolerations:
-        - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+$build_tolerations
       initContainers:
         - name: extract-context
           image: $KANIKO_IMAGE
-          command: [/busybox/sh, -c, 'cd /workspace && /busybox/tar xzf /archive/context.tar.gz']
+          command: [/busybox/sh, -c, 'cd /workspace && /busybox/cat /archive/part-* | /busybox/tar xzf -']
           volumeMounts:
             - {name: archive, mountPath: /archive, readOnly: true}
             - {name: workspace, mountPath: /workspace}
@@ -114,29 +147,53 @@ spec:
             - --digest-file=/dev/termination-log
             - --skip-tls-verify
             - --snapshot-mode=redo
+            - --cache=true
+            - --cache-copy-layers=true
+            - --cache-run-layers=true
+            - --cache-repo=$REGISTRY/build-cache
+            - --cache-ttl=336h
+$kaniko_build_args
           volumeMounts:
             # Kaniko may chown copied source paths while evaluating COPY . .;
             # its extracted context therefore must remain writable.
             - {name: workspace, mountPath: /workspace}
             - {name: registry-auth, mountPath: /kaniko/.docker, readOnly: true}
       volumes:
-        - {name: archive, configMap: {name: $job}}
+        - name: archive
+          projected:
+            sources:
+$archive_sources
         - {name: workspace, emptyDir: {}}
         - name: registry-auth
           secret: {secretName: $REGISTRY_SECRET, items: [{key: .dockerconfigjson, path: config.json}]}
 EOF
-  deadline=$((SECONDS + 1800))
+  # CUDA/cuDNN development layers are several GiB and can take longer than the
+  # generic 30-minute ceiling to unpack on the isolated utility builder.
+  # Keep the wider ceiling scoped to the GPU Cell instead of weakening every
+  # image build timeout.
+  local build_timeout_seconds=1800
+  [[ $name == flyt-gpu-cell || $name == flyt-client-package || $name == flyt-cuda-*-base ]] && build_timeout_seconds=7200
+  deadline=$((SECONDS + build_timeout_seconds))
   until [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.succeeded}' 2>/dev/null) == 1 ]]; do
     [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.failed}' 2>/dev/null) != 1 ]] || {
       kubectl logs -n "$NAMESPACE" "job/$job" --tail=200 >&2 || true
+      kubectl delete job -n "$NAMESPACE" "$job" --wait=false >/dev/null 2>&1 || true
+      kubectl delete configmap -n "$NAMESPACE" -l "dcn.ssu.ac.kr/build-job=$job" >/dev/null 2>&1 || true
       echo "$job failed" >&2
       exit 1
     }
-    (( SECONDS < deadline )) || { echo "$job timed out" >&2; exit 1; }
+    (( SECONDS < deadline )) || {
+      kubectl logs -n "$NAMESPACE" "job/$job" --tail=200 >&2 || true
+      kubectl delete job -n "$NAMESPACE" "$job" --wait=false >/dev/null 2>&1 || true
+      kubectl delete configmap -n "$NAMESPACE" -l "dcn.ssu.ac.kr/build-job=$job" >/dev/null 2>&1 || true
+      echo "$job timed out" >&2
+      exit 1
+    }
     sleep 5
   done
   digest=$(kubectl get pod -n "$NAMESPACE" -l "job-name=$job" -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.message}')
   [[ "$digest" == sha256:* ]] || { echo "$name did not emit a digest: $digest" >&2; exit 1; }
+  kubectl delete configmap -n "$NAMESPACE" -l "dcn.ssu.ac.kr/build-job=$job" >/dev/null
   printf '%s=%s@%s\n' "${name//-/_}" "$image" "$digest" | tee -a "$RESULT_FILE"
 }
 
@@ -191,6 +248,9 @@ selected neutron-fwaas && simple_context neutron-fwaas neutron
 selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
 selected project-facade && simple_context project-facade
+selected flyt-cuda-devel-base && simple_context flyt-cuda-devel-base
+selected flyt-cuda-runtime-base && simple_context flyt-cuda-runtime-base
+selected flyt-mongodb && simple_context flyt-mongodb
 
 build_loki_tenant_gateway() {
   local context="$WORK_DIR/loki-tenant-gateway"
@@ -199,6 +259,58 @@ build_loki_tenant_gateway() {
   build_context loki-tenant-gateway "$context" "$REGISTRY/loki-tenant-gateway:source-$BUILD_ID"
 }
 selected loki-tenant-gateway && build_loki_tenant_gateway
+
+build_git_dockerfile() {
+  local component repository dockerfile image_name context build_root context_subdir
+  local -a build_args=()
+  component=$1
+  repository=$2
+  dockerfile=$3
+  image_name=${4:-$component}
+  context_subdir=${5:-.}
+  (( $# <= 5 )) || build_args=("${@:6}")
+  git -C "$repository" diff --quiet && git -C "$repository" diff --cached --quiet || {
+    echo "refusing to build $component from dirty source: $repository" >&2
+    exit 1
+  }
+  context="$WORK_DIR/$component"
+  mkdir -p "$context"
+  git -C "$repository" archive HEAD | tar -x -C "$context"
+  build_root="$context/$context_subdir"
+  [[ $dockerfile == Dockerfile ]] || cp "$build_root/$dockerfile" "$build_root/Dockerfile"
+  build_context "$component" "$build_root" "$REGISTRY/$image_name:source-$BUILD_ID" "${build_args[@]}"
+}
+
+selected openstack-flyt-adapter && \
+  build_git_dockerfile openstack-flyt-adapter "$FLYT_ADAPTER_REPO" Dockerfile
+selected flyt-cluster-manager && \
+  build_git_dockerfile flyt-cluster-manager "$FLYT_RUNTIME_REPO" \
+    Dockerfile.cluster-manager flyt-cluster-manager control-managers
+selected flyt-gpu-cell && \
+  build_git_dockerfile flyt-gpu-cell "$FLYT_RUNTIME_REPO" \
+    control-managers/Dockerfile.gpu-cell flyt-gpu-cell . \
+    "CUDA_DEVEL_IMAGE=$FLYT_CUDA_DEVEL_IMAGE" \
+    "CUDA_RUNTIME_IMAGE=$FLYT_CUDA_RUNTIME_IMAGE"
+selected flyt-client-package && \
+  build_git_dockerfile flyt-client-package "$FLYT_RUNTIME_REPO" \
+    control-managers/Dockerfile.client-package flyt-client-package . \
+    "CUDA_IMAGE=$FLYT_CUDA_DEVEL_IMAGE"
+
+build_nova_extended_compute() {
+  local context="$WORK_DIR/nova-extended-compute"
+  git -C "$NOVA_EXTENDED_COMPUTE_REPO" diff --quiet &&
+    git -C "$NOVA_EXTENDED_COMPUTE_REPO" diff --cached --quiet || {
+      echo "refusing to build nova-extended-compute from dirty source: $NOVA_EXTENDED_COMPUTE_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  git -C "$NOVA_EXTENDED_COMPUTE_REPO" archive HEAD nova | tar -x -C "$context"
+  cp "$REPO_ROOT/images/nova-extended-compute/Dockerfile" \
+    "$REPO_ROOT/images/nova-extended-compute/verify_installed.py" "$context/"
+  build_context nova-extended-compute "$context" \
+    "$REGISTRY/nova-extended-compute:source-$BUILD_ID"
+}
+selected nova-extended-compute && build_nova_extended_compute
 
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context

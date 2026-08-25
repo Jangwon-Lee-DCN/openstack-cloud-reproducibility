@@ -10,7 +10,7 @@ Kubernetes controller, CRD, database, or web API is introduced.
   release and verified against the committed SHA-256 values.
 - One persistent systemd service runs as the existing `ubuntu` operator.
 - Pueue groups have parallelism one. Horizon, Nova, Neutron, Keystone,
-  Octavia, Magnum, and other platform images have independent groups.
+  Octavia, Magnum, FLYT, and other platform images have independent groups.
 - Requests accept only allow-listed components and exact Git commits that are
   present on an `origin/*` branch.
 - The request fingerprint includes every source repository and revision.
@@ -63,6 +63,34 @@ dcn-image-build submit --component horizon-complete \
 
 The first JSON line records the request/task identity. On success, `--wait`
 prints the immutable image reference on the final line.
+
+## Submit FLYT images
+
+Each request produces exactly one immutable image. Submit the Adapter, runtime
+roles, and HTTPS guest-package server separately so CUDA-heavy builds cannot
+overwrite or block promotion of the GPU-free control-plane images.
+
+```bash
+dcn-image-build submit --component openstack-flyt-adapter \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source flyt_adapter=/path/to/openstack-flyt-adapter@FULL_SHA --wait
+
+dcn-image-build submit --component flyt-cluster-manager \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source flyt_runtime=/path/to/flyt-managed-runtime@FULL_SHA --wait
+
+dcn-image-build submit --component flyt-gpu-cell \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source flyt_runtime=/path/to/flyt-managed-runtime@FULL_SHA --wait
+
+dcn-image-build submit --component flyt-client-package \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source flyt_runtime=/path/to/flyt-managed-runtime@FULL_SHA --wait
+
+dcn-image-build submit --component nova-extended-compute \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source nova_extended_compute=/path/to/nova-extended-compute@FULL_SHA --wait
+```
 
 ## Operate
 
