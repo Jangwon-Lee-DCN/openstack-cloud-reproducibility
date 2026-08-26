@@ -1,7 +1,7 @@
 # HA Horizon dashboard at the cloud root URL.
 images:
   tags:
-    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-b55c38c2eb060fd642fc@sha256:334fc1d989ca398c098311614fc5118b99b0657255340b58e7557a9ad7694eff
+    horizon: registry.dcn.ssu.ac.kr/openstack/horizon:source-a09da5724a8f6cfb35ad@sha256:baeeac6a55ee5cda8201871de583e3ce79b31a805dfc95c94848fe1f7888ec28
 pod:
   # Internal endpoint names already contain multiple labels. ndots:5 makes
   # glibc query an impossible search-suffixed name before the real service
