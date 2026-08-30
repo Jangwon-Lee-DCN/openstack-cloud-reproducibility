@@ -32,4 +32,22 @@ if "OIDCCABundlePath" not in updated:
     )
     if count != 1:
         raise SystemExit("expected exactly one OIDCSSLValidateServer On directive")
+websso_aliases = """
+    # Horizon names the configured authentication choice, whereas Keystone's
+    # stock example protects only the protocol-named /websso/openid path.
+    # Protect the actual keycloak_dcn URL emitted by Horizon as well.
+    <Location /v3/auth/OS-FEDERATION/websso/keycloak_dcn>
+        AuthType openid-connect
+        Require valid-user
+    </Location>
+    <Location /identity/v3/auth/OS-FEDERATION/websso/keycloak_dcn>
+        AuthType openid-connect
+        Require valid-user
+    </Location>
+"""
+if "/websso/keycloak_dcn>" not in updated:
+    marker = "</VirtualHost>"
+    if marker not in updated:
+        raise SystemExit("expected a VirtualHost terminator in wsgi-keystone.conf")
+    updated = updated.replace(marker, websso_aliases + "\n" + marker, 1)
 pathlib.Path(output_path).write_text(yaml.safe_dump({"conf": {"wsgi_keystone": updated}}, sort_keys=False))
