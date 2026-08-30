@@ -25,7 +25,13 @@ const assert = require('node:assert/strict');
   await page.locator('input[name="username"]').fill(username);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', {name: /sign in|log in|로그인/i}).click();
-  await page.waitForURL(url => url.origin === cloud && url.pathname.startsWith('/horizon/'), {timeout: 60000});
+  try {
+    await page.waitForURL(url => url.origin === cloud && url.pathname.startsWith('/horizon/'), {timeout: 60000});
+  } catch (error) {
+    console.error(`login remained at ${page.url()}`);
+    console.error((await page.locator('body').innerText()).slice(0, 2000));
+    throw error;
+  }
   await page.locator('body').waitFor();
   const body = await page.locator('body').innerText();
   assert(!/Something went wrong|Internal Server Error|Unable to retrieve|권한 오류/i.test(body), body.slice(0, 2000));

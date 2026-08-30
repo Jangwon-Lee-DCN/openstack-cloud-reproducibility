@@ -44,6 +44,10 @@ websso_aliases = """
         AuthType openid-connect
         Require valid-user
     </Location>
+    <Location /identity/v3/auth/OS-FEDERATION/websso/openid>
+        AuthType openid-connect
+        Require valid-user
+    </Location>
 """
 if "/websso/keycloak_dcn>" not in updated:
     marker = "</VirtualHost>"
