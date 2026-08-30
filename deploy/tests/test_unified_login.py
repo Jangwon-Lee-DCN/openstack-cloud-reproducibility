@@ -53,8 +53,18 @@ def test_rendered_horizon_redirects_directly_to_dcn_identity_provider():
     )
     settings = base64.b64decode(secret["data"]["local_settings"]).decode()
     assert "WEBSSO_DEFAULT_REDIRECT = True" in settings
-    assert 'WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "keycloak_dcn"' in settings
+    assert settings.rfind('WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "openid"') > settings.rfind(
+        'WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "keycloak_dcn"'
+    )
     assert (
         'WEBSSO_DEFAULT_REDIRECT_REGION = '
         '"https://cloud.dcn.ssu.ac.kr/identity/v3"'
     ) in settings
+
+
+def test_keystone_resolves_protocol_only_websso_to_keycloak_issuer():
+    values = yaml.safe_load((ROOT / "deploy/values/site/keystone.yaml").read_text())
+    assert (
+        values["conf"]["keystone"]["federation"]["remote_id_attribute"]
+        == "HTTP_OIDC_ISS"
+    )
