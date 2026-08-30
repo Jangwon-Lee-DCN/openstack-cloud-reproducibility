@@ -36,8 +36,21 @@ body,
 
 .card-pf,
 .pf-v5-c-login__main {
+  background: #fff;
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  color: var(--dcn-ink);
+}
+
+#kc-form label,
+.pf-v5-c-login__main label {
+  color: var(--dcn-ink);
+}
+
+#kc-form input:not([type="submit"]),
+.pf-v5-c-form-control {
+  background: #fff;
+  color: var(--dcn-ink);
 }
 
 #kc-login,
@@ -53,9 +66,26 @@ input[type="submit"]:hover {
 }
 
 #kc-social-providers a {
+  align-items: center;
   background: #fff;
   border: 1px solid #d0d5dd;
   color: var(--dcn-ink);
+  display: flex;
+  height: 44px;
+  justify-content: center !important;
+  min-height: 44px;
+  overflow: hidden;
+  position: relative;
+}
+
+#kc-social-providers a svg {
+  flex: 0 0 20px;
+  height: 20px;
+  left: 16px;
+  max-height: 20px;
+  max-width: 20px;
+  position: absolute;
+  width: 20px;
 }
 
 .instruction,
