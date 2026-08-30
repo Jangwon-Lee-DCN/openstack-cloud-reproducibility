@@ -23,6 +23,7 @@ sops -d "$ROOT/$snapshot" > "$work/base.yaml"
 helm upgrade --install keystone "$ROOT/$package" -n openstack \
   -f "$work/base.yaml" -f "$ROOT/deploy/values/site/keystone.yaml" \
   -f "$work/oidc.yaml" -f "$work/database.yaml" --timeout 15m
+kubectl apply -f "$ROOT/deploy/manifests/keystone-oidc-federation-routes.yaml"
 kubectl -n openstack wait --for=condition=complete job -l release_group=keystone --timeout=15m
 "$ROOT/deploy/scripts/fix-keystone-fernet-permissions.sh"
 kubectl -n openstack rollout status deployment/keystone-api --timeout=15m
