@@ -1,0 +1,65 @@
+:root {
+  --dcn-red: #ed1944;
+  --dcn-ink: #1f2937;
+  --dcn-muted: #667085;
+}
+
+body,
+.login-pf body,
+.pf-v5-c-login {
+  background: #f5f7fa;
+}
+
+#kc-header,
+.pf-v5-c-login__main-header {
+  color: var(--dcn-ink);
+}
+
+#kc-header-wrapper,
+.kc-logo-text {
+  background: none;
+  font-size: 0;
+  height: auto;
+  width: auto;
+}
+
+#kc-header-wrapper::after,
+.kc-logo-text::after {
+  color: var(--dcn-ink);
+  content: "DCN OpenStack";
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.card-pf,
+.pf-v5-c-login__main {
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+#kc-login,
+input[type="submit"] {
+  background: var(--dcn-red);
+  border-color: var(--dcn-red);
+}
+
+#kc-login:hover,
+input[type="submit"]:hover {
+  background: #c81038;
+  border-color: #c81038;
+}
+
+#kc-social-providers a {
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  color: var(--dcn-ink);
+}
+
+.instruction,
+.subtitle,
+#kc-info {
+  color: var(--dcn-muted);
+}
