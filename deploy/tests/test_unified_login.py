@@ -15,6 +15,10 @@ def test_keycloak_image_packages_dcn_openstack_theme():
     assert "parent=keycloak.v2" in (theme / "theme.properties").read_text()
     assert "Keycloak" not in (theme / "messages/messages_en.properties").read_text()
     assert "DCN OpenStack" in (theme / "messages/messages_en.properties").read_text()
+    css = (theme / "resources/css/dcn-openstack.css").read_text()
+    assert "#kc-social-providers a svg" in css
+    assert "max-width: 20px" in css
+    assert "height: 44px" in css
 
 
 def test_iam_reconciler_selects_theme_without_user_password_grant():
