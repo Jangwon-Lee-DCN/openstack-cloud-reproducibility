@@ -62,8 +62,11 @@ conf:
         auth:
           sso:
             enabled: true
-            initial_choice: credentials
+            initial_choice: keycloak_dcn
             websso_keystone_url: https://cloud.dcn.ssu.ac.kr/identity/v3
+            default_redirect: true
+            default_redirect_protocol: keycloak_dcn
+            default_redirect_region: https://cloud.dcn.ssu.ac.kr/identity/v3
           idp_mapping:
             - name: keycloak_dcn
               label: DCN Keycloak SSO

@@ -100,6 +100,14 @@ if ! curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
     -d "{\"realm\":\"${REALM}\",\"enabled\":true}" \
     "http://${KEYCLOAK_SVC}/admin/realms" >/dev/null
 fi
+realm_payload=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+  "http://${KEYCLOAK_SVC}/admin/realms/${REALM}" | jq \
+  '.loginTheme="dcn-openstack" |
+   .displayName="DCN OpenStack" |
+   .displayNameHtml="DCN OpenStack"')
+curl -sf -X PUT -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+  -d "${realm_payload}" "http://${KEYCLOAK_SVC}/admin/realms/${REALM}" >/dev/null
+unset realm_payload
 OIDC_CLIENT_SECRET=$(kubectl -n keycloak get secret keycloak-credentials \
   -o jsonpath='{.data.oidc-client-secret}' | base64 -d)
 client_payload=$(jq -nc --arg secret "$OIDC_CLIENT_SECRET" '{
