@@ -33,6 +33,11 @@ images:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
   keystone:
+    federation:
+      # The protocol-only WebSSO endpoint used by Horizon's automatic
+      # redirect must resolve the configured IdP from mod_auth_openidc's
+      # issuer claim. Without this, OIDC succeeds but Keystone returns 401.
+      remote_id_attribute: HTTP_OIDC_ISS
     resource:
       # Service-to-service requests must see resources across tenant projects.
       admin_project_domain_name: service

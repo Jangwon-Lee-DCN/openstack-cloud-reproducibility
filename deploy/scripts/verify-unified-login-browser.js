@@ -30,6 +30,9 @@ const assert = require('node:assert/strict');
   } catch (error) {
     console.error(`login remained at ${page.url()}`);
     console.error((await page.locator('body').innerText()).slice(0, 2000));
+    const cookies = await context.cookies();
+    console.error(`cookie metadata: ${JSON.stringify(cookies.map(({name, domain, path, sameSite, secure}) => ({name, domain, path, sameSite, secure})))}`);
+    console.error(`request failures: ${failures.join(' | ')}`);
     throw error;
   }
   await page.locator('body').waitFor();
