@@ -6,4 +6,6 @@ ENV KC_DB=mariadb
 ENV KC_HEALTH_ENABLED=true
 ENV KC_METRICS_ENABLED=true
 
+COPY --chown=keycloak:keycloak themes/dcn-openstack /opt/keycloak/themes/dcn-openstack
+
 RUN /opt/keycloak/bin/kc.sh build

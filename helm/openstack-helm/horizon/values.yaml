@@ -273,6 +273,10 @@ conf:
           sso:
             enabled: False
             initial_choice: "credentials"
+            websso_keystone_url:
+            default_redirect: false
+            default_redirect_protocol:
+            default_redirect_region:
           idp_mapping:
             - name: "acme_oidc"
               label: "Acme Corporation - OpenID Connect"
@@ -503,6 +507,17 @@ conf:
 
         # Determines which authentication choice to show as default.
         WEBSSO_INITIAL_CHOICE = "{{ .Values.conf.horizon.local_settings.config.auth.sso.initial_choice }}"
+
+        # Production can skip Horizon's authentication-method selector while
+        # development keeps Keystone credentials available. Authentication is
+        # still completed through Keystone WebSSO and Keycloak.
+        WEBSSO_DEFAULT_REDIRECT = {{ ternary "True" "False" .Values.conf.horizon.local_settings.config.auth.sso.default_redirect }}
+        {{- if .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_protocol }}
+        WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "{{ .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_protocol }}"
+        {{- end }}
+        {{- if .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_region }}
+        WEBSSO_DEFAULT_REDIRECT_REGION = "{{ .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_region }}"
+        {{- end }}
 
         {{- if .Values.conf.horizon.local_settings.config.auth.sso.websso_keystone_url }}
         # The full auth URL for the Keystone endpoint used for web single-sign-on authentication.
