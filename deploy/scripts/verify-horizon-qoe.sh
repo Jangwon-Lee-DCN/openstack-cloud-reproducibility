@@ -3,7 +3,7 @@ set -euo pipefail
 
 NAMESPACE=${NAMESPACE:-openstack}
 HORIZON_URL=${HORIZON_URL:-https://cloud.dcn.ssu.ac.kr/horizon}
-HORIZON_RESOLVE=${HORIZON_RESOLVE:-}
+HORIZON_RESOLVE=${HORIZON_RESOLVE:-cloud.dcn.ssu.ac.kr:443:10.67.10.6}
 SAMPLES=${SAMPLES:-5}
 work_dir=$(mktemp -d /tmp/horizon-qoe.XXXXXX)
 cleanup() {
