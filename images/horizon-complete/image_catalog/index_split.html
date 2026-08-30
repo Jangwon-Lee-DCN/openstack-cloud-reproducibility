@@ -3,59 +3,182 @@
 {% block title %}{% trans "Images" %}{% endblock %}
 {% block main %}
   {{ table.render }}
-  <section id="image-inspector" class="panel panel-default" style="margin-top:16px;min-height:210px">
+  <section id="image-inspector" class="panel panel-default" style="margin-top:16px;min-height:210px" aria-live="polite">
     <div class="panel-heading"><h3 class="panel-title">{% trans "Image details" %}</h3></div>
-    <div id="image-inspector-body" class="panel-body text-muted">
-      {% trans "Select one image in the list to inspect its main properties." %}
-    </div>
+    <div id="image-inspector-body" class="panel-body text-muted">{% trans "Select one image to inspect its details and linked resources." %}</div>
   </section>
   <script>
   (function () {
-    var body = document.getElementById('image-inspector-body');
-    if (!body) return;
-    function text(value) { return value === undefined || value === null || value === '' ? '—' : String(value); }
+    'use strict';
+    var body = document.getElementById('image-inspector-body'), sequence = 0, controller = null;
+    if (!body || !window.fetch) return;
+    function text(value) {
+      if (value === true) return '{% trans "Yes" %}';
+      if (value === false) return '{% trans "No" %}';
+      return value === undefined || value === null || value === '' ? '—' : String(value);
+    }
+    function bytes(value) {
+      var size = Number(value), units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'], unit = 0;
+      if (!isFinite(size) || size < 0) return text(value);
+      while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+      return (unit ? size.toFixed(size < 10 ? 1 : 0) : size.toFixed(0)) + ' ' + units[unit];
+    }
+    function root(path) {
+      var value = window.WEBROOT || '/horizon/';
+      if (value.slice(-1) !== '/') value += '/';
+      return value + path.replace(/^\//, '');
+    }
     function cell(label, value) {
       var row = document.createElement('tr'), key = document.createElement('th'), val = document.createElement('td');
-      key.textContent = label; val.textContent = text(value); row.appendChild(key); row.appendChild(val); return row;
+      key.style.width = '190px'; key.textContent = label; val.textContent = text(value);
+      row.appendChild(key); row.appendChild(val); return row;
+    }
+    function badge(label, style) {
+      var node = document.createElement('span');
+      node.className = 'label label-' + style; node.style.marginRight = '6px'; node.textContent = label; return node;
+    }
+    function status(properties) {
+      var value = String(properties.dcn_support_status || '').toLowerCase();
+      if (properties.dcn_workload_type === 'amphora') return ['{% trans "Service only" %}', 'default'];
+      if (value === 'recommended') return ['{% trans "Recommended" %}', 'success'];
+      if (value === 'supported') return ['{% trans "Supported" %}', 'info'];
+      if (value === 'deprecated') return ['{% trans "Deprecated" %}', 'warning'];
+      if (value === 'end-of-support' || value === 'unsupported') return ['{% trans "Unsupported" %}', 'danger'];
+      return ['{% trans "Unspecified" %}', 'default'];
     }
     function selected() {
       var boxes = document.querySelectorAll('#images input[type=checkbox]:checked, table#images input[type=checkbox]:checked');
-      for (var i = 0; i < boxes.length; i++) if (boxes[i].value && boxes[i].value !== 'on') return boxes[i].value;
+      for (var i = 0; i < boxes.length; i += 1) if (boxes[i].value && boxes[i].value !== 'on') return boxes[i].value;
       return '';
     }
-    function render(image) {
-      var properties = image.properties || image, tags = image.tags || properties.tags || [];
-      body.innerHTML = '';
-      var tagsBox = document.createElement('p');
-      (Array.isArray(tags) ? tags : []).forEach(function (tag) {
-        var badge = document.createElement('span'); badge.className = 'label label-info';
-        badge.style.marginRight = '6px'; badge.textContent = tag; tagsBox.appendChild(badge);
+    function list(payload) {
+      if (Array.isArray(payload)) return payload;
+      return (payload && (payload.items || payload.clusters || payload.loadbalancers || payload.servers)) || [];
+    }
+    function get(path, signal) {
+      return fetch(root(path), {
+        credentials: 'same-origin', signal: signal,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+      }).then(function (response) {
+        var type = response.headers.get('content-type') || '';
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        if (type.indexOf('application/json') === -1) throw new Error('Expected JSON');
+        return response.json();
       });
-      if (!tagsBox.childNodes.length) tagsBox.textContent = '{% trans "No tags" %}';
-      body.appendChild(tagsBox);
+    }
+    function resourceSection(title, resources, path) {
+      var section = document.createElement('div'), heading = document.createElement('h4');
+      heading.textContent = title + ' (' + resources.length + ')'; section.appendChild(heading);
+      if (!resources.length) {
+        var empty = document.createElement('p'); empty.className = 'text-muted'; empty.textContent = '{% trans "None in this project" %}';
+        section.appendChild(empty); return section;
+      }
+      var items = document.createElement('ul');
+      resources.forEach(function (resource) {
+        var item = document.createElement('li'), link = document.createElement('a');
+        link.href = root(path(resource)); link.textContent = text(resource.name || resource.id); item.appendChild(link);
+        if (resource.status) item.appendChild(document.createTextNode(' — ' + resource.status));
+        items.appendChild(item);
+      });
+      section.appendChild(items); return section;
+    }
+    function relationships(image, properties, signal) {
+      var tasks = [get('api/nova/servers/', signal).then(function (payload) {
+        return ['instances', list(payload).filter(function (server) {
+          var imageRef = server.image && (server.image.id || server.image);
+          return imageRef === image.id;
+        })];
+      })];
+      if (properties.dcn_workload_type === 'capi') {
+        tasks.push(get('api/container_infra/clusters/', signal).then(function (payload) {
+          var clusters = list(payload), ids = [];
+          clusters.forEach(function (cluster) {
+            var id = cluster.cluster_template_id || cluster.cluster_template_uuid;
+            if (id && ids.indexOf(id) === -1) ids.push(id);
+          });
+          return Promise.all(ids.map(function (id) {
+            return get('api/container_infra/cluster_templates/' + encodeURIComponent(id), signal)
+              .then(function (template) { return {id: id, image: template.image_id}; });
+          })).then(function (templates) {
+            return ['clusters', clusters.filter(function (cluster) {
+              var id = cluster.cluster_template_id || cluster.cluster_template_uuid;
+              return templates.some(function (template) { return template.id === id && template.image === image.id; });
+            })];
+          });
+        }));
+      }
+      if (properties.dcn_workload_type === 'amphora') {
+        tasks.push(get('api/lbaas/loadbalancers/', signal).then(function (payload) {
+          return ['loadbalancers', list(payload).filter(function (lb) {
+            return !lb.provider || String(lb.provider).toLowerCase() === 'amphora';
+          })];
+        }));
+      }
+      return Promise.all(tasks);
+    }
+    function render(image, linked, current) {
+      if (current !== sequence) return;
+      var properties = image.properties || image, state = status(properties), tags = image.tags || properties.tags || [];
+      body.className = 'panel-body'; body.innerHTML = '';
+      var summary = document.createElement('p'); summary.appendChild(badge(state[0], state[1]));
+      (Array.isArray(tags) ? tags : []).forEach(function (tag) { summary.appendChild(badge(tag, 'primary')); });
+      body.appendChild(summary);
       var table = document.createElement('table'); table.className = 'table table-condensed';
-      table.appendChild(cell('{% trans "Name" %}', image.name));
-      table.appendChild(cell('{% trans "Purpose" %}', properties.dcn_workload_type));
-      table.appendChild(cell('{% trans "Kubernetes version" %}', properties.kube_version));
-      table.appendChild(cell('{% trans "Support status" %}', properties.dcn_support_status));
-      table.appendChild(cell('{% trans "Operating system" %}', [properties.os_distro, properties.os_version].filter(Boolean).join(' ')));
-      table.appendChild(cell('{% trans "Visibility" %}', image.visibility));
-      table.appendChild(cell('{% trans "Protected" %}', image.protected));
-      table.appendChild(cell('SHA-512', properties.os_hash_value || image.os_hash_value));
+      [
+        ['{% trans "Name" %}', image.name],
+        ['{% trans "Purpose" %}', properties.dcn_workload_type],
+        ['{% trans "Kubernetes version" %}', properties.kube_version],
+        ['{% trans "Created" %}', image.created_at],
+        ['{% trans "Operating system" %}', [properties.os_distro, properties.os_version].filter(Boolean).join(' ')],
+        ['{% trans "Architecture" %}', properties.hw_architecture || properties.architecture],
+        ['{% trans "Format" %}', image.disk_format],
+        ['{% trans "Size" %}', bytes(image.size)],
+        ['{% trans "Minimum RAM" %}', image.min_ram ? image.min_ram + ' MiB' : image.min_ram],
+        ['{% trans "Minimum disk" %}', image.min_disk ? image.min_disk + ' GiB' : image.min_disk],
+        ['{% trans "Visibility" %}', image.visibility],
+        ['{% trans "Protected" %}', image.protected],
+        ['SHA-512', properties.os_hash_value || image.os_hash_value]
+      ].forEach(function (entry) { table.appendChild(cell(entry[0], entry[1])); });
       body.appendChild(table);
+      var resources = document.createElement('div'); resources.id = 'image-linked-resources'; resources.className = 'row';
+      linked.forEach(function (result) {
+        var column = document.createElement('div'); column.className = 'col-md-4';
+        if (result[0] === 'instances') column.appendChild(resourceSection('{% trans "Instances" %}', result[1], function (r) { return 'project/instances/' + r.id + '/'; }));
+        if (result[0] === 'clusters') column.appendChild(resourceSection('{% trans "Kubernetes clusters" %}', result[1], function (r) { return 'project/clusters/' + r.id + '/'; }));
+        if (result[0] === 'loadbalancers') column.appendChild(resourceSection('{% trans "Amphora load balancers" %}', result[1], function (r) { return 'project/load_balancer/' + r.id + '/'; }));
+        resources.appendChild(column);
+      });
+      body.appendChild(resources);
+    }
+    function error(id) {
+      body.className = 'panel-body'; body.innerHTML = '';
+      var alert = document.createElement('div'), retry = document.createElement('button');
+      alert.className = 'alert alert-danger'; alert.appendChild(document.createTextNode('{% trans "Unable to load image details or linked resources." %} '));
+      retry.type = 'button'; retry.className = 'btn btn-default btn-sm'; retry.id = 'image-inspector-retry'; retry.textContent = '{% trans "Retry" %}';
+      retry.addEventListener('click', function () { load(id); }); alert.appendChild(retry); body.appendChild(alert);
     }
     function load(id) {
-      if (!id) { body.className = 'panel-body text-muted'; body.textContent = '{% trans "Select one image in the list to inspect its main properties." %}'; return; }
-      body.className = 'panel-body'; body.textContent = '{% trans "Loading image details…" %}';
-      var webroot = window.WEBROOT || '/horizon/';
-      if (webroot.slice(-1) !== '/') webroot += '/';
-      fetch(webroot + 'api/glance/images/' + encodeURIComponent(id) + '/', {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
-        .then(function (response) { if (!response.ok) throw new Error(response.status); return response.json(); })
-        .then(render).catch(function () { body.innerHTML = '<div class="alert alert-danger">{% trans "Unable to load image details." %}</div>'; });
+      sequence += 1; var current = sequence;
+      if (controller) controller.abort(); controller = window.AbortController ? new AbortController() : null;
+      if (!id) {
+        body.className = 'panel-body text-muted'; body.textContent = '{% trans "Select one image to inspect its details and linked resources." %}'; return;
+      }
+      body.className = 'panel-body text-muted'; body.textContent = '{% trans "Loading image details…" %}';
+      var signal = controller && controller.signal;
+      get('api/glance/images/' + encodeURIComponent(id) + '/', signal).then(function (image) {
+        return relationships(image, image.properties || image, signal).then(function (linked) { render(image, linked, current); });
+      }).catch(function (failure) {
+        if (failure && failure.name === 'AbortError') return;
+        if (current === sequence) error(id);
+      });
     }
     document.addEventListener('change', function (event) {
       if (!event.target.matches('#images input[type=checkbox], table#images input[type=checkbox]')) return;
-      if (event.target.checked) document.querySelectorAll('#images input[type=checkbox]:checked, table#images input[type=checkbox]:checked').forEach(function (box) { if (box !== event.target && box.value !== 'on') box.checked = false; });
+      if (event.target.checked && event.target.value && event.target.value !== 'on') {
+        document.querySelectorAll('#images input[type=checkbox]:checked, table#images input[type=checkbox]:checked').forEach(function (box) {
+          if (box !== event.target && box.value !== 'on') box.checked = false;
+        });
+      }
       load(selected());
     });
   }());

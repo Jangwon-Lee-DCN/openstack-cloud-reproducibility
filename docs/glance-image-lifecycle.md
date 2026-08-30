@@ -10,8 +10,9 @@ read-only drift audit.
 - Supported Ubuntu general-purpose and CAPI images appear in Horizon.
 - CAPI images remain public, visible and protected so project users can build
   their own CAPI clusters.
-- Horizon labels CAPI entries with their Kubernetes version and support status
-  under `Platform Images`, while ordinary Ubuntu VM images keep their base name.
+- Horizon keeps image names unchanged. Selecting one row opens a lower
+  inspector with tags, a support-status badge, major image properties, and
+  project-scoped linked Nova instances or CAPI clusters.
 - The Amphora image remains private, hidden and owned by the service project.
 - All managed images carry class, workload type, support status and OS version.
 

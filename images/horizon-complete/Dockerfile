@@ -89,6 +89,8 @@ RUN python3 /tmp/enhance_images_ui.py \
     && grep -q "dcn_image_class" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py \
     && grep -q "template_name = 'project/images/index_split.html'" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/views.py \
     && grep -q "window.WEBROOT" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html \
+    && grep -q "image-linked-resources" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html \
+    && grep -q "image-inspector-retry" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html \
     && ! grep -q "CAPI Kubernetes" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py
 
 # Local Octavia workflow patches and self-service Identity integration are
