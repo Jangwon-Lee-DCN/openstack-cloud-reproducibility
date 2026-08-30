@@ -40,8 +40,13 @@
       args: {chdir: "{{ repro_repo_path }}"}
       environment:
         ONLY_RELEASE: horizon
-        VERIFY_AFTER_RECONCILE: "1"
+        VERIFY_AFTER_RECONCILE: "0"
       changed_when: true
+
+    - name: Verify the production unified login in a real browser
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/verify-unified-login-browser.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      changed_when: false
 
     - name: Install the VPC and OPA policy plane
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-vpc-policy-plane.sh"
