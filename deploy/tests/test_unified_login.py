@@ -1,4 +1,5 @@
 import base64
+import hashlib
 from pathlib import Path
 import subprocess
 
@@ -63,6 +64,39 @@ def test_rendered_horizon_redirects_to_same_origin_websso():
         'WEBSSO_DEFAULT_REDIRECT_REGION = '
         '"https://cloud.dcn.ssu.ac.kr/identity/v3"'
     ) in settings
+
+
+def test_locked_horizon_package_renders_same_origin_websso():
+    lock = yaml.safe_load((ROOT / "release-lock.yaml").read_text())
+    release = next(
+        item for item in lock["spec"]["releases"] if item["name"] == "horizon"
+    )
+    package = ROOT / release["package"]
+    assert hashlib.sha256(package.read_bytes()).hexdigest() == release["sha256"]
+    rendered = subprocess.run(
+        [
+            "helm",
+            "template",
+            "horizon",
+            str(package),
+            "-f",
+            str(ROOT / "deploy/values/site/horizon.yaml"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    documents = [document for document in yaml.safe_load_all(rendered) if document]
+    secret = next(
+        document
+        for document in documents
+        if document.get("kind") == "Secret"
+        and "local_settings" in document.get("data", {})
+    )
+    settings = base64.b64decode(secret["data"]["local_settings"]).decode()
+    assert "WEBSSO_DEFAULT_REDIRECT = True" in settings
+    assert 'WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "openid"' in settings
+    assert "auth.cloud.dcn.ssu.ac.kr" not in settings
 
 
 def test_keystone_resolves_protocol_only_websso_to_keycloak_issuer():
