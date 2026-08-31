@@ -41,9 +41,8 @@ body,
 
 .pf-v5-c-login__container {
   align-items: start;
-  display: grid;
+  display: flex;
   gap: 40px;
-  grid-template-columns: minmax(420px, 544px) minmax(320px, 420px);
   justify-content: center;
   margin: 0 auto;
   max-width: 1080px;
@@ -51,10 +50,21 @@ body,
   width: 100%;
 }
 
+.pf-v5-c-login__main {
+  flex: 1 1 544px;
+  max-width: 544px;
+  order: 1;
+  width: 100%;
+}
+
 .dcn-resource-panel {
   align-self: center;
   display: grid;
+  flex: 1 1 420px;
   gap: 12px;
+  max-width: 420px;
+  order: 2;
+  width: 100%;
 }
 
 .dcn-resource-link {
@@ -105,13 +115,17 @@ body,
 
 @media (max-width: 860px) {
   .pf-v5-c-login__container {
+    align-items: center;
+    flex-direction: column;
     gap: 24px;
-    grid-template-columns: minmax(0, 544px);
     padding: 32px 20px;
   }
 
+  .pf-v5-c-login__main,
   .dcn-resource-panel {
     align-self: auto;
+    flex: none;
+    max-width: 544px;
   }
 }
 

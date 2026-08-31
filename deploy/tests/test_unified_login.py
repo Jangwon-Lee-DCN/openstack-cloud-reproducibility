@@ -23,6 +23,9 @@ def test_keycloak_image_packages_dcn_openstack_theme():
     assert "max-width: 20px" in css
     assert "height: 44px" in css
     assert ".dcn-resource-panel" in css
+    assert "flex-direction: column" in css
+    assert "order: 1" in css
+    assert "order: 2" in css
     properties = (theme / "theme.properties").read_text()
     assert "scripts=js/dcn-portals.js" in properties
     portals = (theme / "resources/js/dcn-portals.js").read_text()
