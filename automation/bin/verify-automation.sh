@@ -63,7 +63,13 @@ nova = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["conf"]["nova"]
 pci = nova["pci"]
 assert pci["report_in_placement"] is False
 device_specs = __import__("json").loads(pci["device_spec"])
-assert len(device_specs) == 2
+assert len(device_specs) == 3
+assert {
+    "address": "0000:af:00.1",
+    "physical_network": "sriov-rack-2",
+    "managed": "yes",
+} in device_specs
+assert all("devname" not in spec for spec in device_specs)
 assert pci["alias"].count("alias = ") == 1
 assert pci["alias"].count('"numa_policy":"legacy"') == 2
 assert "live_migratable" not in pci["alias"]
@@ -80,7 +86,10 @@ config = base64.b64decode(secret["data"]["nova.conf"]).decode()
 assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
 assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
-assert len(json.loads(device_line.split(" = ", 1)[1])) == 2
+device_specs = json.loads(device_line.split(" = ", 1)[1])
+assert len(device_specs) == 3
+assert any(spec.get("address") == "0000:af:00.1" and spec.get("physical_network") == "sriov-rack-2" for spec in device_specs)
+assert all("devname" not in spec for spec in device_specs)
 '
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
   awk '/node_selector_key: openstack-compute-node/{found=1} END{exit !found}'
