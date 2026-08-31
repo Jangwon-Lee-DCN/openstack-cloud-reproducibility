@@ -11,6 +11,9 @@ pod:
     # Rack 2/Rack 3 keep the API available without an unschedulable rollout.
     # Phase 61 restores three after Rack 1 passes its stability gate.
     server: 2
+    # OVN itself is RPC-less, but the SR-IOV NIC Switch agent reports state
+    # and receives port updates through Neutron RPC workers.
+    rpc_server: 2
   lifecycle:
     disruption_budget:
       server:
@@ -116,5 +119,6 @@ endpoints:
       api:
         public: 443
 manifests:
+  deployment_rpc_server: true
   ingress_server: false
   service_ingress_server: false

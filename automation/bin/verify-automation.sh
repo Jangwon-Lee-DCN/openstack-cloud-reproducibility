@@ -77,6 +77,14 @@ filters = nova["filter_scheduler"]["enabled_filters"]
 assert "NUMATopologyFilter" in filters
 assert "PciPassthroughFilter" in filters
 PY
+python3 - "$root/deploy/values/site/neutron.yaml" <<'PY'
+import sys
+import yaml
+
+neutron = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+assert neutron["manifests"]["deployment_rpc_server"] is True
+assert neutron["pod"]["replicas"]["rpc_server"] == 2
+PY
 helm template nova "$nova_chart" -f "$root/deploy/values/site/nova.yaml" | \
   python3 -c '
 import base64, json, sys, yaml
