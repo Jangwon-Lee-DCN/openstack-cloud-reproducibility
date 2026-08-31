@@ -49,7 +49,10 @@ conf:
       # alias requires repeated INI keys, rendered here as a trusted scalar.
       # The single-NUMA-node GPU host reports PCI numa_node=-1, so Nova's
       # legacy policy is required to allow the documented no-affinity fallback.
-      device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"},{"devname":"dcn-ovn0","physical_network":"sriov-rack-2","managed":"yes"}]'
+      # Use the canary PF's stable PCI address rather than its interface name.
+      # device_spec is parsed on every Compute node, and dcn-ovn0 is a USB NIC
+      # on the heterogeneous Rack 1 GPU host, which is not a valid PCI address.
+      device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"},{"address":"0000:af:00.1","physical_network":"sriov-rack-2","managed":"yes"}]'
       alias: |-
         {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"legacy"}
         alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"legacy"}
