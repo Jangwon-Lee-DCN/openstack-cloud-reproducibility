@@ -277,6 +277,7 @@ conf:
             default_redirect: false
             default_redirect_protocol:
             default_redirect_region:
+            default_redirect_logout:
           idp_mapping:
             - name: "acme_oidc"
               label: "Acme Corporation - OpenID Connect"
@@ -517,6 +518,9 @@ conf:
         {{- end }}
         {{- if .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_region }}
         WEBSSO_DEFAULT_REDIRECT_REGION = "{{ .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_region }}"
+        {{- end }}
+        {{- if .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_logout }}
+        WEBSSO_DEFAULT_REDIRECT_LOGOUT = "{{ .Values.conf.horizon.local_settings.config.auth.sso.default_redirect_logout }}"
         {{- end }}
 
         {{- if .Values.conf.horizon.local_settings.config.auth.sso.websso_keystone_url }}

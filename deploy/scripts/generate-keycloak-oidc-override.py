@@ -34,6 +34,14 @@ updated, count = re.subn(
 )
 if count != 1:
     raise SystemExit("expected exactly one OIDCProviderMetadataURL directive")
+updated, count = re.subn(
+    r'OIDCSessionType\s+"[^"]*"',
+    'OIDCSessionType "client-cookie:persistent:store_id_token"\n'
+    '    OIDCLogoutRequestParams "client_id=keystone"',
+    updated,
+)
+if count != 1:
+    raise SystemExit("expected exactly one OIDCSessionType directive")
 ca_directive = 'OIDCCABundlePath "/usr/local/share/ca-certificates/openstack-public-ca.crt"'
 if "OIDCCABundlePath" not in updated:
     updated, count = re.subn(
