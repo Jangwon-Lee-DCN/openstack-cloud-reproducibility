@@ -31,6 +31,7 @@ mkdir -p "$context/octavia-workflow" "$context/project-selfservice" "$context/ma
 (cd "$S3_DASHBOARD_REPO" && python3 -m build && make verify)
 
 cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$context/Dockerfile"
+cp "$REPO_ROOT/images/horizon-complete/patch_federated_logout.py" "$context/patch_federated_logout.py"
 cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$context/platform_navigation.py"
 cp "$REPO_ROOT/images/horizon-complete/enabled/_9999_platform_navigation.py" "$context/enabled/_9999_platform_navigation.py"
 cp "$REPO_ROOT/images/horizon-complete/enabled/_1380_dcn_service_catalog.py" "$context/enabled/_1380_dcn_service_catalog.py"

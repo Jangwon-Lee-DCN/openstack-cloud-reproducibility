@@ -19,6 +19,7 @@ COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
 COPY enhance_images_ui.py /tmp/enhance_images_ui.py
+COPY patch_federated_logout.py /tmp/patch_federated_logout.py
 COPY image_catalog/index_split.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html
 COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/platform_navigation.py
 COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
@@ -92,6 +93,11 @@ RUN python3 /tmp/enhance_images_ui.py \
     && grep -q "image-linked-resources" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html \
     && grep -q "image-inspector-retry" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html \
     && ! grep -q "CAPI Kubernetes" /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/dashboards/project/images/images/tables.py
+
+RUN python3 /tmp/patch_federated_logout.py \
+    && rm -f /tmp/patch_federated_logout.py \
+    && grep -q 'Flush the local session before starting RP-initiated logout' /var/lib/openstack/lib/python3.12/site-packages/openstack_auth/views.py \
+    && python3 -m py_compile /var/lib/openstack/lib/python3.12/site-packages/openstack_auth/views.py
 
 # Local Octavia workflow patches and self-service Identity integration are
 # copied from this repository; the VPC wheel is built from its separately

@@ -28,6 +28,20 @@ def test_iam_reconciler_selects_theme_without_user_password_grant():
     assert 'directAccessGrantsEnabled:false' in reconciler
 
 
+def test_horizon_image_flushes_local_session_before_oidc_logout():
+    patcher = (ROOT / "images/horizon-complete/patch_federated_logout.py").read_text()
+    dockerfile = (ROOT / "images/horizon-complete/Dockerfile").read_text()
+    builder = (ROOT / "deploy/scripts/build-horizon-image.sh").read_text()
+    queued_builder = (ROOT / "deploy/scripts/build-images.sh").read_text()
+    assert "auth.logout(request)" in patcher
+    assert "auth_user.unset_session_user_variables(request)" in patcher
+    assert "source.count(old) != 1" in patcher
+    assert "COPY patch_federated_logout.py" in dockerfile
+    assert "python3 /tmp/patch_federated_logout.py" in dockerfile
+    assert 'cp "$REPO_ROOT/images/horizon-complete/patch_federated_logout.py"' in builder
+    assert 'cp "$REPO_ROOT/images/horizon-complete/patch_federated_logout.py"' in queued_builder
+
+
 def test_production_horizon_uses_same_origin_keycloak_websso():
     values = (ROOT / "deploy/values/site/horizon.yaml").read_text()
     assert "default_redirect: true" in values
