@@ -39,23 +39,21 @@ const assert = require('node:assert/strict');
     await link.waitFor();
     assert.equal(await link.getAttribute('href'), href);
     assert.equal(await link.getAttribute('target'), '_blank');
-    const destination = new URL(href);
-    const destinationResponse = context.waitForEvent('response', {
-      predicate: response =>
-        response.request().resourceType() === 'document' &&
-        new URL(response.url()).origin === destination.origin,
-      timeout: 30000,
-    });
     const popup = page.waitForEvent('popup');
     await link.click();
     const opened = await popup;
-    const response = await destinationResponse;
-    assert(response.status() < 400, `${name} returned HTTP ${response.status()}: ${response.url()}`);
     await opened.waitForLoadState('domcontentloaded');
     assert.notEqual(opened.url(), 'about:blank', `${name} did not navigate`);
+    const response = await context.request.get(href, {
+      failOnStatusCode: false,
+      maxRedirects: 0,
+      timeout: 30000,
+    });
+    assert(response.status() < 400, `${name} returned HTTP ${response.status()}: ${response.url()}`);
     const destinationBody = await opened.locator('body').innerText().catch(() => '');
     assert(!/Something went wrong|Internal Server Error|404 Not Found/i.test(destinationBody),
       `${name} opened an error page at ${opened.url()}: ${destinationBody.slice(0, 500)}`);
+    console.log(`${name}: click=${opened.url()} status=${response.status()}`);
     await opened.close();
   }
   assert.equal(await page.getByText('Keycloak', {exact: false}).count(), 0);
