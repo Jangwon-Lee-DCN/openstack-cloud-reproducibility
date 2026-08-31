@@ -68,6 +68,14 @@ def test_production_horizon_uses_same_origin_keycloak_websso():
     assert "initial_choice: keycloak_dcn" in values
 
 
+def test_horizon_qoe_uses_csrf_endpoint_when_visible_login_redirects_to_oidc():
+    verifier = (ROOT / "deploy/scripts/verify-horizon-qoe.sh").read_text()
+    assert "openssl rand -hex 16" in verifier
+    assert '-b "csrftoken=$csrf"' in verifier
+    assert "--data-urlencode auth_type=credentials" in verifier
+    assert "Horizon login form has no CSRF token" not in verifier
+
+
 def test_rendered_horizon_redirects_to_same_origin_websso():
     rendered = subprocess.run(
         [
