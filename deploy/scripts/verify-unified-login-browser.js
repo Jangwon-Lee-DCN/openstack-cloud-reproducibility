@@ -11,6 +11,13 @@ const assert = require('node:assert/strict');
   const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}});
   const page = await context.newPage();
   const failures = [];
+  const expectedPortals = [
+    ['Platform Monitoring', 'https://platform.dcn.ssu.ac.kr/grafana/'],
+    ['Infrastructure Inventory', 'https://platform.dcn.ssu.ac.kr/netbox/'],
+    ['Cloud Billing', 'https://billing.dcn.ssu.ac.kr/'],
+    ['Source Code', 'https://platform.dcn.ssu.ac.kr/git/'],
+    ['Container Registry', 'https://registry.dcn.ssu.ac.kr/'],
+  ];
   page.on('console', m => { if (m.type() === 'error') failures.push(`console: ${m.text()}`); });
   page.on('pageerror', e => failures.push(`pageerror: ${e.message}`));
   page.on('request', r => {
@@ -25,7 +32,32 @@ const assert = require('node:assert/strict');
   await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
   assert.equal(new URL(page.url()).origin, cloud, `Horizon entry left the dashboard origin: ${page.url()}`);
   assert(page.url().startsWith(identityFrontend), `Horizon did not enter its same-origin identity frontend: ${page.url()}`);
-  await page.getByText('DCN OpenStack', {exact: false}).first().waitFor();
+  await page.getByText('Sign in to DCN Cloud', {exact: true}).waitFor();
+  assert.equal(await page.getByText('DCN OpenStack', {exact: false}).count(), 0);
+  for (const [name, href] of expectedPortals) {
+    const link = page.getByRole('link', {name: new RegExp(name, 'i')});
+    await link.waitFor();
+    assert.equal(await link.getAttribute('href'), href);
+    assert.equal(await link.getAttribute('target'), '_blank');
+    const destination = new URL(href);
+    const destinationResponse = context.waitForEvent('response', {
+      predicate: response =>
+        response.request().resourceType() === 'document' &&
+        new URL(response.url()).origin === destination.origin,
+      timeout: 30000,
+    });
+    const popup = page.waitForEvent('popup');
+    await link.click();
+    const opened = await popup;
+    const response = await destinationResponse;
+    assert(response.status() < 400, `${name} returned HTTP ${response.status()}: ${response.url()}`);
+    await opened.waitForLoadState('domcontentloaded');
+    assert.notEqual(opened.url(), 'about:blank', `${name} did not navigate`);
+    const destinationBody = await opened.locator('body').innerText().catch(() => '');
+    assert(!/Something went wrong|Internal Server Error|404 Not Found/i.test(destinationBody),
+      `${name} opened an error page at ${opened.url()}: ${destinationBody.slice(0, 500)}`);
+    await opened.close();
+  }
   assert.equal(await page.getByText('Keycloak', {exact: false}).count(), 0);
   await page.locator('input[name="username"]').fill(username);
   await page.locator('input[name="password"]').fill(password);
@@ -54,7 +86,7 @@ const assert = require('node:assert/strict');
   await page.locator('.user-menu .dropdown-toggle').click();
   await page.getByRole('button', {name: /sign out|log out|로그아웃/i}).click();
   await page.waitForURL(url => url.origin === cloud && url.pathname.startsWith('/horizon/auth/idp/'), {timeout: 60000});
-  await page.getByText('DCN OpenStack', {exact: false}).first().waitFor();
+  await page.getByText('Sign in to DCN Cloud', {exact: true}).waitFor();
   const logoutBody = await page.locator('body').innerText();
   assert(!/Something went wrong|Internal Server Error|Forbidden|권한 오류/i.test(logoutBody), logoutBody.slice(0, 2000));
   const remainingCookies = await context.cookies();
@@ -80,10 +112,19 @@ const assert = require('node:assert/strict');
     assert(button && button.height >= 40 && button.height <= 56, `invalid Google button bounds: ${JSON.stringify(button)}`);
     assert(icon && icon.width <= 24 && icon.height <= 24, `oversized Google icon: ${JSON.stringify(icon)}`);
     assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), 'login page overflows horizontally');
+    assert.equal(await page.locator('.dcn-resource-link').count(), expectedPortals.length);
   };
   await assertLoginLayout();
+  const desktopLogin = await page.locator('.pf-v5-c-login__main').boundingBox();
+  const desktopPanel = await page.locator('.dcn-resource-panel').boundingBox();
+  assert(desktopLogin && desktopPanel && desktopPanel.x > desktopLogin.x + desktopLogin.width,
+    `portal cards are not to the right of login: ${JSON.stringify({desktopLogin, desktopPanel})}`);
   await page.setViewportSize({width: 390, height: 844});
   await assertLoginLayout();
+  const mobileLogin = await page.locator('.pf-v5-c-login__main').boundingBox();
+  const mobilePanel = await page.locator('.dcn-resource-panel').boundingBox();
+  assert(mobileLogin && mobilePanel && mobilePanel.y >= mobileLogin.y + mobileLogin.height,
+    `portal cards are not below login on mobile: ${JSON.stringify({mobileLogin, mobilePanel})}`);
   const request = page.waitForRequest(r => r.url().startsWith('https://accounts.google.com/'));
   await google.click({noWaitAfter: true});
   const googleUrl = new URL((await request).url());

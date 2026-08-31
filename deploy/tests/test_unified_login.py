@@ -15,11 +15,30 @@ def test_keycloak_image_packages_dcn_openstack_theme():
     assert "COPY --chown=keycloak:keycloak themes/dcn-openstack" in dockerfile
     assert "parent=keycloak.v2" in (theme / "theme.properties").read_text()
     assert "Keycloak" not in (theme / "messages/messages_en.properties").read_text()
-    assert "DCN OpenStack" in (theme / "messages/messages_en.properties").read_text()
+    messages = (theme / "messages/messages_en.properties").read_text()
+    assert "Sign in to DCN Cloud" in messages
+    assert "DCN OpenStack" not in messages
     css = (theme / "resources/css/dcn-openstack.css").read_text()
     assert "#kc-social-providers a svg" in css
     assert "max-width: 20px" in css
     assert "height: 44px" in css
+    assert ".dcn-resource-panel" in css
+    assert "flex-direction: column" in css
+    assert "order: 1" in css
+    assert "order: 2" in css
+    properties = (theme / "theme.properties").read_text()
+    assert "scripts=js/dcn-portals.js" in properties
+    portals = (theme / "resources/js/dcn-portals.js").read_text()
+    for url in (
+        "https://platform.dcn.ssu.ac.kr/grafana/",
+        "https://platform.dcn.ssu.ac.kr/netbox/",
+        "https://billing.dcn.ssu.ac.kr/",
+        "https://platform.dcn.ssu.ac.kr/git/",
+        "https://registry.dcn.ssu.ac.kr/",
+    ):
+        assert url in portals
+    for forbidden in ("prometheus", "alertmanager", "hubble", "rabbitmq"):
+        assert forbidden not in portals.lower()
 
 
 def test_iam_reconciler_selects_theme_without_user_password_grant():
