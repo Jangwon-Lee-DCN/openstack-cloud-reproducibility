@@ -16,6 +16,8 @@ images:
   tags:
     neutron_db_sync: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
     neutron_server: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
+    neutron_sriov_agent: quay.io/airshipit/neutron:2026.1-ubuntu_noble
+    neutron_sriov_agent_init: quay.io/airshipit/neutron:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 dependencies:
   static:
@@ -50,15 +52,19 @@ conf:
   plugins:
     ml2_conf:
       ml2:
-        type_drivers: flat,geneve
+        type_drivers: flat,geneve,vlan
         tenant_network_types: geneve
-        mechanism_drivers: ovn
+        mechanism_drivers: ovn,sriovnicswitch
         extension_drivers: port_security
       ml2_type_flat:
         flat_networks: external-rack-1,external-rack-2,external-rack-3
       ml2_type_geneve:
         vni_ranges: 1:65536
         max_header_size: 38
+      ml2_type_vlan:
+        # VLAN 141 is the Rack 2 SR-IOV pilot broadcast domain.  The range is
+        # deliberately one VLAN wide until another rack passes qualification.
+        network_vlan_ranges: sriov-rack-2:141:141
       ovn:
         ovn_l3_scheduler: leastloaded
         neutron_sync_mode: repair
@@ -69,6 +75,26 @@ conf:
       network_log:
         rate_limit: 150
         burst_limit: 50
+    sriov_agent:
+      securitygroup:
+        firewall_driver: neutron.agent.firewall.NoopFirewallDriver
+      sriov_nic:
+        physical_device_mappings: sriov-rack-2:dcn-ovn0
+        exclude_devices: ""
+network:
+  backend:
+    - ovn
+    - sriov
+  interface:
+    sriov:
+      dcn_ovn0:
+        device: dcn-ovn0
+        num_vfs: 8
+        mtu: 1500
+labels:
+  sriov:
+    node_selector_key: sriov
+    node_selector_value: enabled
 endpoints:
   identity:
     auth:
