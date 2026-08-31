@@ -84,7 +84,13 @@ const assert = require('node:assert/strict');
   await page.locator('.user-menu .dropdown-toggle').click();
   await page.getByRole('button', {name: /sign out|log out|로그아웃/i}).click();
   await page.waitForURL(url => url.origin === cloud && url.pathname.startsWith('/horizon/auth/idp/'), {timeout: 60000});
-  await page.getByText('Sign in to DCN Cloud', {exact: true}).waitFor();
+  try {
+    await page.getByText('Sign in to DCN Cloud', {exact: true}).waitFor();
+  } catch (error) {
+    console.error(`logout remained at ${page.url()}`);
+    console.error((await page.locator('body').innerText()).slice(0, 2000));
+    throw error;
+  }
   const logoutBody = await page.locator('body').innerText();
   assert(!/Something went wrong|Internal Server Error|Forbidden|권한 오류/i.test(logoutBody), logoutBody.slice(0, 2000));
   const remainingCookies = await context.cookies();

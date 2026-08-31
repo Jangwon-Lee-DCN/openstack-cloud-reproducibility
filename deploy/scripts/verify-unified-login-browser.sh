@@ -57,7 +57,11 @@ spec:
       nodeSelector: {kubernetes.io/hostname: dcn-1a-compute-0}
       hostAliases:
         - ip: "10.67.10.6"
-          hostnames: [cloud.dcn.ssu.ac.kr]
+          hostnames: [cloud.dcn.ssu.ac.kr, billing.dcn.ssu.ac.kr]
+        - ip: "10.67.10.5"
+          hostnames: [platform.dcn.ssu.ac.kr]
+        - ip: "10.67.10.4"
+          hostnames: [registry.dcn.ssu.ac.kr]
       securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: browser
