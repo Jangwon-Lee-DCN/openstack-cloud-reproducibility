@@ -18,8 +18,12 @@ const assert = require('node:assert/strict');
       failures.push(`http ${r.status()}: ${r.url()}`);
   });
 
-  await page.goto(`${cloud}/horizon/auth/login/`, {waitUntil: 'networkidle'});
-  assert(page.url().startsWith(auth), `Horizon did not auto-redirect to the identity login: ${page.url()}`);
+  await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
+  assert.equal(new URL(page.url()).origin, cloud, `Horizon entry left the dashboard origin: ${page.url()}`);
+  assert.equal(new URL(page.url()).pathname, '/horizon/auth/login/', `Horizon entry did not reach its login page: ${page.url()}`);
+  assert.equal(await page.locator('select[name="auth_type"]').inputValue(), 'keycloak_dcn');
+  await page.locator('form').locator('button[type="submit"], input[type="submit"]').click();
+  await page.waitForURL(url => url.origin === auth, {timeout: 30000});
   await page.getByText('DCN OpenStack', {exact: false}).first().waitFor();
   assert.equal(await page.getByText('Keycloak', {exact: false}).count(), 0);
   await page.locator('input[name="username"]').fill(username);
@@ -37,11 +41,21 @@ const assert = require('node:assert/strict');
   }
   await page.locator('body').waitFor();
   const body = await page.locator('body').innerText();
-  assert(!/Something went wrong|Internal Server Error|Unable to retrieve|권한 오류/i.test(body), body.slice(0, 2000));
+  assert(!/Something went wrong|Internal Server Error|Unable to retrieve|Forbidden|권한 오류/i.test(body), body.slice(0, 2000));
+  await page.reload({waitUntil: 'networkidle'});
+  assert(new URL(page.url()).pathname.startsWith('/horizon/'), `refresh lost the Horizon session: ${page.url()}`);
+  await page.goto(`${cloud}/horizon/project/instances/`, {waitUntil: 'networkidle'});
+  const deepLinkBody = await page.locator('body').innerText();
+  assert.equal(new URL(page.url()).origin, cloud, `deep link left Horizon: ${page.url()}`);
+  assert(!/Something went wrong|Internal Server Error|Forbidden|권한 오류/i.test(deepLinkBody), deepLinkBody.slice(0, 2000));
   assert.equal(failures.length, 0, failures.join('\n'));
 
   await context.clearCookies();
-  await page.goto(`${cloud}/horizon/auth/login/`, {waitUntil: 'networkidle'});
+  await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
+  assert.equal(new URL(page.url()).origin, cloud, `fresh Horizon entry auto-redirected: ${page.url()}`);
+  await page.locator('select[name="auth_type"]').selectOption('keycloak_dcn');
+  await page.locator('form').locator('button[type="submit"], input[type="submit"]').click();
+  await page.waitForURL(url => url.origin === auth, {timeout: 30000});
   const google = page.getByRole('link', {name: /google/i});
   await google.waitFor();
   const assertLoginLayout = async () => {
