@@ -27,14 +27,14 @@ def test_iam_reconciler_selects_theme_without_user_password_grant():
     assert 'directAccessGrantsEnabled:false' in reconciler
 
 
-def test_production_horizon_requires_explicit_keycloak_websso():
+def test_production_horizon_uses_same_origin_keycloak_websso():
     values = (ROOT / "deploy/values/site/horizon.yaml").read_text()
-    assert "default_redirect: false" in values
-    assert "default_redirect_protocol: keycloak_dcn" in values
+    assert "default_redirect: true" in values
+    assert "default_redirect_protocol: openid" in values
     assert "initial_choice: keycloak_dcn" in values
 
 
-def test_rendered_horizon_keeps_login_page_until_explicit_websso():
+def test_rendered_horizon_redirects_to_same_origin_websso():
     rendered = subprocess.run(
         [
             "helm",
@@ -56,8 +56,9 @@ def test_rendered_horizon_keeps_login_page_until_explicit_websso():
         and "local_settings" in document.get("data", {})
     )
     settings = base64.b64decode(secret["data"]["local_settings"]).decode()
-    assert "WEBSSO_DEFAULT_REDIRECT = False" in settings
+    assert "WEBSSO_DEFAULT_REDIRECT = True" in settings
     assert 'WEBSSO_INITIAL_CHOICE = "keycloak_dcn"' in settings
+    assert 'WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "openid"' in settings
     assert (
         'WEBSSO_DEFAULT_REDIRECT_REGION = '
         '"https://cloud.dcn.ssu.ac.kr/identity/v3"'
@@ -70,3 +71,6 @@ def test_keystone_resolves_protocol_only_websso_to_keycloak_issuer():
         values["conf"]["keystone"]["federation"]["remote_id_attribute"]
         == "HTTP_OIDC_ISS"
     )
+    reconciler = (ROOT / "deploy/scripts/reconcile-iam-dcn.sh").read_text()
+    assert "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn" in reconciler
+    assert "https://auth.cloud.dcn.ssu.ac.kr/realms/dcn" not in reconciler

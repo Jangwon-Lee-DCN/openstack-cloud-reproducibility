@@ -6,24 +6,25 @@ const assert = require('node:assert/strict');
   const password = process.env.TEST_PASSWORD;
   assert(username && password, 'transient test credentials are required');
   const cloud = 'https://cloud.dcn.ssu.ac.kr';
-  const auth = 'https://auth.cloud.dcn.ssu.ac.kr';
+  const identityFrontend = `${cloud}/horizon/auth/idp`;
   const browser = await chromium.launch({headless: true});
   const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}});
   const page = await context.newPage();
   const failures = [];
   page.on('console', m => { if (m.type() === 'error') failures.push(`console: ${m.text()}`); });
   page.on('pageerror', e => failures.push(`pageerror: ${e.message}`));
+  page.on('request', r => {
+    if (new URL(r.url()).hostname === 'auth.cloud.dcn.ssu.ac.kr')
+      failures.push(`identity hostname escaped Horizon: ${r.url()}`);
+  });
   page.on('response', r => {
-    if ((r.url().startsWith(cloud) || r.url().startsWith(auth)) && r.status() >= 400)
+    if (r.url().startsWith(cloud) && r.status() >= 400)
       failures.push(`http ${r.status()}: ${r.url()}`);
   });
 
   await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
   assert.equal(new URL(page.url()).origin, cloud, `Horizon entry left the dashboard origin: ${page.url()}`);
-  assert.equal(new URL(page.url()).pathname, '/horizon/auth/login/', `Horizon entry did not reach its login page: ${page.url()}`);
-  assert.equal(await page.locator('select[name="auth_type"]').inputValue(), 'keycloak_dcn');
-  await page.locator('form').locator('button[type="submit"], input[type="submit"]').click();
-  await page.waitForURL(url => url.origin === auth, {timeout: 30000});
+  assert(page.url().startsWith(identityFrontend), `Horizon did not enter its same-origin identity frontend: ${page.url()}`);
   await page.getByText('DCN OpenStack', {exact: false}).first().waitFor();
   assert.equal(await page.getByText('Keycloak', {exact: false}).count(), 0);
   await page.locator('input[name="username"]').fill(username);
@@ -52,10 +53,7 @@ const assert = require('node:assert/strict');
 
   await context.clearCookies();
   await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
-  assert.equal(new URL(page.url()).origin, cloud, `fresh Horizon entry auto-redirected: ${page.url()}`);
-  await page.locator('select[name="auth_type"]').selectOption('keycloak_dcn');
-  await page.locator('form').locator('button[type="submit"], input[type="submit"]').click();
-  await page.waitForURL(url => url.origin === auth, {timeout: 30000});
+  assert(page.url().startsWith(identityFrontend), `fresh Horizon entry left its same-origin identity frontend: ${page.url()}`);
   const google = page.getByRole('link', {name: /google/i});
   await google.waitFor();
   const assertLoginLayout = async () => {
@@ -70,7 +68,16 @@ const assert = require('node:assert/strict');
   await assertLoginLayout();
   const request = page.waitForRequest(r => r.url().startsWith('https://accounts.google.com/'));
   await google.click({noWaitAfter: true});
-  assert.match((await request).url(), /^https:\/\/accounts\.google\.com\//);
+  const googleUrl = new URL((await request).url());
+  assert.equal(
+    googleUrl.searchParams.get('redirect_uri'),
+    `${identityFrontend}/realms/dcn/broker/google/endpoint`,
+    `Google callback escaped the Horizon identity path: ${googleUrl}`,
+  );
+  await page.waitForURL(url => url.hostname === 'accounts.google.com', {timeout: 30000});
+  await page.locator('body').waitFor();
+  assert(!/redirect_uri_mismatch|Error 400/i.test(await page.locator('body').innerText()), 'Google rejected the same-origin broker callback');
+  assert.equal(failures.length, 0, failures.join('\n'));
   await browser.close();
   console.log('production-unified-login-browser-e2e-passed');
 })().catch(e => { console.error(e); process.exit(1); });
