@@ -26,12 +26,104 @@ body,
 #kc-header-wrapper::after,
 .kc-logo-text::after {
   color: var(--dcn-ink);
-  content: "DCN OpenStack";
+  content: "DCN Cloud";
   display: block;
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.2;
+}
+
+#kc-header,
+.pf-v5-c-login__header {
+  display: none;
+}
+
+.pf-v5-c-login__container {
+  align-items: start;
+  display: grid;
+  gap: 40px;
+  grid-template-columns: minmax(420px, 544px) minmax(320px, 420px);
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 1080px;
+  padding: 64px 32px;
+  width: 100%;
+}
+
+.dcn-resource-panel {
+  align-self: center;
+  display: grid;
+  gap: 12px;
+}
+
+.dcn-resource-link {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  color: var(--dcn-ink);
+  display: grid;
+  gap: 3px 16px;
+  grid-template-columns: 1fr auto;
+  min-height: 76px;
+  padding: 16px 18px;
+  text-decoration: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.dcn-resource-link:hover,
+.dcn-resource-link:focus-visible {
+  border-color: #98a2b3;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
+  color: var(--dcn-ink);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.dcn-resource-name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.dcn-resource-description {
+  color: var(--dcn-muted);
+  font-size: 0.875rem;
+  grid-column: 1;
+  line-height: 1.4;
+}
+
+.dcn-resource-arrow {
+  align-self: center;
+  color: #475467;
+  font-size: 1.25rem;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+@media (max-width: 860px) {
+  .pf-v5-c-login__container {
+    gap: 24px;
+    grid-template-columns: minmax(0, 544px);
+    padding: 32px 20px;
+  }
+
+  .dcn-resource-panel {
+    align-self: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .pf-v5-c-login__container {
+    padding: 20px 12px;
+  }
+
+  .dcn-resource-link {
+    min-height: 68px;
+    padding: 13px 15px;
+  }
 }
 
 .card-pf,
