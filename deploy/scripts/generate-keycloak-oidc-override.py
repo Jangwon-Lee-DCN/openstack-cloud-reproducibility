@@ -24,7 +24,7 @@ updated, count = re.subn(r'OIDCClientSecret\s+"[^"]*"', f'OIDCClientSecret "{cli
 if count != 1:
     raise SystemExit("expected exactly one OIDCClientSecret directive")
 metadata_url = (
-    "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn/"
+    "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/dcn/"
     ".well-known/openid-configuration"
 )
 updated, count = re.subn(

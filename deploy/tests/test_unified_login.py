@@ -112,7 +112,7 @@ def test_keystone_resolves_protocol_only_websso_to_keycloak_issuer():
     assert "https://auth.cloud.dcn.ssu.ac.kr/realms/dcn" not in reconciler
     generator = (ROOT / "deploy/scripts/generate-keycloak-oidc-override.py").read_text()
     assert (
-        "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn/"
+        "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/dcn/"
         in generator
     )
     assert "expected exactly one OIDCProviderMetadataURL directive" in generator
