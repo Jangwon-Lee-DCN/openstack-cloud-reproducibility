@@ -84,6 +84,7 @@ for item in json.load(sys.stdin).get("items", []):
 }
 
 install_release() {
+  local nova_cell_setup_active
   if [[ "$1" == "octavia" ]]; then
     "$REPO_ROOT/deploy/scripts/reconcile-octavia.sh"
     return
@@ -108,6 +109,20 @@ install_release() {
     # bootstrap Job before the idempotent Helm upgrade recreates it.
     kubectl delete job -n "$NAMESPACE" \
       prometheus-openstack-exporter-ks-user --ignore-not-found --wait=true
+  fi
+  if [[ "$1" == "nova" ]] && kubectl -n "$NAMESPACE" get job nova-cell-setup >/dev/null 2>&1; then
+    # The Nova chart retains cell-setup as a normal Job rather than a Helm
+    # hook. Any rendered pod-template change is immutable, so an otherwise
+    # idempotent upgrade cannot patch the completed Job. Never interrupt an
+    # active setup run; replace only terminal history while the reconciler's
+    # cluster-wide deployment lock is held.
+    nova_cell_setup_active=$(kubectl -n "$NAMESPACE" get job nova-cell-setup \
+      -o jsonpath='{.status.active}')
+    if [[ "${nova_cell_setup_active:-0}" != "0" ]]; then
+      echo "nova-cell-setup is active; refusing to replace it" >&2
+      exit 1
+    fi
+    kubectl delete job -n "$NAMESPACE" nova-cell-setup --wait=true
   fi
   local release=$1 package snapshot values_file secrets_file expected actual values
   package=$(release_field "$release" package)
