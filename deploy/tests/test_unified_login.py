@@ -1,4 +1,5 @@
 import base64
+import hashlib
 from pathlib import Path
 import subprocess
 
@@ -71,6 +72,7 @@ def test_locked_horizon_package_renders_same_origin_websso():
         item for item in lock["spec"]["releases"] if item["name"] == "horizon"
     )
     package = ROOT / release["package"]
+    assert hashlib.sha256(package.read_bytes()).hexdigest() == release["sha256"]
     rendered = subprocess.run(
         [
             "helm",
