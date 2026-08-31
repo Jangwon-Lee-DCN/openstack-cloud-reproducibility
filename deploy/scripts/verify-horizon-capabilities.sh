@@ -2,10 +2,25 @@
 set -euo pipefail
 
 NAMESPACE=${NAMESPACE:-openstack}
-selector='application=horizon,component=server'
+selector='application=horizon,component=server,release_group=horizon'
 
 test "$(kubectl -n "$NAMESPACE" get deployment horizon -o jsonpath='{.status.readyReplicas}')" -ge 3
-test "$(kubectl -n "$NAMESPACE" get pods -l "$selector" -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l)" -ge 3
+horizon_zones=$(kubectl -n "$NAMESPACE" get pods -l "$selector" \
+  -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | \
+  xargs -r -n1 kubectl get node -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)
+schedulable_zones=$(kubectl get nodes -l openstack-control-plane=enabled -o json | python3 -c '
+import json, sys
+nodes = json.load(sys.stdin)["items"]
+zones = {
+    node["metadata"].get("labels", {}).get("topology.kubernetes.io/zone")
+    for node in nodes
+    if not node.get("spec", {}).get("unschedulable", False)
+    and any(condition.get("type") == "Ready" and condition.get("status") == "True"
+            for condition in node.get("status", {}).get("conditions", []))
+}
+print(len(zones - {None}))')
+test "$schedulable_zones" -ge 2
+test "$horizon_zones" -eq "$schedulable_zones"
 
 for pod in $(kubectl -n "$NAMESPACE" get pods -l "$selector" -o name); do
   kubectl -n "$NAMESPACE" exec "$pod" -- sh -c '
