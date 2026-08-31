@@ -69,6 +69,7 @@ conf:
             default_redirect: true
             default_redirect_protocol: openid
             default_redirect_region: https://cloud.dcn.ssu.ac.kr/identity/v3
+            default_redirect_logout: "https://cloud.dcn.ssu.ac.kr/identity/v3/OS-FEDERATION/oidc-callback?logout=https%3A%2F%2Fcloud.dcn.ssu.ac.kr%2Fhorizon%2Fauth%2Flogin%2F"
           idp_mapping:
             - name: keycloak_dcn
               label: DCN Keycloak SSO

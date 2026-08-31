@@ -51,6 +51,24 @@ const assert = require('node:assert/strict');
   assert(!/Something went wrong|Internal Server Error|Forbidden|권한 오류/i.test(deepLinkBody), deepLinkBody.slice(0, 2000));
   assert.equal(failures.length, 0, failures.join('\n'));
 
+  await page.locator('.user-menu .dropdown-toggle').click();
+  await page.getByRole('button', {name: /sign out|log out|로그아웃/i}).click();
+  await page.waitForURL(url => url.origin === cloud && url.pathname.startsWith('/horizon/auth/idp/'), {timeout: 60000});
+  await page.getByText('DCN OpenStack', {exact: false}).first().waitFor();
+  const logoutBody = await page.locator('body').innerText();
+  assert(!/Something went wrong|Internal Server Error|Forbidden|권한 오류/i.test(logoutBody), logoutBody.slice(0, 2000));
+  const remainingCookies = await context.cookies();
+  const sessionCookies = remainingCookies.filter(cookie =>
+    cookie.name === 'sessionid' ||
+    cookie.name.startsWith('mod_auth_openidc_session') ||
+    cookie.name === 'KEYCLOAK_SESSION' ||
+    cookie.name === 'KEYCLOAK_IDENTITY'
+  );
+  assert.equal(sessionCookies.length, 0, `logout retained authentication cookies: ${JSON.stringify(sessionCookies.map(({name, domain, path}) => ({name, domain, path})))}`);
+  await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
+  assert(page.url().startsWith(identityFrontend), `logged-out Horizon entry restored the prior session: ${page.url()}`);
+  assert.equal(failures.length, 0, failures.join('\n'));
+
   await context.clearCookies();
   await page.goto(`${cloud}/horizon`, {waitUntil: 'networkidle'});
   assert(page.url().startsWith(identityFrontend), `fresh Horizon entry left its same-origin identity frontend: ${page.url()}`);

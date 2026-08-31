@@ -115,7 +115,8 @@ client_payload=$(jq -nc --arg secret "$OIDC_CLIENT_SECRET" '{
   protocol:"openid-connect", publicClient:false, secret:$secret,
   standardFlowEnabled:true, directAccessGrantsEnabled:false,
   redirectUris:["https://cloud.dcn.ssu.ac.kr/identity/v3/OS-FEDERATION/oidc-callback"],
-  webOrigins:["https://cloud.dcn.ssu.ac.kr"]
+  webOrigins:["https://cloud.dcn.ssu.ac.kr"],
+  attributes:{"post.logout.redirect.uris":"https://cloud.dcn.ssu.ac.kr/horizon/auth/login/"}
 }')
 existing_client=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
   "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/clients?clientId=${KEYSTONE_CLIENT_ID}" | jq -r '.[0].id // empty')

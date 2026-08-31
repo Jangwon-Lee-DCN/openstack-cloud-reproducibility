@@ -96,6 +96,8 @@ def test_locked_horizon_package_renders_same_origin_websso():
     settings = base64.b64decode(secret["data"]["local_settings"]).decode()
     assert "WEBSSO_DEFAULT_REDIRECT = True" in settings
     assert 'WEBSSO_DEFAULT_REDIRECT_PROTOCOL = "openid"' in settings
+    assert "WEBSSO_DEFAULT_REDIRECT_LOGOUT" in settings
+    assert "oidc-callback?logout=" in settings
     assert "auth.cloud.dcn.ssu.ac.kr" not in settings
 
 
@@ -114,3 +116,6 @@ def test_keystone_resolves_protocol_only_websso_to_keycloak_issuer():
         in generator
     )
     assert "expected exactly one OIDCProviderMetadataURL directive" in generator
+    assert "client-cookie:persistent:store_id_token" in generator
+    assert 'OIDCLogoutRequestParams "client_id=keystone"' in generator
+    assert '"post.logout.redirect.uris"' in reconciler
