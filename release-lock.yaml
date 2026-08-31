@@ -153,7 +153,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: 28.0.0
     package: helm/packages/patched/neutron-2026.1.0.tgz
-    sha256: c6f68b82b4f898bb6b475be68dfec163399edb9945a4ff573d6ac54e02d5a603
+    sha256: 138b62e440c2aaf7555cced2cb10b08caf97281065b9d4aed00b72a39ff93319
     valuesSnapshot: deploy/releases/neutron.values.sops.yaml
   - name: nova
     chart: nova

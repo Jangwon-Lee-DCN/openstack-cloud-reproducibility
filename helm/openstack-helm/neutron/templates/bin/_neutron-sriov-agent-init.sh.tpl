@@ -92,7 +92,13 @@ NIC_BUS=$(lshw -c network -businfo | awk '/{{ $sriov.device }}/ {print $1}')
 #NOTE(portdirect): get first port on the nic
 NIC_FIRST_PORT=$(lshw -c network -businfo | awk "/${NIC_BUS%%.*}/ { print \$2; exit }")
 #NOTE(portdirect): Enable promisc mode on the nic, by setting it for the 1st port
-ethtool --set-priv-flags ${NIC_FIRST_PORT} vf-true-promisc-support ${promisc_mode}
+# This private flag exists only on drivers that implement VF true-promiscuous
+# support. Its absence does not prevent standard spoof-checked SR-IOV VFs from
+# operating, so keep the required VF creation/link checks strict while treating
+# this optional driver capability as non-fatal.
+if ! ethtool --set-priv-flags ${NIC_FIRST_PORT} vf-true-promisc-support ${promisc_mode}; then
+  echo "WARNING: ${NIC_FIRST_PORT} does not support vf-true-promisc-support; continuing with trust off" >&2
+fi
 {{- end }}
 
 {{- if and ( empty .Values.conf.neutron.DEFAULT.host ) ( .Values.pod.use_fqdn.neutron_agent ) }}
