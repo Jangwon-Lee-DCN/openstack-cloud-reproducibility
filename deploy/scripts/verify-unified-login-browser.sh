@@ -39,6 +39,29 @@ group_id=$(${kc_curl[@]} -H "Authorization: Bearer $token" \
 ${kc_curl[@]} -X PUT -H "Authorization: Bearer $token" \
   "http://$kc_host:8080/admin/realms/dcn/users/$user_id/groups/$group_id" >/dev/null
 
+# The acceptance user may authenticate through either Keycloak replica. Do not
+# race the distributed user/group cache after assigning the mapped group.
+membership_deadline=$((SECONDS + 60))
+while :; do
+  membership_ready=1
+  while read -r pod_ip; do
+    if ! curl -fsS --resolve "$kc_host:8080:$pod_ip" \
+      -H "Authorization: Bearer $token" \
+      "http://$kc_host:8080/admin/realms/dcn/users/$user_id/groups" |
+      jq -e 'any(.name == "openstack-members")' >/dev/null; then
+      membership_ready=0
+      break
+    fi
+  done < <(kubectl -n "$KEYCLOAK_NAMESPACE" get pod -l app=keycloak \
+    -o jsonpath='{range .items[*]}{.status.podIP}{"\n"}{end}')
+  (( membership_ready == 1 )) && break
+  (( SECONDS < membership_deadline )) || {
+    echo "Keycloak replicas did not converge the acceptance user's group membership" >&2
+    exit 1
+  }
+  sleep 2
+done
+
 kubectl -n "$NAMESPACE" create configmap unified-login-production-browser \
   --from-file=test.js="$ROOT/deploy/scripts/verify-unified-login-browser.js" \
   --from-file=package.json="$ROOT/deploy/tests/unified-login-package.json" \
