@@ -39,6 +39,24 @@ const assert = require('node:assert/strict');
     await link.waitFor();
     assert.equal(await link.getAttribute('href'), href);
     assert.equal(await link.getAttribute('target'), '_blank');
+    const destination = new URL(href);
+    const destinationResponse = context.waitForEvent('response', {
+      predicate: response =>
+        response.request().resourceType() === 'document' &&
+        new URL(response.url()).origin === destination.origin,
+      timeout: 30000,
+    });
+    const popup = page.waitForEvent('popup');
+    await link.click();
+    const opened = await popup;
+    const response = await destinationResponse;
+    assert(response.status() < 400, `${name} returned HTTP ${response.status()}: ${response.url()}`);
+    await opened.waitForLoadState('domcontentloaded');
+    assert.notEqual(opened.url(), 'about:blank', `${name} did not navigate`);
+    const destinationBody = await opened.locator('body').innerText().catch(() => '');
+    assert(!/Something went wrong|Internal Server Error|404 Not Found/i.test(destinationBody),
+      `${name} opened an error page at ${opened.url()}: ${destinationBody.slice(0, 500)}`);
+    await opened.close();
   }
   assert.equal(await page.getByText('Keycloak', {exact: false}).count(), 0);
   await page.locator('input[name="username"]').fill(username);
@@ -97,8 +115,16 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('.dcn-resource-link').count(), expectedPortals.length);
   };
   await assertLoginLayout();
+  const desktopLogin = await page.locator('.pf-v5-c-login__main').boundingBox();
+  const desktopPanel = await page.locator('.dcn-resource-panel').boundingBox();
+  assert(desktopLogin && desktopPanel && desktopPanel.x > desktopLogin.x + desktopLogin.width,
+    `portal cards are not to the right of login: ${JSON.stringify({desktopLogin, desktopPanel})}`);
   await page.setViewportSize({width: 390, height: 844});
   await assertLoginLayout();
+  const mobileLogin = await page.locator('.pf-v5-c-login__main').boundingBox();
+  const mobilePanel = await page.locator('.dcn-resource-panel').boundingBox();
+  assert(mobileLogin && mobilePanel && mobilePanel.y >= mobileLogin.y + mobileLogin.height,
+    `portal cards are not below login on mobile: ${JSON.stringify({mobileLogin, mobilePanel})}`);
   const request = page.waitForRequest(r => r.url().startsWith('https://accounts.google.com/'));
   await google.click({noWaitAfter: true});
   const googleUrl = new URL((await request).url());
