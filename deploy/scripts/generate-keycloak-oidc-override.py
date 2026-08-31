@@ -23,6 +23,17 @@ wsgi = base["conf"]["wsgi_keystone"]
 updated, count = re.subn(r'OIDCClientSecret\s+"[^"]*"', f'OIDCClientSecret "{client_secret}"', wsgi)
 if count != 1:
     raise SystemExit("expected exactly one OIDCClientSecret directive")
+metadata_url = (
+    "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn/"
+    ".well-known/openid-configuration"
+)
+updated, count = re.subn(
+    r'OIDCProviderMetadataURL\s+"[^"]*"',
+    f'OIDCProviderMetadataURL "{metadata_url}"',
+    updated,
+)
+if count != 1:
+    raise SystemExit("expected exactly one OIDCProviderMetadataURL directive")
 ca_directive = 'OIDCCABundlePath "/usr/local/share/ca-certificates/openstack-public-ca.crt"'
 if "OIDCCABundlePath" not in updated:
     updated, count = re.subn(
