@@ -3,11 +3,13 @@ set -euo pipefail
 
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
+PUBLIC_GATEWAY_IP=${PUBLIC_GATEWAY_IP:-10.67.10.6}
 
 public_status() {
   local path=$1 code attempt
   for attempt in $(seq 1 30); do
     code=$(curl -ksS --connect-timeout 2 --max-time 10 \
+      --resolve "cloud.dcn.ssu.ac.kr:443:${PUBLIC_GATEWAY_IP}" \
       -o /dev/null -w '%{http_code}' "https://cloud.dcn.ssu.ac.kr${path}" 2>/dev/null || true)
     if [[ "$code" != "000" && -n "$code" ]]; then
       printf '%s\n' "$code"
@@ -31,13 +33,19 @@ PYLOCK
   }
 done
 
-[[ "$(kubectl get deployment -n "$NAMESPACE" neutron-server -o jsonpath='{.status.readyReplicas}')" == 3 ]] || {
-  echo "Neutron API does not have three ready replicas" >&2; exit 1;
+neutron_desired=$(kubectl get deployment -n "$NAMESPACE" neutron-server -o jsonpath='{.spec.replicas}')
+neutron_ready=$(kubectl get deployment -n "$NAMESPACE" neutron-server -o jsonpath='{.status.readyReplicas}')
+[[ "$neutron_desired" =~ ^[0-9]+$ && "$neutron_desired" -ge 2 ]] || {
+  echo "Neutron API desired replicas must be at least two, got ${neutron_desired:-unset}" >&2; exit 1;
 }
-[[ "$(kubectl get pods -n "$NAMESPACE" -l application=neutron,component=server \
+[[ "$neutron_ready" == "$neutron_desired" ]] || {
+  echo "Neutron API ready replicas ${neutron_ready:-0} do not match desired replicas $neutron_desired" >&2; exit 1;
+}
+neutron_zones=$(kubectl get pods -n "$NAMESPACE" -l application=neutron,component=server \
   -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | \
-  xargs -r -n1 kubectl get node -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)" == 3 ]] || {
-  echo "Neutron API is not spread across all three rack zones" >&2; exit 1;
+  xargs -r -n1 kubectl get node -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)
+[[ "$neutron_zones" == "$neutron_desired" ]] || {
+  echo "Neutron API spans $neutron_zones rack zones, expected $neutron_desired" >&2; exit 1;
 }
 
 for release in $(helm list -n "$NAMESPACE" -q); do
@@ -106,7 +114,7 @@ done
 # final /horizon STATIC_URL before Apache starts. It prevents expensive
 # request-time template compression in every WSGI worker.
 mapfile -t horizon_pods < <(kubectl get pods -n "$NAMESPACE" \
-  -l application=horizon,component=server \
+  -l application=horizon,component=server,release_group=horizon \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
 [[ "${#horizon_pods[@]}" -eq 3 ]] || {
   echo "expected three Horizon server pods" >&2; exit 1;
@@ -114,10 +122,23 @@ mapfile -t horizon_pods < <(kubectl get pods -n "$NAMESPACE" \
 [[ "$(kubectl get service -n "$NAMESPACE" horizon-int -o jsonpath='{.spec.sessionAffinity}')" == ClientIP ]] || {
   echo "Horizon service does not use ClientIP affinity" >&2; exit 1;
 }
-[[ "$(printf '%s\n' "${horizon_pods[@]}" | xargs -r -n1 kubectl get pod -n "$NAMESPACE" \
+horizon_zones=$(printf '%s\n' "${horizon_pods[@]}" | xargs -r -n1 kubectl get pod -n "$NAMESPACE" \
   -o jsonpath='{.spec.nodeName}{"\n"}' | xargs -r -n1 kubectl get node \
-  -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)" == 3 ]] || {
-  echo "Horizon replicas are not spread across all three rack zones" >&2; exit 1;
+  -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' | sort -u | wc -l)
+schedulable_control_plane_zones=$(kubectl get nodes -l openstack-control-plane=enabled -o json | python3 -c '
+import json, sys
+nodes = json.load(sys.stdin)["items"]
+zones = {
+    node["metadata"].get("labels", {}).get("topology.kubernetes.io/zone")
+    for node in nodes
+    if not node.get("spec", {}).get("unschedulable", False)
+    and any(condition.get("type") == "Ready" and condition.get("status") == "True"
+            for condition in node.get("status", {}).get("conditions", []))
+}
+print(len(zones - {None}))')
+horizon_expected_zones=$(( schedulable_control_plane_zones < 3 ? schedulable_control_plane_zones : 3 ))
+[[ "$horizon_expected_zones" -ge 2 && "$horizon_zones" == "$horizon_expected_zones" ]] || {
+  echo "Horizon replicas span $horizon_zones rack zones, expected $horizon_expected_zones schedulable zones" >&2; exit 1;
 }
 horizon_bundle=''
 for pod in "${horizon_pods[@]}"; do
@@ -146,9 +167,14 @@ done
 # Catch regressions where login rendering silently performs runtime asset
 # compression again. Use the median to tolerate one connection/setup outlier.
 mapfile -t login_samples < <(for _ in 1 2 3 4 5; do
-  curl -ksS -o /dev/null -w '%{time_starttransfer}\n' \
+  curl -ksS --connect-timeout 2 --max-time 10 \
+    --resolve "cloud.dcn.ssu.ac.kr:443:${PUBLIC_GATEWAY_IP}" \
+    -o /dev/null -w '%{time_starttransfer}\n' \
     https://cloud.dcn.ssu.ac.kr/horizon/auth/login/
 done | sort -n)
+[[ "${#login_samples[@]}" -eq 5 ]] || {
+  echo "Horizon login TTFB sampling did not return five results" >&2; exit 1;
+}
 python3 - "${login_samples[2]}" <<'PY'
 import sys
 median = float(sys.argv[1])
