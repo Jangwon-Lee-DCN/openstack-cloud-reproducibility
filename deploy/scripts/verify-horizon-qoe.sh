@@ -18,7 +18,7 @@ if [[ -n "$HORIZON_RESOLVE" ]]; then
   curl_args+=(--resolve "$HORIZON_RESOLVE")
 fi
 
-for command in curl kubectl python3 base64; do
+for command in curl kubectl python3 base64 openssl; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
 
@@ -29,33 +29,20 @@ secret_value() {
 }
 
 cookie="$work_dir/cookies"
-login="$work_dir/login.html"
-curl "${curl_args[@]}" -c "$cookie" "$HORIZON_URL/auth/login/" -o "$login"
-csrf=$(python3 - "$login" <<'PY'
-import re, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-match = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', text)
-if not match:
-    raise SystemExit("Horizon login form has no CSRF token")
-print(match.group(1))
-PY
-)
-region=$(python3 - "$login" <<'PY'
-import re, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-match = re.search(r'name="region" value="([^"]+)"', text)
-print(match.group(1) if match else "default")
-PY
-)
+# Unified login redirects the visible entry to OIDC, so it no longer renders
+# Horizon's credential form.  The QoE probe still uses the dedicated Keystone
+# admin account through Horizon's CSRF-protected credential endpoint.
+csrf=$(openssl rand -hex 16)
 
 username=$(secret_value OS_USERNAME)
 password=$(secret_value OS_PASSWORD)
 domain=$(secret_value OS_USER_DOMAIN_NAME)
-status=$(curl "${curl_args[@]}" -b "$cookie" -c "$cookie" -o "$work_dir/auth-response" \
+status=$(curl "${curl_args[@]}" -b "csrftoken=$csrf" -c "$cookie" -o "$work_dir/auth-response" \
   -w '%{http_code}' -X POST "$HORIZON_URL/auth/login/" \
+  -H "Origin: ${HORIZON_URL%/horizon}" \
   --data-urlencode "csrfmiddlewaretoken=$csrf" \
   --data-urlencode auth_type=credentials \
-  --data-urlencode "region=$region" \
+  --data-urlencode region=0 \
   --data-urlencode "username=$username" \
   --data-urlencode "password=$password" \
   --data-urlencode "domain=$domain" \
