@@ -64,11 +64,10 @@ conf:
             enabled: true
             initial_choice: keycloak_dcn
             websso_keystone_url: https://cloud.dcn.ssu.ac.kr/identity/v3
-            # Keep the user on Horizon until they explicitly submit the
-            # selected WebSSO method.  Automatic redirect loses the visible
-            # login boundary and made entry/deep-link regressions invisible.
-            default_redirect: false
-            default_redirect_protocol: keycloak_dcn
+            # Keycloak's public frontend is reverse-proxied below /horizon;
+            # one-step WebSSO therefore stays on the Horizon public origin.
+            default_redirect: true
+            default_redirect_protocol: openid
             default_redirect_region: https://cloud.dcn.ssu.ac.kr/identity/v3
           idp_mapping:
             - name: keycloak_dcn
