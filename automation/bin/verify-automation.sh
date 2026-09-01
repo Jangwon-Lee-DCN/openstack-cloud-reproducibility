@@ -84,6 +84,9 @@ import yaml
 neutron = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 assert neutron["manifests"]["deployment_rpc_server"] is True
 assert neutron["pod"]["replicas"]["rpc_server"] == 2
+images = neutron["images"]["tags"]
+assert images["neutron_rpc_server"] == images["neutron_server"]
+assert "@sha256:" in images["neutron_rpc_server"]
 PY
 helm template nova "$nova_chart" -f "$root/deploy/values/site/nova.yaml" | \
   python3 -c '
