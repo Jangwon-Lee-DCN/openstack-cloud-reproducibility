@@ -58,6 +58,7 @@ dcn-image-build submit --component horizon-complete \
   --source vpc_dashboard=/path/to/openstack-vpc-dashboard@FULL_SHA \
   --source telemetry_dashboard=/path/to/openstack-telemetry-dashboard@FULL_SHA \
   --source s3_dashboard=/path/to/openstack-s3-dashboard@FULL_SHA \
+  --source baremetal_access_dashboard=/path/to/openstack-baremetal-access-dashboard@FULL_SHA \
   --wait
 ```
 
