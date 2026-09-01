@@ -26,6 +26,7 @@ VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
+NETBOX_IRONIC_CONTROLLER_REPO=${NETBOX_IRONIC_CONTROLLER_REPO:-$REPO_ROOT/../netbox-ironic-controller}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -206,6 +207,17 @@ build_loki_tenant_gateway() {
   build_context loki-tenant-gateway "$context" "$REGISTRY/loki-tenant-gateway:source-$BUILD_ID"
 }
 selected loki-tenant-gateway && build_loki_tenant_gateway
+
+build_baremetal_access_service() {
+  git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --quiet \
+    && git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --cached --quiet || {
+      echo "refusing dirty Bare Metal Access source: $NETBOX_IRONIC_CONTROLLER_REPO" >&2
+      exit 1
+    }
+  build_context baremetal-access-service "$NETBOX_IRONIC_CONTROLLER_REPO" \
+    "$REGISTRY/baremetal-access-service:source-$BUILD_ID"
+}
+selected baremetal-access-service && build_baremetal_access_service
 
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context

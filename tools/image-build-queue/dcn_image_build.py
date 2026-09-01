@@ -39,6 +39,9 @@ COMPONENTS = {
     "keycloak": ("platform-images", ("reproducibility",)),
     "project-facade": ("platform-images", ("reproducibility",)),
     "loki-tenant-gateway": ("platform-images", ("reproducibility",)),
+    "baremetal-access-service": (
+        "platform-images", ("reproducibility", "netbox_ironic_controller"),
+    ),
 }
 
 
