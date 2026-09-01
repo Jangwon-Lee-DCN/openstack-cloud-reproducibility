@@ -14,6 +14,8 @@ ADD https://tarballs.openstack.org/python-heatclient/python_heatclient-5.1.0-py3
 ADD https://tarballs.openstack.org/manila-ui/manila_ui-15.0.0-py3-none-any.whl /tmp/manila_ui.whl
 ADD https://tarballs.openstack.org/python-manilaclient/python_manilaclient-6.0.0-py3-none-any.whl /tmp/python_manilaclient.whl
 ADD https://tarballs.openstack.org/masakari-dashboard/masakari_dashboard-14.0.0-py3-none-any.whl /tmp/masakari_dashboard.whl
+ADD https://tarballs.openstack.org/ironic-ui/ironic_ui-6.8.0-py3-none-any.whl /tmp/ironic_ui.whl
+ADD https://tarballs.openstack.org/python-ironicclient/python_ironicclient-6.0.0-py3-none-any.whl /tmp/python_ironicclient.whl
 COPY openstack_vpc_dashboard.whl /tmp/openstack_vpc_dashboard.whl
 COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
@@ -45,6 +47,8 @@ RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp
     && echo "4e064674a7d49648a70c56fda84a63201d2c472bd30bbc048955c17111b19995  /tmp/manila_ui.whl" | sha256sum -c - \
     && echo "079a248ed632c30a3c625d31b04b0899fdc4ff3944a06cede5ca62e2a4f8ecd6  /tmp/python_manilaclient.whl" | sha256sum -c - \
     && echo "73fe9c0f48af35f25baae83a98e77e98ab6b419d45d64277331bc1d75e1cdd53  /tmp/masakari_dashboard.whl" | sha256sum -c - \
+    && echo "0f3f09ce5f9c080005ad110f0b76181c7a361f19c36049e0841e4fd33a7e3a65  /tmp/ironic_ui.whl" | sha256sum -c - \
+    && echo "4ae61cab95453db196123574601a8f84b520c6459d39a1bfbbaf502841d2a6d0  /tmp/python_ironicclient.whl" | sha256sum -c - \
     && python3 -m zipfile -e /tmp/octavia_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/designate_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/openstack_vpc_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
@@ -54,6 +58,8 @@ RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp
     && python3 -m zipfile -e /tmp/python_manilaclient.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/manila_ui.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/masakari_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
+    && python3 -m zipfile -e /tmp/ironic_ui.whl /var/lib/openstack/lib/python3.12/site-packages \
+    && python3 -m zipfile -e /tmp/python_ironicclient.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/openstack_telemetry_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/openstack_s3_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && cp /var/lib/openstack/lib/python3.12/site-packages/octavia_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
@@ -65,6 +71,7 @@ RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp
     && cp /var/lib/openstack/lib/python3.12/site-packages/magnum_ui/enabled/_23*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/manila_ui/local/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/local/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
+    && cp /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/enabled/_2200_ironic.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/cloud_telemetry_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/cloud_s3_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && sed -i 's/\$gray-lighter/#eeeeee/g' /var/lib/openstack/lib/python3.12/site-packages/magnum_ui/static/dashboard/container-infra/clusters/clusters.scss \
@@ -131,7 +138,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && sed -i "s/region_name = request.COOKIES.get('services_region')/region_name = getattr(request.user, 'services_region', None) or request.COOKIES.get('services_region')/" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && sed -i "/region_name = getattr(request.user, 'services_region'/a\\    if region_name in ('RegionOne', 'RegionOne-VM'):\\n        region_name = None" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && grep -q "getattr(request.user, 'services_region'" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
-    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, cloud_telemetry_dashboard, cloud_s3_dashboard, governance_dashboard" \
+    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, ironic_ui, ironicclient, cloud_telemetry_dashboard, cloud_s3_dashboard, governance_dashboard" \
     && grep -q 'remove_stock_actions(tables.InstancesTable, {"associate", "disassociate"})' /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/customization.py \
     && test ! -e /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/api/native_inventory.py \
     && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard \
@@ -142,6 +149,10 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_1800_project_selfservice_app.py" \
     && test -f "$local_enabled/_9010_manila_project_add_shares_panel_to_share_panel_group.py" \
     && test -f "$local_enabled/_50_masakaridashboard.py" \
+    && test -f "$local_enabled/_2200_ironic.py" \
+    && grep -q "PANEL_DASHBOARD = 'admin'" "$local_enabled/_2200_ironic.py" \
+    && grep -q "openstack.roles.admin" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
+    && grep -q "openstack.services.baremetal" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && test -f "$local_enabled/_1610_project_metrics.py" \
     && test -f "$local_enabled/_1620_project_alarms.py" \
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
