@@ -64,6 +64,18 @@ dcn-image-build submit --component horizon-complete \
 The first JSON line records the request/task identity. On success, `--wait`
 prints the immutable image reference on the final line.
 
+The controller manager and facade are separate immutable artifacts from the
+same pinned source revision:
+
+```bash
+dcn-image-build submit --component vpc-control-plane \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source vpc_control_plane=/path/to/vpc-control-plane@FULL_SHA --wait
+dcn-image-build submit --component vpc-facade \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source vpc_control_plane=/path/to/vpc-control-plane@FULL_SHA --wait
+```
+
 ## Operate
 
 ```bash
