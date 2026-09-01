@@ -14,8 +14,9 @@ def test_ironic_ui_is_versioned_verified_and_admin_only():
     assert "ironic_ui/enabled/_2200_ironic.py" in dockerfile
     assert 'test -f "$local_enabled/_2200_ironic.py"' in dockerfile
     assert "PANEL_DASHBOARD = 'admin'" in dockerfile
-    assert "openstack.roles.admin" in dockerfile
     assert "openstack.services.baremetal" in dockerfile
+    assert "DCN_BAREMETAL_ADMIN_PROJECT_ID" in dockerfile
+    assert "baremetal_admin" in dockerfile
     assert "window.jQuery.migrateMute = true;" in dockerfile
 
 
@@ -24,3 +25,21 @@ def test_ironic_ui_is_not_registered_as_a_project_panel():
 
     assert "ironic_ui/enabled/_2200_ironic.py" in dockerfile
     assert "project_ironic" not in dockerfile
+
+
+def test_full_ironic_panel_policy_is_project_id_and_role_scoped():
+    policy = (ROOT / "images/horizon-complete/ironic_policy/panel.py").read_text()
+    setting = (ROOT / "images/horizon-complete/settings/0002_baremetal_access.py").read_text()
+
+    assert 'getattr(user, "project_id", None) != expected_project' in policy
+    assert '"baremetal_admin" in roles' in policy
+    assert 'getattr(settings, "DCN_BAREMETAL_ADMIN_PROJECT_ID", "")' in policy
+    assert 'os.environ.get("DCN_BAREMETAL_ADMIN_PROJECT_ID", "")' in setting
+    assert "project_name" not in policy
+
+
+def test_every_horizon_builder_copies_the_policy_and_setting():
+    for relative in ("deploy/scripts/build-images.sh", "deploy/scripts/build-horizon-image.sh"):
+        builder = (ROOT / relative).read_text()
+        assert "ironic_policy/panel.py" in builder
+        assert "settings/0002_baremetal_access.py" in builder
