@@ -47,6 +47,14 @@ def test_iam_reconciler_selects_theme_without_user_password_grant():
     assert 'directAccessGrantsEnabled:false' in reconciler
 
 
+def test_iam_reconciler_creates_baremetal_roles_and_limits_admin_marker():
+    reconciler = (ROOT / "deploy/scripts/reconcile-iam-dcn.sh").read_text()
+    for role in ("baremetal_admin", "baremetal_requester", "baremetal_operator"):
+        assert role in reconciler
+    assert '[openstack-admins]="admin baremetal_admin"' in reconciler
+    assert '[openstack-members]="member baremetal_requester"' not in reconciler
+
+
 def test_horizon_image_flushes_local_session_before_oidc_logout():
     patcher = (ROOT / "images/horizon-complete/patch_federated_logout.py").read_text()
     dockerfile = (ROOT / "images/horizon-complete/Dockerfile").read_text()

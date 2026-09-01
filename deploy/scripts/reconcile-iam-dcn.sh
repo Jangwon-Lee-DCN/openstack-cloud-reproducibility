@@ -185,7 +185,7 @@ fi
 # for security-operator). Ensuring they exist here only makes them
 # assignable; it grants no OpenStack-service-level capability by itself.
 echo "== ensuring custom roles exist =="
-for role_name in admin member reader load-balancer_admin monitoring network-operator security-operator project-creator; do
+for role_name in admin member reader load-balancer_admin monitoring network-operator security-operator project-creator baremetal_admin baremetal_requester baremetal_operator; do
   existing=$(curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/roles?name=${role_name}" | jq -r '.roles[0].id // empty')
   if [[ -z "${existing}" ]]; then
     curl -sf -X POST -H "X-Auth-Token: ${OS_TOKEN}" -H 'Content-Type: application/json' \
@@ -205,7 +205,7 @@ done
 # the existing local break-glass admin model, not a default extension of
 # this pattern.
 declare -A PERSONA_ROLES=(
-  [openstack-admins]="admin"
+  [openstack-admins]="admin baremetal_admin"
   [openstack-operators]="member load-balancer_admin monitoring"
   [openstack-members]="member"
   [openstack-readers]="reader"
