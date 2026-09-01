@@ -182,6 +182,22 @@ spec:
             summary: Orphan network interface resource detected
             description: "{{ $labels.project_namespace }} has {{ $value }} orphan {{ $labels.kind }} resources."
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#vpc-control-plane
+        - alert: VPCAcceleratedInterfaceCapacityLow
+          expr: (vpc_network_interface_accelerated_capacity{profile="sriov-rack2",kind="limit"} - on(project_namespace,profile) vpc_network_interface_accelerated_capacity{profile="sriov-rack2",kind="allocated"}) <= 2
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: Rack 2 accelerated interface capacity is low
+            description: "{{ $labels.project_namespace }} has {{ $value }} accelerated interfaces remaining."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/eni-operations.md
+        - alert: VPCAcceleratedInterfaceCapacityExhausted
+          expr: (vpc_network_interface_accelerated_capacity{profile="sriov-rack2",kind="limit"} - on(project_namespace,profile) vpc_network_interface_accelerated_capacity{profile="sriov-rack2",kind="allocated"}) <= 0
+          for: 2m
+          labels: {severity: critical}
+          annotations:
+            summary: Rack 2 accelerated interface capacity is exhausted
+            description: "{{ $labels.project_namespace }} cannot allocate another accelerated interface."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/eni-operations.md
         - alert: VPCNetworkInterfacePortQuotaLow
           expr: (vpc_network_interface_port_quota{kind="limit"} - on(project_namespace) vpc_network_interface_port_quota{kind="used"}) <= 10
           for: 10m
