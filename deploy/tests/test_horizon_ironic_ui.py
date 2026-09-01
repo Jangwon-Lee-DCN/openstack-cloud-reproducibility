@@ -43,3 +43,18 @@ def test_every_horizon_builder_copies_the_policy_and_setting():
         builder = (ROOT / relative).read_text()
         assert "ironic_policy/panel.py" in builder
         assert "settings/0002_baremetal_access.py" in builder
+
+
+def test_project_access_and_dcn_approval_panels_are_built_from_separate_plugin():
+    dockerfile = (ROOT / "images/horizon-complete/Dockerfile").read_text()
+    assert "openstack_baremetal_access_dashboard.whl" in dockerfile
+    assert "_1390_project_baremetal_access.py" in dockerfile
+    assert "_2210_admin_baremetal_approvals.py" in dockerfile
+    assert "baremetal_access_dashboard" in dockerfile
+
+
+def test_every_horizon_builder_uses_baremetal_dashboard_repository():
+    for relative in ("deploy/scripts/build-images.sh", "deploy/scripts/build-horizon-image.sh"):
+        builder = (ROOT / relative).read_text()
+        assert "BAREMETAL_ACCESS_DASHBOARD_REPO" in builder
+        assert "openstack_baremetal_access_dashboard-*.whl" in builder
