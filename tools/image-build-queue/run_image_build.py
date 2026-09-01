@@ -53,6 +53,7 @@ def execute(path: Path) -> int:
             "vpc_dashboard": "VPC_DASHBOARD_REPO",
             "telemetry_dashboard": "TELEMETRY_DASHBOARD_REPO",
             "s3_dashboard": "S3_DASHBOARD_REPO",
+            "baremetal_access_dashboard": "BAREMETAL_ACCESS_DASHBOARD_REPO",
             "magnum_gitops": "MAGNUM_GITOPS_REPO",
             "vpc_control_plane": "VPC_CONTROL_PLANE_REPO",
         }

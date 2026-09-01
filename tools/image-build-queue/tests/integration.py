@@ -124,7 +124,10 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
             parallel_revision = command(["git", "-C", str(repository), "rev-parse", "HEAD"]).stdout.strip()
             parallel_a = json.loads(command([cli, "submit", "--component", "keystone-oidc", "--source", f"reproducibility={repository}@{parallel_revision}"], env=base_env).stdout)
             horizon_sources = []
-            for source_name in ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard"):
+            for source_name in (
+                "reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard",
+                "baremetal_access_dashboard",
+            ):
                 horizon_sources.extend(["--source", f"{source_name}={repository}@{parallel_revision}"])
             parallel_b = json.loads(command([cli, "submit", "--component", "horizon-complete", *horizon_sources], env=base_env).stdout)
             command([cli, "wait", str(parallel_a["task_id"]), "--quiet"], env=base_env)
