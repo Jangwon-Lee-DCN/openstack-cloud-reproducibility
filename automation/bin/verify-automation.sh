@@ -65,8 +65,9 @@ assert pci["report_in_placement"] is False
 device_specs = __import__("json").loads(pci["device_spec"])
 assert len(device_specs) == 3
 assert {
-    "address": "0000:af:00.1",
-    "physical_network": "sriov-rack-2",
+    "vendor_id": "8086",
+    "product_id": "10ed",
+    "physical_network": "sriov-provider",
     "managed": "yes",
 } in device_specs
 assert all("devname" not in spec for spec in device_specs)
@@ -99,7 +100,7 @@ assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
 device_specs = json.loads(device_line.split(" = ", 1)[1])
 assert len(device_specs) == 3
-assert any(spec.get("address") == "0000:af:00.1" and spec.get("physical_network") == "sriov-rack-2" for spec in device_specs)
+assert any(spec.get("vendor_id") == "8086" and spec.get("product_id") == "10ed" and spec.get("physical_network") == "sriov-provider" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 '
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
