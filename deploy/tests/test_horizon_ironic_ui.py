@@ -16,6 +16,7 @@ def test_ironic_ui_is_versioned_verified_and_admin_only():
     assert "PANEL_DASHBOARD = 'admin'" in dockerfile
     assert "openstack.roles.admin" in dockerfile
     assert "openstack.services.baremetal" in dockerfile
+    assert "window.jQuery.migrateMute = true;" in dockerfile
 
 
 def test_ironic_ui_is_not_registered_as_a_project_panel():

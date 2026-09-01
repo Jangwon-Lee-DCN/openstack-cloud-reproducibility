@@ -74,6 +74,8 @@ RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp
     && cp /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/enabled/_2200_ironic.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/cloud_telemetry_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/cloud_s3_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
+    && sed -i '1i window.jQuery.migrateMute = true;' /var/lib/openstack/lib/python3.12/site-packages/xstatic/pkg/jquery_migrate/data/jquery-migrate.js /var/lib/openstack/lib/python3.12/site-packages/xstatic/pkg/jquery_migrate/data/jquery-migrate.min.js \
+    && grep -q '^window.jQuery.migrateMute = true;' /var/lib/openstack/lib/python3.12/site-packages/xstatic/pkg/jquery_migrate/data/jquery-migrate.min.js \
     && sed -i 's/\$gray-lighter/#eeeeee/g' /var/lib/openstack/lib/python3.12/site-packages/magnum_ui/static/dashboard/container-infra/clusters/clusters.scss \
     && rm -f /tmp/*.whl
 
