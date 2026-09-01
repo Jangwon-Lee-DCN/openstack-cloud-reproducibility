@@ -161,7 +161,6 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_1390_project_baremetal_access.py" \
     && test -f "$local_enabled/_2210_admin_baremetal_approvals.py" \
     && grep -q "PANEL_DASHBOARD = 'admin'" "$local_enabled/_2200_ironic.py" \
-    && grep -q "openstack.roles.admin" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && grep -q "openstack.services.baremetal" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && grep -q "DCN_BAREMETAL_ADMIN_PROJECT_ID" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && grep -q "baremetal_admin" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \

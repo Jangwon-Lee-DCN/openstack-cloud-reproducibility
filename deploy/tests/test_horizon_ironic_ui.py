@@ -33,6 +33,8 @@ def test_full_ironic_panel_policy_is_project_id_and_role_scoped():
 
     assert 'getattr(user, "project_id", None) != expected_project' in policy
     assert '"baremetal_admin" in roles' in policy
+    assert 'permissions = ("openstack.services.baremetal",)' in policy
+    assert "openstack.roles.admin" not in policy
     assert 'getattr(settings, "DCN_BAREMETAL_ADMIN_PROJECT_ID", "")' in policy
     assert 'os.environ.get("DCN_BAREMETAL_ADMIN_PROJECT_ID", "")' in setting
     assert "project_name" not in policy
