@@ -209,12 +209,17 @@ build_loki_tenant_gateway() {
 selected loki-tenant-gateway && build_loki_tenant_gateway
 
 build_baremetal_access_service() {
+  local context="$WORK_DIR/baremetal-access-service"
   git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --quiet \
     && git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --cached --quiet || {
       echo "refusing dirty Bare Metal Access source: $NETBOX_IRONIC_CONTROLLER_REPO" >&2
       exit 1
     }
-  build_context baremetal-access-service "$NETBOX_IRONIC_CONTROLLER_REPO" \
+  mkdir -p "$context"
+  cp "$NETBOX_IRONIC_CONTROLLER_REPO/Dockerfile" "$context/Dockerfile"
+  cp "$NETBOX_IRONIC_CONTROLLER_REPO/pyproject.toml" "$context/pyproject.toml"
+  cp -a "$NETBOX_IRONIC_CONTROLLER_REPO/netbox_ironic_controller" "$context/"
+  build_context baremetal-access-service "$context" \
     "$REGISTRY/baremetal-access-service:source-$BUILD_ID"
 }
 selected baremetal-access-service && build_baremetal_access_service
