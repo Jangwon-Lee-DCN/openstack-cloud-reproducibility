@@ -30,16 +30,13 @@ class IndexView(generic.TemplateView):
         try:
             catalog = get_catalog(self.request.user)
             flavors = catalog["flavors"]
-            accelerators = catalog["accelerators"]
             flavor_error = None
         except Exception:
             LOG.exception("Flavor availability lookup failed")
             flavors = []
-            accelerators = []
             flavor_error = "Flavor availability is temporarily unavailable. No Flavor is assumed launchable."
         context.update(
             region=value["region"], services=services, flavors=flavors,
-            accelerators=accelerators,
             flavor_error=flavor_error,
         )
         return context

@@ -27,14 +27,10 @@ def get_catalog(user):
     value = response.json()
     if value.get("schema") != "dcn.ssu.ac.kr/flavor-availability/v2":
         raise ValueError("unexpected Flavor availability schema")
-    if not isinstance(value.get("flavors"), list) or not isinstance(value.get("accelerators"), list):
+    if not isinstance(value.get("flavors"), list):
         raise ValueError("incomplete Flavor availability response")
     return value
 
 
 def list_flavors(user):
     return get_catalog(user)["flavors"]
-
-
-def list_accelerators(user):
-    return get_catalog(user)["accelerators"]
