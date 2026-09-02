@@ -66,7 +66,7 @@ def test_unified_login_proves_default_member_can_open_baremetal_requests():
     assert '/users/$user_id/groups/$group_id' not in runner
     assert "Bare Metal Access" in browser
     assert "/horizon/project/baremetal_access/" in browser
-    assert "Request nodes" in browser
+    assert "베어메탈 서버 사용 신청" in browser
     assert "baseline DCN member received approval UI" in browser
 
 

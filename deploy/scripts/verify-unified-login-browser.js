@@ -85,7 +85,9 @@ const assert = require('node:assert/strict');
   await page.waitForURL(url => url.pathname.startsWith('/horizon/project/baremetal_access/'));
   await page.waitForLoadState('networkidle');
   const bareMetalBody = await page.locator('body').innerText();
-  assert(/Request nodes/i.test(bareMetalBody), `Bare Metal request UI did not render: ${bareMetalBody.slice(0, 1000)}`);
+  assert(/베어메탈 서버 사용 신청/.test(bareMetalBody), `Bare Metal request UI did not render: ${bareMetalBody.slice(0, 1000)}`);
+  assert(!/Project\s*\/\s*Compute\s*\/\s*None/.test(bareMetalBody), 'Bare Metal breadcrumb contains None');
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Bare Metal page overflows horizontally');
   assert(!/Bare Metal Approvals/i.test(bareMetalBody), 'baseline DCN member received approval UI');
   assert.equal(failures.length, 0, failures.join('\n'));
 
