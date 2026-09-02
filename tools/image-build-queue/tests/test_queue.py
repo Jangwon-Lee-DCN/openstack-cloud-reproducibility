@@ -28,6 +28,15 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_baremetal_service_and_dashboard_sources_are_mandatory(self):
+        self.assertEqual(
+            queue.COMPONENTS["baremetal-access-service"][1],
+            ("reproducibility", "netbox_ironic_controller"),
+        )
+        self.assertIn(
+            "baremetal_access_dashboard", queue.COMPONENTS["horizon-complete"][1],
+        )
+
     def test_service_supplies_a_build_capable_python(self):
         service = (ROOT / "dcn-image-build-queue.service").read_text()
         installer = (ROOT / "install.sh").read_text()

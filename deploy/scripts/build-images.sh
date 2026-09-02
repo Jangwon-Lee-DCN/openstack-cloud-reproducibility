@@ -21,10 +21,12 @@ REGISTRY_IP=${REGISTRY_IP:-$(getent ahostsv4 "$REGISTRY_HOST" | awk 'NR == 1 {pr
 [[ -n "$REGISTRY_IP" ]] || { echo "cannot resolve registry host $REGISTRY_HOST" >&2; exit 1; }
 BUILD_ID=${BUILD_ID:-$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)}
 VPC_DASHBOARD_REPO=${VPC_DASHBOARD_REPO:-$REPO_ROOT/../openstack-vpc-dashboard}
+BAREMETAL_ACCESS_DASHBOARD_REPO=${BAREMETAL_ACCESS_DASHBOARD_REPO:-$REPO_ROOT/../openstack-baremetal-access-dashboard}
 VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
+NETBOX_IRONIC_CONTROLLER_REPO=${NETBOX_IRONIC_CONTROLLER_REPO:-$REPO_ROOT/../netbox-ironic-controller}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -150,7 +152,7 @@ simple_context() {
 
 build_horizon_complete() {
   local repo horizon_context
-  for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO"; do
+  for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$BAREMETAL_ACCESS_DASHBOARD_REPO"; do
     git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
       echo "refusing to build from dirty source repository: $repo" >&2
       exit 1
@@ -159,11 +161,14 @@ build_horizon_complete() {
   (cd "$VPC_DASHBOARD_REPO" && "$PYTHON_BINARY" -m build && make verify-wheel)
   (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
+  (cd "$BAREMETAL_ACCESS_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   horizon_context="$WORK_DIR/horizon-complete"
   mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings" "$horizon_context/service_catalog" "$horizon_context/image_catalog" "$horizon_context/track-b"
   cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
   cp "$REPO_ROOT/images/horizon-complete/enhance_images_ui.py" "$horizon_context/enhance_images_ui.py"
   cp "$REPO_ROOT/images/horizon-complete/patch_federated_logout.py" "$horizon_context/patch_federated_logout.py"
+  mkdir -p "$horizon_context/ironic_policy"
+  cp "$REPO_ROOT/images/horizon-complete/ironic_policy/panel.py" "$horizon_context/ironic_policy/panel.py"
   cp "$REPO_ROOT/images/horizon-complete/image_catalog/index_split.html" "$horizon_context/image_catalog/index_split.html"
   cp "$REPO_ROOT/images/horizon-complete/platform_navigation.py" "$horizon_context/platform_navigation.py"
   cp "$REPO_ROOT/images/horizon-complete/region_selector.html" "$horizon_context/region_selector.html"
@@ -172,9 +177,11 @@ build_horizon_complete() {
   cp -a "$REPO_ROOT/images/horizon-complete/service_catalog/." "$horizon_context/service_catalog/"
   cp "$REPO_ROOT/deploy/config/tenant-service-catalog.yaml" "$horizon_context/tenant-service-catalog.yaml"
   cp "$REPO_ROOT/images/horizon-complete/settings/0001_production_region.py" "$horizon_context/settings/0001_production_region.py"
+  cp "$REPO_ROOT/images/horizon-complete/settings/0002_baremetal_access.py" "$horizon_context/settings/0002_baremetal_access.py"
   cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$horizon_context/openstack_vpc_dashboard.whl"
   cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
   cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"
+  cp "$BAREMETAL_ACCESS_DASHBOARD_REPO"/dist/openstack_baremetal_access_dashboard-*.whl "$horizon_context/openstack_baremetal_access_dashboard.whl"
   cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$horizon_context/octavia-workflow/"
   cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
   cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
@@ -200,6 +207,22 @@ build_loki_tenant_gateway() {
   build_context loki-tenant-gateway "$context" "$REGISTRY/loki-tenant-gateway:source-$BUILD_ID"
 }
 selected loki-tenant-gateway && build_loki_tenant_gateway
+
+build_baremetal_access_service() {
+  local context="$WORK_DIR/baremetal-access-service"
+  git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --quiet \
+    && git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --cached --quiet || {
+      echo "refusing dirty Bare Metal Access source: $NETBOX_IRONIC_CONTROLLER_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  cp "$NETBOX_IRONIC_CONTROLLER_REPO/Dockerfile" "$context/Dockerfile"
+  cp "$NETBOX_IRONIC_CONTROLLER_REPO/pyproject.toml" "$context/pyproject.toml"
+  cp -a "$NETBOX_IRONIC_CONTROLLER_REPO/netbox_ironic_controller" "$context/"
+  build_context baremetal-access-service "$context" \
+    "$REGISTRY/baremetal-access-service:source-$BUILD_ID"
+}
+selected baremetal-access-service && build_baremetal_access_service
 
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context

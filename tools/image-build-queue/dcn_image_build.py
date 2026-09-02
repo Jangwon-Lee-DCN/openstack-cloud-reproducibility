@@ -41,6 +41,9 @@ COMPONENTS = {
     "vpc-control-plane": ("platform-images", ("reproducibility", "vpc_control_plane")),
     "vpc-facade": ("platform-images", ("reproducibility", "vpc_control_plane")),
     "loki-tenant-gateway": ("platform-images", ("reproducibility",)),
+    "baremetal-access-service": (
+        "platform-images", ("reproducibility", "netbox_ironic_controller"),
+    ),
 }
 
 

@@ -7,6 +7,8 @@ BUILD_IMAGES=${BUILD_IMAGES:-0}
 VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
 START_AT=${START_AT:-mariadb}
 ONLY_RELEASE=${ONLY_RELEASE:-}
+DCN_BAREMETAL_ADMIN_PROJECT_ID=${DCN_BAREMETAL_ADMIN_PROJECT_ID:-29789b94354b470f9a92d3069a114a57}
+BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
 for command in kubectl helm sops python3 sha256sum curl; do
@@ -182,6 +184,13 @@ install_release() {
   esac
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
+  if [[ "$release" == "horizon" ]]; then
+    : "${DCN_BAREMETAL_ADMIN_PROJECT_ID:?exact DCN project UUID is required for Horizon}"
+    : "${BAREMETAL_ACCESS_API_URL:?Bare Metal Access API URL is required for Horizon}"
+    kubectl -n "$NAMESPACE" set env deployment/horizon \
+      "DCN_BAREMETAL_ADMIN_PROJECT_ID=$DCN_BAREMETAL_ADMIN_PROJECT_ID" \
+      "BAREMETAL_ACCESS_API_URL=$BAREMETAL_ACCESS_API_URL"
+  fi
   # Helm renders the Fernet repository as a read-only Secret volume. Restore
   # the permission-safe emptyDir + sync sidecar before waiting for Keystone's
   # rollout, otherwise its init container cannot chmod the Secret mount.

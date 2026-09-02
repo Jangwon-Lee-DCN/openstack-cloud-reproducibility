@@ -1,0 +1,28 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: baremetal-access-image-lock.dcn.ssu.ac.kr
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+  validations:
+    - expression: >-
+        object.metadata.namespace != 'netbox-ironic-controller' ||
+        object.metadata.name != 'baremetal-access' ||
+        object.spec.template.spec.containers.exists(c,
+          c.name == 'api' &&
+          c.image == 'registry.dcn.ssu.ac.kr/openstack/baremetal-access-service:source-99585783ee71b581dca9@sha256:b208d7bf2100ac7132f4c35239284c613f39af219579b4655b89ce92115132ea')
+      message: Bare Metal Access may only run the production-approved immutable image digest.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: baremetal-access-image-lock.dcn.ssu.ac.kr
+spec:
+  policyName: baremetal-access-image-lock.dcn.ssu.ac.kr
+  validationActions: [Deny]

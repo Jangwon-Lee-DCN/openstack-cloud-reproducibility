@@ -19,13 +19,16 @@ ADD https://tarballs.openstack.org/python-ironicclient/python_ironicclient-6.0.0
 COPY openstack_vpc_dashboard.whl /tmp/openstack_vpc_dashboard.whl
 COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
+COPY openstack_baremetal_access_dashboard.whl /tmp/openstack_baremetal_access_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
 COPY enhance_images_ui.py /tmp/enhance_images_ui.py
 COPY patch_federated_logout.py /tmp/patch_federated_logout.py
+COPY ironic_policy/panel.py /tmp/ironic-policy-panel.py
 COPY image_catalog/index_split.html /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/templates/project/images/index_split.html
 COPY platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/platform_navigation.py
 COPY enabled/_9999_platform_navigation.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_9999_platform_navigation.py
 COPY settings/0001_production_region.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0001_production_region.py
+COPY settings/0002_baremetal_access.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/local_settings.d/0002_baremetal_access.py
 COPY region_selector.html /var/lib/openstack/lib/python3.12/site-packages/horizon/templates/horizon/common/_region_selector.html
 COPY service_catalog/ /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/service_catalog/
 COPY enabled/_1380_dcn_service_catalog.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_1380_dcn_service_catalog.py
@@ -60,8 +63,11 @@ RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp
     && python3 -m zipfile -e /tmp/masakari_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/ironic_ui.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/python_ironicclient.whl /var/lib/openstack/lib/python3.12/site-packages \
+    && cp /tmp/ironic-policy-panel.py /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && python3 -m zipfile -e /tmp/openstack_telemetry_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/openstack_s3_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
+    && python3 -m zipfile -e /tmp/openstack_baremetal_access_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
+    && cp /var/lib/openstack/lib/python3.12/site-packages/baremetal_access_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/octavia_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/designatedashboard/enabled/_17*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/enabled/_31*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
@@ -140,7 +146,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && sed -i "s/region_name = request.COOKIES.get('services_region')/region_name = getattr(request.user, 'services_region', None) or request.COOKIES.get('services_region')/" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && sed -i "/region_name = getattr(request.user, 'services_region'/a\\    if region_name in ('RegionOne', 'RegionOne-VM'):\\n        region_name = None" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && grep -q "getattr(request.user, 'services_region'" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
-    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, ironic_ui, ironicclient, cloud_telemetry_dashboard, cloud_s3_dashboard, governance_dashboard" \
+    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, ironic_ui, ironicclient, cloud_telemetry_dashboard, cloud_s3_dashboard, governance_dashboard, baremetal_access_dashboard" \
     && grep -q 'remove_stock_actions(tables.InstancesTable, {"associate", "disassociate"})' /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/customization.py \
     && test ! -e /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/api/native_inventory.py \
     && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard \
@@ -152,9 +158,12 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_9010_manila_project_add_shares_panel_to_share_panel_group.py" \
     && test -f "$local_enabled/_50_masakaridashboard.py" \
     && test -f "$local_enabled/_2200_ironic.py" \
+    && test -f "$local_enabled/_1390_project_baremetal_access.py" \
+    && test -f "$local_enabled/_2210_admin_baremetal_approvals.py" \
     && grep -q "PANEL_DASHBOARD = 'admin'" "$local_enabled/_2200_ironic.py" \
-    && grep -q "openstack.roles.admin" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && grep -q "openstack.services.baremetal" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
+    && grep -q "DCN_BAREMETAL_ADMIN_PROJECT_ID" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
+    && grep -q "baremetal_admin" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && test -f "$local_enabled/_1610_project_metrics.py" \
     && test -f "$local_enabled/_1620_project_alarms.py" \
     && test -f "$local_enabled/_2610_admin_telemetry_health.py" \
