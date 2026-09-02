@@ -42,7 +42,8 @@ COPY track-b/governance_dashboard/enabled/_3122_governance_cost_budgets.py /var/
 COPY track-b/governance_dashboard/enabled/_3123_governance_aws_forecast.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3123_governance_aws_forecast.py
 COPY track-b/governance_dashboard/enabled/_3124_governance_cost_profiles.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/_3124_governance_cost_profiles.py
 
-RUN echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
+RUN chmod 0644 /etc/openstack-dashboard/dcn-service-catalog.yaml \
+    && echo "c0698143689bc25576799eb9558a0452874171995406230b72c8b79f4af8d56f  /tmp/octavia_dashboard.whl" | sha256sum -c - \
     && echo "5937bb7c901f59142d97afc14dd7e48b9e80ea679e9c25d214d5eb88b632716c  /tmp/designate_dashboard.whl" | sha256sum -c - \
     && echo "93139ab8e6401a7069fa22b0f39deecc9defd73eed62f0441b0923926914f72a  /tmp/magnum_ui.whl" | sha256sum -c - \
     && echo "4d2717f0e98202dfc8ef8f966186dec39ef221e1e4e666a4dc08a17445acb039  /tmp/python_magnumclient.whl" | sha256sum -c - \
@@ -188,6 +189,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && grep -q 'ADD_INSTALLED_APPS.*cloud_telemetry_dashboard' "$local_enabled/_1600_project_observability.py" \
     && grep -q 'ADD_INSTALLED_APPS.*cloud_s3_dashboard' "$local_enabled/_1930_project_s3.py" \
     && grep -q 'ADD_INSTALLED_APPS.*openstack_dashboard.service_catalog' "$local_enabled/_1380_dcn_service_catalog.py" \
+    && test -r /etc/openstack-dashboard/dcn-service-catalog.yaml \
     && grep -q 'baremetal-virtual' /etc/openstack-dashboard/dcn-service-catalog.yaml \
     && grep -q 'openstack_dashboard.platform_navigation' "$local_enabled/_9999_platform_navigation.py" \
     && grep -q 'ADD_INSTALLED_APPS' "$local_enabled/_1800_project_selfservice_app.py" \

@@ -30,3 +30,21 @@ class CatalogTest(unittest.TestCase):
             'ADD_INSTALLED_APPS = ["openstack_dashboard.service_catalog"]',
             enabled,
         )
+        dockerfile = (ROOT.parent / "images/horizon-complete/Dockerfile").read_text()
+        self.assertIn("chmod 0644 /etc/openstack-dashboard/dcn-service-catalog.yaml", dockerfile)
+
+    def test_instance_type_table_keeps_availability_separate_from_name(self):
+        root = ROOT.parent / "images/horizon-complete/service_catalog"
+        view = (root / "views.py").read_text()
+        template = (root / "templates/service_catalog/index.html").read_text()
+        self.assertIn("list_flavors(self.request.user)", view)
+        self.assertIn('LOG.exception("Flavor availability lookup failed")', view)
+        self.assertIn('data-availability="{{ flavor.availability }}"', template)
+        self.assertIn("Eligible hosts", template)
+        self.assertIn("Checked at", template)
+        self.assertIn("flavor.reason", template)
+
+    def test_horizon_reconciler_injects_internal_catalog_endpoint(self):
+        reconcile = (ROOT / "scripts/reconcile-full-stack.sh").read_text()
+        self.assertIn("FLAVOR_CATALOG_API_URL", reconcile)
+        self.assertIn("flavor-catalog.openstack.svc.cluster.local:8080", reconcile)
