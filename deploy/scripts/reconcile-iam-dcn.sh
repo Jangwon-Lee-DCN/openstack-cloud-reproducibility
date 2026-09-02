@@ -207,7 +207,7 @@ done
 declare -A PERSONA_ROLES=(
   [openstack-admins]="admin baremetal_admin"
   [openstack-operators]="member load-balancer_admin monitoring"
-  [openstack-members]="member baremetal_requester"
+  [openstack-members]="member"
   [openstack-readers]="reader"
   [openstack-network-operators]="member network-operator"
   [openstack-security-operators]="member security-operator"
@@ -234,6 +234,13 @@ declare -A PERSONA_ROLES=(
 declare -A DOMAIN_PERSONA_ROLES=(
   [openstack-domain-admins]="admin"
   [openstack-project-creators]="project-creator"
+)
+
+# Roles inherited by every project below the DCN domain. This is deliberately
+# requester-only: approval and unrestricted Ironic operations remain bound to
+# the administrative project and openstack-admins.
+declare -A INHERITED_PROJECT_ROLES=(
+  [openstack-members]="baremetal_requester"
 )
 
 echo "== ensuring Keycloak groups =="
@@ -317,6 +324,18 @@ for persona in "${!DOMAIN_PERSONA_ROLES[@]}"; do
     curl -sf -o /dev/null -X PUT -H "X-Auth-Token: ${OS_TOKEN}" \
       "${OS_AUTH_URL}/domains/${DOMAIN_ID}/groups/${group_id}/roles/${rid}"
     echo "ensured domain-scoped role '${role_name}' on group ${persona}"
+  done
+done
+
+echo "== ensuring roles inherited by every DCN-domain project =="
+for persona in "${!INHERITED_PROJECT_ROLES[@]}"; do
+  group_id=$(ensure_keystone_group "${persona}")
+  for role_name in ${INHERITED_PROJECT_ROLES[$persona]}; do
+    rid=$(role_id "${role_name}")
+    test -n "${rid}"
+    curl -sf -o /dev/null -X PUT -H "X-Auth-Token: ${OS_TOKEN}" \
+      "${OS_AUTH_URL}/OS-INHERIT/domains/${DOMAIN_ID}/groups/${group_id}/roles/${rid}/inherited_to_projects"
+    echo "ensured inherited project role '${role_name}' on group ${persona}"
   done
 done
 
