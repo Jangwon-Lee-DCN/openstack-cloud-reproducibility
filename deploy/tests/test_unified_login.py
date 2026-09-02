@@ -58,6 +58,16 @@ def test_iam_reconciler_creates_baremetal_roles_and_limits_admin_marker():
     assert 'startswith("service-account-")' in reconciler
 
 
+def test_unified_login_proves_default_member_can_open_baremetal_requests():
+    runner = (ROOT / "deploy/scripts/verify-unified-login-browser.sh").read_text()
+    browser = (ROOT / "deploy/scripts/verify-unified-login-browser.js").read_text()
+    assert '/users/$user_id/groups/$group_id' not in runner
+    assert "Bare Metal Access" in browser
+    assert "/horizon/project/baremetal_access/" in browser
+    assert "Request nodes" in browser
+    assert "baseline DCN member received approval UI" in browser
+
+
 def test_horizon_image_flushes_local_session_before_oidc_logout():
     patcher = (ROOT / "images/horizon-complete/patch_federated_logout.py").read_text()
     dockerfile = (ROOT / "images/horizon-complete/Dockerfile").read_text()

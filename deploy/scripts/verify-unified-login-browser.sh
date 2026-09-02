@@ -36,11 +36,9 @@ user_id=$(${kc_curl[@]} -H "Authorization: Bearer $token" \
   "http://$kc_host:8080/admin/realms/dcn/users?username=$username&exact=true" | jq -er '.[0].id')
 group_id=$(${kc_curl[@]} -H "Authorization: Bearer $token" \
   "http://$kc_host:8080/admin/realms/dcn/groups?search=openstack-members&exact=true" | jq -er '.[] | select(.name=="openstack-members") | .id')
-${kc_curl[@]} -X PUT -H "Authorization: Bearer $token" \
-  "http://$kc_host:8080/admin/realms/dcn/users/$user_id/groups/$group_id" >/dev/null
 
-# The acceptance user may authenticate through either Keycloak replica. Do not
-# race the distributed user/group cache after assigning the mapped group.
+# The user was created without an explicit group assignment. This wait proves
+# that the realm default supplies openstack-members on every Keycloak replica.
 membership_deadline=$((SECONDS + 60))
 while :; do
   membership_ready=1
