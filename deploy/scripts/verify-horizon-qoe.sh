@@ -32,23 +32,27 @@ cookie="$work_dir/cookies"
 # Unified login redirects the visible entry to OIDC, so it no longer renders
 # Horizon's credential form.  The QoE probe still uses the dedicated Keystone
 # admin account through Horizon's CSRF-protected credential endpoint.
-csrf=$(openssl rand -hex 16)
-
 username=$(secret_value OS_USERNAME)
 password=$(secret_value OS_PASSWORD)
 domain=$(secret_value OS_USER_DOMAIN_NAME)
-status=$(curl "${curl_args[@]}" -b "csrftoken=$csrf" -c "$cookie" -o "$work_dir/auth-response" \
-  -w '%{http_code}' -X POST "$HORIZON_URL/auth/login/" \
-  -H "Origin: ${HORIZON_URL%/horizon}" \
-  --data-urlencode "csrfmiddlewaretoken=$csrf" \
-  --data-urlencode auth_type=credentials \
-  --data-urlencode region=0 \
-  --data-urlencode "username=$username" \
-  --data-urlencode "password=$password" \
-  --data-urlencode "domain=$domain" \
-  -e "$HORIZON_URL/auth/login/")
+status=
+for attempt in 1 2 3 4 5 6; do
+  csrf=$(openssl rand -hex 16)
+  status=$(curl "${curl_args[@]}" -b "csrftoken=$csrf" -c "$cookie" -o "$work_dir/auth-response" \
+    -w '%{http_code}' -X POST "$HORIZON_URL/auth/login/" \
+    -H "Origin: ${HORIZON_URL%/horizon}" \
+    --data-urlencode "csrfmiddlewaretoken=$csrf" \
+    --data-urlencode auth_type=credentials \
+    --data-urlencode region=0 \
+    --data-urlencode "username=$username" \
+    --data-urlencode "password=$password" \
+    --data-urlencode "domain=$domain" \
+    -e "$HORIZON_URL/auth/login/")
+  [[ $status == 302 || $status == 303 ]] && break
+  sleep 2
+done
 unset username password domain
-if [[ "$status" != 302 ]]; then
+if [[ "$status" != 302 && "$status" != 303 ]]; then
   echo "Horizon benchmark login failed: HTTP $status" >&2
   python3 - "$work_dir/auth-response" <<'PY' >&2
 import re, sys
