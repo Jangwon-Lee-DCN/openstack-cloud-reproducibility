@@ -207,7 +207,7 @@ done
 declare -A PERSONA_ROLES=(
   [openstack-admins]="admin baremetal_admin"
   [openstack-operators]="member load-balancer_admin monitoring"
-  [openstack-members]="member"
+  [openstack-members]="member baremetal_requester"
   [openstack-readers]="reader"
   [openstack-network-operators]="member network-operator"
   [openstack-security-operators]="member security-operator"
@@ -248,6 +248,28 @@ for persona in "${!PERSONA_ROLES[@]}" "${!DOMAIN_PERSONA_ROLES[@]}"; do
     echo "Keycloak group ${persona} already present"
   fi
 done
+
+# Every human identity in the dcn realm receives the baseline member persona.
+# Setting the realm default covers future local users; the Google broker's
+# hardcoded mapper covers future brokered users. Reconciliation below also
+# repairs existing users without removing any elevated persona membership.
+echo "== ensuring the default DCN member group for current and future users =="
+member_group_id=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+  "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/groups?search=openstack-members&exact=true" | jq -r '.[0].id // empty')
+test -n "${member_group_id}"
+realm_payload=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+  "http://${KEYCLOAK_SVC}/admin/realms/${REALM}" | jq \
+  '.defaultGroups = (((.defaultGroups // []) + ["/openstack-members"]) | unique)')
+curl -sf -X PUT -H "Authorization: Bearer ${KC_TOKEN}" -H 'Content-Type: application/json' \
+  -d "${realm_payload}" "http://${KEYCLOAK_SVC}/admin/realms/${REALM}" >/dev/null
+unset realm_payload
+while read -r user_id; do
+  test -n "${user_id}" || continue
+  curl -sf -o /dev/null -X PUT -H "Authorization: Bearer ${KC_TOKEN}" \
+    "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/users/${user_id}/groups/${member_group_id}"
+done < <(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
+  "http://${KEYCLOAK_SVC}/admin/realms/${REALM}/users?max=1000" | jq -r \
+  '.[] | select(.enabled != false and (.username | startswith("service-account-") | not)) | .id')
 
 role_id() {
   curl -sf -H "X-Auth-Token: ${OS_TOKEN}" "${OS_AUTH_URL}/roles?name=$1" | jq -r '.roles[0].id // empty'
