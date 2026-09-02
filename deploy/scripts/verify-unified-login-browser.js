@@ -79,6 +79,14 @@ const assert = require('node:assert/strict');
   const deepLinkBody = await page.locator('body').innerText();
   assert.equal(new URL(page.url()).origin, cloud, `deep link left Horizon: ${page.url()}`);
   assert(!/Something went wrong|Internal Server Error|Forbidden|권한 오류/i.test(deepLinkBody), deepLinkBody.slice(0, 2000));
+  const bareMetalAccess = page.getByRole('link', {name: 'Bare Metal Access', exact: true});
+  await bareMetalAccess.waitFor();
+  await bareMetalAccess.click();
+  await page.waitForURL(url => url.pathname.startsWith('/horizon/project/baremetal_access/'));
+  await page.waitForLoadState('networkidle');
+  const bareMetalBody = await page.locator('body').innerText();
+  assert(/Request nodes/i.test(bareMetalBody), `Bare Metal request UI did not render: ${bareMetalBody.slice(0, 1000)}`);
+  assert(!/Bare Metal Approvals/i.test(bareMetalBody), 'baseline DCN member received approval UI');
   assert.equal(failures.length, 0, failures.join('\n'));
 
   await page.locator('.user-menu .dropdown-toggle').click();
