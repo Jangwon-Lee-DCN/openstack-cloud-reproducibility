@@ -14,6 +14,9 @@ class FlavorCatalogDeploymentTest(unittest.TestCase):
         service = next(x for x in docs if x["kind"] == "Service")
         policy = next(x for x in docs if x["kind"] == "NetworkPolicy")
         self.assertEqual(2, deployment["spec"]["replicas"])
+        spread = deployment["spec"]["template"]["spec"]["topologySpreadConstraints"][0]
+        self.assertEqual("kubernetes.io/hostname", spread["topologyKey"])
+        self.assertEqual("DoNotSchedule", spread["whenUnsatisfiable"])
         self.assertEqual("FLAVOR_CATALOG_IMAGE", deployment["spec"]["template"]["spec"]["containers"][0]["image"])
         self.assertEqual("ClusterIP", service["spec"].get("type", "ClusterIP"))
         self.assertEqual(["Ingress", "Egress"], policy["spec"]["policyTypes"])
