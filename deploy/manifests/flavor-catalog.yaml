@@ -10,6 +10,7 @@ spec:
   template:
     metadata: {labels: {application: flavor-catalog, component: api}}
     spec:
+      securityContext: {seccompProfile: {type: RuntimeDefault}}
       imagePullSecrets: [{name: telemetry-harbor-push}]
       nodeSelector: {openstack-control-plane: enabled}
       topologySpreadConstraints:
@@ -36,8 +37,10 @@ spec:
           resources:
             requests: {cpu: 25m, memory: 64Mi}
             limits: {cpu: 500m, memory: 256Mi}
+          volumeMounts: [{name: runtime, mountPath: /tmp}]
           readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 3, periodSeconds: 10}
           livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 20}
+      volumes: [{name: runtime, emptyDir: {}}]
 ---
 apiVersion: v1
 kind: Service
