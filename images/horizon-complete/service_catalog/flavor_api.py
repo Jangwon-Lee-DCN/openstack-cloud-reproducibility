@@ -14,7 +14,7 @@ def _token_id(user):
     return getattr(token, "id", token) if token else None
 
 
-def list_flavors(user):
+def get_catalog(user):
     token = _token_id(user)
     if not token:
         raise ValueError("project-scoped user token is unavailable")
@@ -25,6 +25,12 @@ def list_flavors(user):
     )
     response.raise_for_status()
     value = response.json()
-    if value.get("schema") != "dcn.ssu.ac.kr/flavor-availability/v1":
+    if value.get("schema") != "dcn.ssu.ac.kr/flavor-availability/v2":
         raise ValueError("unexpected Flavor availability schema")
-    return value["flavors"]
+    if not isinstance(value.get("flavors"), list):
+        raise ValueError("incomplete Flavor availability response")
+    return value
+
+
+def list_flavors(user):
+    return get_catalog(user)["flavors"]

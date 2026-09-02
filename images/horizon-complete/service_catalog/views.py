@@ -4,7 +4,7 @@ import logging
 from django.views import generic
 import yaml
 
-from .flavor_api import list_flavors
+from .flavor_api import get_catalog
 
 
 CATALOG = os.getenv("DCN_SERVICE_CATALOG", "/etc/openstack-dashboard/dcn-service-catalog.yaml")
@@ -28,7 +28,8 @@ class IndexView(generic.TemplateView):
                 continue
             services.append({"name": name.replace("-", " ").title(), **item})
         try:
-            flavors = list_flavors(self.request.user)
+            catalog = get_catalog(self.request.user)
+            flavors = catalog["flavors"]
             flavor_error = None
         except Exception:
             LOG.exception("Flavor availability lookup failed")

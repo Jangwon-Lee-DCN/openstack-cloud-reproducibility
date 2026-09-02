@@ -18,7 +18,7 @@
 <table class="table table-striped table-rsp" id="dcn-flavor-catalog">
   <thead><tr>
     <th>{% trans "Flavor" %}</th><th>{% trans "vCPU" %}</th><th>{% trans "RAM" %}</th>
-    <th>{% trans "Root disk" %}</th><th>{% trans "Capabilities" %}</th>
+    <th>{% trans "Root disk" %}</th><th>{% trans "Capabilities" %}</th><th>{% trans "Accelerator guarantee" %}</th>
     <th>{% trans "Availability" %}</th><th>{% trans "Eligible hosts" %}</th><th>{% trans "Checked at" %}</th><th>{% trans "Reason" %}</th>
   </tr></thead>
   <tbody>
@@ -27,11 +27,12 @@
       <td><strong>{{ flavor.name }}</strong><br><small>{{ flavor.lifecycle|upper }}</small></td>
       <td>{{ flavor.vcpus }}</td><td>{% widthratio flavor.ram_mb 1024 1 %} GiB</td><td>{{ flavor.disk_gb }} GiB</td>
       <td>{{ flavor.capabilities|join:", "|default:"Standard" }}</td>
+      <td>{% if flavor.accelerator %}<strong>{{ flavor.accelerator.vendor }} {{ flavor.accelerator.model }}</strong><br><small>{{ flavor.accelerator.quantity }} device · {{ flavor.accelerator.memory_gib }} GiB · {{ flavor.accelerator.delivery }} · {{ flavor.accelerator.isolation }}</small>{% else %}-{% endif %}</td>
       <td><span class="label {% if flavor.availability == 'available' %}label-success{% elif flavor.availability == 'constrained' %}label-warning{% else %}label-danger{% endif %}">{{ flavor.availability|upper }}</span></td>
       <td>{{ flavor.eligible_hosts }}</td><td>{{ flavor.checked_at }}</td><td>{{ flavor.reason }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="9">{% trans "No verified instance type is currently available." %}</td></tr>
+    <tr><td colspan="10">{% trans "No verified instance type is currently available." %}</td></tr>
   {% endfor %}
   </tbody>
 </table>
