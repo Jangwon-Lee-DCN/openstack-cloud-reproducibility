@@ -38,6 +38,7 @@ class CatalogTest(unittest.TestCase):
         self.assertIn("list_flavors(self.request.user)", view)
         self.assertIn('data-availability="{{ flavor.availability }}"', template)
         self.assertIn("Eligible hosts", template)
+        self.assertIn("Checked at", template)
         self.assertIn("flavor.reason", template)
 
     def test_horizon_reconciler_injects_internal_catalog_endpoint(self):

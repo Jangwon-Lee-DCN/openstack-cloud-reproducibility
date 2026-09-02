@@ -19,7 +19,7 @@
   <thead><tr>
     <th>{% trans "Flavor" %}</th><th>{% trans "vCPU" %}</th><th>{% trans "RAM" %}</th>
     <th>{% trans "Root disk" %}</th><th>{% trans "Capabilities" %}</th>
-    <th>{% trans "Availability" %}</th><th>{% trans "Eligible hosts" %}</th><th>{% trans "Reason" %}</th>
+    <th>{% trans "Availability" %}</th><th>{% trans "Eligible hosts" %}</th><th>{% trans "Checked at" %}</th><th>{% trans "Reason" %}</th>
   </tr></thead>
   <tbody>
   {% for flavor in flavors %}
@@ -28,10 +28,10 @@
       <td>{{ flavor.vcpus }}</td><td>{% widthratio flavor.ram_mb 1024 1 %} GiB</td><td>{{ flavor.disk_gb }} GiB</td>
       <td>{{ flavor.capabilities|join:", "|default:"Standard" }}</td>
       <td><span class="label {% if flavor.availability == 'available' %}label-success{% elif flavor.availability == 'constrained' %}label-warning{% else %}label-danger{% endif %}">{{ flavor.availability|upper }}</span></td>
-      <td>{{ flavor.eligible_hosts }}</td><td>{{ flavor.reason }}</td>
+      <td>{{ flavor.eligible_hosts }}</td><td>{{ flavor.checked_at }}</td><td>{{ flavor.reason }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="8">{% trans "No verified instance type is currently available." %}</td></tr>
+    <tr><td colspan="9">{% trans "No verified instance type is currently available." %}</td></tr>
   {% endfor %}
   </tbody>
 </table>
