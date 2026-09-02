@@ -38,6 +38,7 @@ class CatalogTest(unittest.TestCase):
         view = (root / "views.py").read_text()
         template = (root / "templates/service_catalog/index.html").read_text()
         self.assertIn("list_flavors(self.request.user)", view)
+        self.assertIn('LOG.exception("Flavor availability lookup failed")', view)
         self.assertIn('data-availability="{{ flavor.availability }}"', template)
         self.assertIn("Eligible hosts", template)
         self.assertIn("Checked at", template)

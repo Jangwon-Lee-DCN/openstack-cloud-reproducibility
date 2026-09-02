@@ -1,4 +1,5 @@
 import os
+import logging
 
 from django.views import generic
 import yaml
@@ -7,6 +8,7 @@ from .flavor_api import list_flavors
 
 
 CATALOG = os.getenv("DCN_SERVICE_CATALOG", "/etc/openstack-dashboard/dcn-service-catalog.yaml")
+LOG = logging.getLogger(__name__)
 
 
 class IndexView(generic.TemplateView):
@@ -29,6 +31,7 @@ class IndexView(generic.TemplateView):
             flavors = list_flavors(self.request.user)
             flavor_error = None
         except Exception:
+            LOG.exception("Flavor availability lookup failed")
             flavors = []
             flavor_error = "Flavor availability is temporarily unavailable. No Flavor is assumed launchable."
         context.update(
