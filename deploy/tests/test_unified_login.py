@@ -52,7 +52,9 @@ def test_iam_reconciler_creates_baremetal_roles_and_limits_admin_marker():
     for role in ("baremetal_admin", "baremetal_requester", "baremetal_operator"):
         assert role in reconciler
     assert '[openstack-admins]="admin baremetal_admin"' in reconciler
-    assert '[openstack-members]="member baremetal_requester"' in reconciler
+    assert '[openstack-members]="member"' in reconciler
+    assert '[openstack-members]="baremetal_requester"' in reconciler
+    assert '/OS-INHERIT/domains/${DOMAIN_ID}/groups/${group_id}/roles/${rid}/inherited_to_projects' in reconciler
     assert '"/openstack-members"' in reconciler
     assert '/groups/${member_group_id}' in reconciler
     assert 'startswith("service-account-")' in reconciler
