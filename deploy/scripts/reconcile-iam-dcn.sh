@@ -236,13 +236,6 @@ declare -A DOMAIN_PERSONA_ROLES=(
   [openstack-project-creators]="project-creator"
 )
 
-# Roles inherited by every project below the DCN domain. This is deliberately
-# requester-only: approval and unrestricted Ironic operations remain bound to
-# the administrative project and openstack-admins.
-declare -A INHERITED_PROJECT_ROLES=(
-  [openstack-members]="baremetal_requester"
-)
-
 echo "== ensuring Keycloak groups =="
 for persona in "${!PERSONA_ROLES[@]}" "${!DOMAIN_PERSONA_ROLES[@]}"; do
   existing=$(curl -sf -H "Authorization: Bearer ${KC_TOKEN}" \
@@ -327,17 +320,31 @@ for persona in "${!DOMAIN_PERSONA_ROLES[@]}"; do
   done
 done
 
-echo "== ensuring roles inherited by every DCN-domain project =="
-for persona in "${!INHERITED_PROJECT_ROLES[@]}"; do
-  group_id=$(ensure_keystone_group "${persona}")
-  for role_name in ${INHERITED_PROJECT_ROLES[$persona]}; do
-    rid=$(role_id "${role_name}")
-    test -n "${rid}"
-    curl -sf -o /dev/null -X PUT -H "X-Auth-Token: ${OS_TOKEN}" \
-      "${OS_AUTH_URL}/OS-INHERIT/domains/${DOMAIN_ID}/groups/${group_id}/roles/${rid}/inherited_to_projects"
-    echo "ensured inherited project role '${role_name}' on group ${persona}"
-  done
-done
+# Never grant the baseline group a role inherited to every project in the
+# domain. Keystone treats such a role as project access, so doing that makes
+# every DCN-domain project appear in every member's Horizon project switcher.
+# Remove the legacy assignment idempotently in case an older release created
+# it. Bare Metal requester access must be granted only in projects where the
+# principal is actually a member (the dcn project is handled below; owned
+# projects are handled by their membership lifecycle).
+echo "== removing unsafe legacy domain-inherited requester assignment =="
+member_group_id=$(ensure_keystone_group openstack-members)
+requester_role_id=$(role_id baremetal_requester)
+test -n "${requester_role_id}"
+legacy_inherited_url="${OS_AUTH_URL}/OS-INHERIT/domains/${DOMAIN_ID}/groups/${member_group_id}/roles/${requester_role_id}/inherited_to_projects"
+legacy_status=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "X-Auth-Token: ${OS_TOKEN}" \
+  "${legacy_inherited_url}")
+case "${legacy_status}" in
+  204|404) echo "legacy inherited baremetal_requester assignment is absent" ;;
+  *) echo "failed to remove legacy inherited baremetal_requester assignment (HTTP ${legacy_status})" >&2; exit 1 ;;
+esac
+
+# The shared administrative project is the only project assigned to the
+# baseline group itself. This preserves requester access there without
+# manufacturing access to unrelated projects.
+curl -sf -o /dev/null -X PUT -H "X-Auth-Token: ${OS_TOKEN}" \
+  "${OS_AUTH_URL}/projects/${PROJECT_ID}/groups/${member_group_id}/roles/${requester_role_id}"
+echo "ensured project-scoped role 'baremetal_requester' on group openstack-members"
 
 echo "== reconciling keycloak-dcn Keystone federation mapping =="
 MAPPING_RULES=$(cat <<EOF

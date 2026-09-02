@@ -53,8 +53,11 @@ def test_iam_reconciler_creates_baremetal_roles_and_limits_admin_marker():
         assert role in reconciler
     assert '[openstack-admins]="admin baremetal_admin"' in reconciler
     assert '[openstack-members]="member"' in reconciler
-    assert '[openstack-members]="baremetal_requester"' in reconciler
-    assert '/OS-INHERIT/domains/${DOMAIN_ID}/groups/${group_id}/roles/${rid}/inherited_to_projects' in reconciler
+    assert 'INHERITED_PROJECT_ROLES' not in reconciler
+    assert '/OS-INHERIT/domains/${DOMAIN_ID}/groups/${member_group_id}/roles/${requester_role_id}/inherited_to_projects' in reconciler
+    assert '-X DELETE' in reconciler
+    assert 'legacy inherited baremetal_requester assignment is absent' in reconciler
+    assert '/projects/${PROJECT_ID}/groups/${member_group_id}/roles/${requester_role_id}' in reconciler
     assert '"/openstack-members"' in reconciler
     assert '/groups/${member_group_id}' in reconciler
     assert 'startswith("service-account-")' in reconciler
