@@ -53,13 +53,16 @@ for release in $(helm list -n "$NAMESPACE" -q); do
   [[ "$status" == deployed ]] || { echo "$release status=$status" >&2; exit 1; }
 done
 
-kubectl get pods -n "$NAMESPACE" -o json | python3 /dev/fd/3 3<<'PODCHECK'
+kubectl get pods -n "$NAMESPACE" -o json | ALLOWED_UNREADY_PODS="${ALLOWED_UNREADY_PODS:-}" python3 /dev/fd/3 3<<'PODCHECK'
 import json
+import os
 import sys
 
 pods = json.load(sys.stdin)["items"]
+allowed = {name for name in os.environ.get("ALLOWED_UNREADY_PODS", "").split(",") if name}
 bad = []
 historical = []
+seen_allowed = set()
 for pod in pods:
     name = pod["metadata"]["name"]
     phase = pod.get("status", {}).get("phase", "Unknown")
@@ -72,7 +75,16 @@ for pod in pods:
         continue
     statuses = pod.get("status", {}).get("containerStatuses", [])
     if phase != "Running" or any(not status.get("ready", False) for status in statuses):
+        if name in allowed:
+            seen_allowed.add(name)
+            print(f"warning: accepting explicitly allowed unready Pod: {name}", file=sys.stderr)
+            continue
         bad.append(f"{name}: phase={phase}, owner={owner_kind or 'none'}")
+
+missing = allowed - seen_allowed
+if missing:
+    print("allowed unready Pods were not observed unready: " + ", ".join(sorted(missing)), file=sys.stderr)
+    raise SystemExit(1)
 
 for name in historical:
     print(f"warning: ignoring retained terminal test/job Pod: {name}", file=sys.stderr)
