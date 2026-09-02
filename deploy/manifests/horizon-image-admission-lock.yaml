@@ -16,8 +16,11 @@ spec:
         object.metadata.name != 'horizon' ||
         object.spec.template.spec.containers.exists(c,
           c.name == 'horizon' &&
-          c.image == 'registry.dcn.ssu.ac.kr/openstack/horizon:source-1056323b523544bf45b8@sha256:fcba0e71a33b5d873ea5fe595203bbdf811234ba88dee2c720a9f152f3a5f8fa')
-      message: Horizon may only run the production-approved immutable image digest.
+          c.image in [
+            'registry.dcn.ssu.ac.kr/openstack/horizon:source-3b143ede50340f105785@sha256:4a763abde9c848fe1c2253acc32efeec0526011627e95e029363921cf4c6264a',
+            'registry.dcn.ssu.ac.kr/openstack/horizon:source-1056323b523544bf45b8@sha256:fcba0e71a33b5d873ea5fe595203bbdf811234ba88dee2c720a9f152f3a5f8fa'
+          ])
+      message: Horizon may only run the production-approved release or rollback image digest.
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
