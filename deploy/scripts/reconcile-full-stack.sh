@@ -9,6 +9,7 @@ START_AT=${START_AT:-mariadb}
 ONLY_RELEASE=${ONLY_RELEASE:-}
 DCN_BAREMETAL_ADMIN_PROJECT_ID=${DCN_BAREMETAL_ADMIN_PROJECT_ID:-29789b94354b470f9a92d3069a114a57}
 BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
+FLAVOR_CATALOG_API_URL=${FLAVOR_CATALOG_API_URL:-http://flavor-catalog.openstack.svc.cluster.local:8080}
 HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
 HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-3b143ede50340f105785@sha256:4a763abde9c848fe1c2253acc32efeec0526011627e95e029363921cf4c6264a
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
@@ -197,9 +198,11 @@ install_release() {
   if [[ "$release" == "horizon" ]]; then
     : "${DCN_BAREMETAL_ADMIN_PROJECT_ID:?exact DCN project UUID is required for Horizon}"
     : "${BAREMETAL_ACCESS_API_URL:?Bare Metal Access API URL is required for Horizon}"
+    : "${FLAVOR_CATALOG_API_URL:?Flavor Catalog API URL is required for Horizon}"
     kubectl -n "$NAMESPACE" set env deployment/horizon \
       "DCN_BAREMETAL_ADMIN_PROJECT_ID=$DCN_BAREMETAL_ADMIN_PROJECT_ID" \
-      "BAREMETAL_ACCESS_API_URL=$BAREMETAL_ACCESS_API_URL"
+      "BAREMETAL_ACCESS_API_URL=$BAREMETAL_ACCESS_API_URL" \
+      "FLAVOR_CATALOG_API_URL=$FLAVOR_CATALOG_API_URL"
   fi
   # Helm renders the Fernet repository as a read-only Secret volume. Restore
   # the permission-safe emptyDir + sync sidecar before waiting for Keystone's

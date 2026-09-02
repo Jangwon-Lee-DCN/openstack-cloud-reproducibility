@@ -12,4 +12,27 @@
   {% endfor %}
   </tbody>
 </table>
+<div class="page-header"><h2>{% trans "Instance types" %}</h2></div>
+<p>{% trans "The name and resource shape are stable product properties. Availability is evaluated separately from current Placement and capability state." %}</p>
+{% if flavor_error %}<div class="alert alert-warning" role="alert">{{ flavor_error }}</div>{% endif %}
+<table class="table table-striped table-rsp" id="dcn-flavor-catalog">
+  <thead><tr>
+    <th>{% trans "Flavor" %}</th><th>{% trans "vCPU" %}</th><th>{% trans "RAM" %}</th>
+    <th>{% trans "Root disk" %}</th><th>{% trans "Capabilities" %}</th>
+    <th>{% trans "Availability" %}</th><th>{% trans "Eligible hosts" %}</th><th>{% trans "Reason" %}</th>
+  </tr></thead>
+  <tbody>
+  {% for flavor in flavors %}
+    <tr data-flavor="{{ flavor.name }}" data-availability="{{ flavor.availability }}">
+      <td><strong>{{ flavor.name }}</strong><br><small>{{ flavor.lifecycle|upper }}</small></td>
+      <td>{{ flavor.vcpus }}</td><td>{% widthratio flavor.ram_mb 1024 1 %} GiB</td><td>{{ flavor.disk_gb }} GiB</td>
+      <td>{{ flavor.capabilities|join:", "|default:"Standard" }}</td>
+      <td><span class="label {% if flavor.availability == 'available' %}label-success{% elif flavor.availability == 'constrained' %}label-warning{% else %}label-danger{% endif %}">{{ flavor.availability|upper }}</span></td>
+      <td>{{ flavor.eligible_hosts }}</td><td>{{ flavor.reason }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8">{% trans "No verified instance type is currently available." %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
 {% endblock %}

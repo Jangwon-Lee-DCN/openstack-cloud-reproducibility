@@ -3,6 +3,8 @@ import os
 from django.views import generic
 import yaml
 
+from .flavor_api import list_flavors
+
 
 CATALOG = os.getenv("DCN_SERVICE_CATALOG", "/etc/openstack-dashboard/dcn-service-catalog.yaml")
 
@@ -23,5 +25,14 @@ class IndexView(generic.TemplateView):
             if item["audience"] == "admin" and not is_admin:
                 continue
             services.append({"name": name.replace("-", " ").title(), **item})
-        context.update(region=value["region"], services=services)
+        try:
+            flavors = list_flavors(self.request.user)
+            flavor_error = None
+        except Exception:
+            flavors = []
+            flavor_error = "Flavor availability is temporarily unavailable. No Flavor is assumed launchable."
+        context.update(
+            region=value["region"], services=services, flavors=flavors,
+            flavor_error=flavor_error,
+        )
         return context
