@@ -22,10 +22,11 @@ pod:
   topology_spread_constraints:
     - maxSkew: 1
       topologyKey: topology.kubernetes.io/zone
-      # Keep rolling upgrades possible while one rack's controller is cordoned.
-      # The scheduler still prefers even rack placement and will use another
-      # healthy rack instead of deadlocking the Deployment rollout.
-      whenUnsatisfiable: ScheduleAnyway
+      # Count only the current ReplicaSet while rolling out, and reject a
+      # same-rack duplicate instead of silently satisfying the old revision.
+      whenUnsatisfiable: DoNotSchedule
+      matchLabelKeys:
+        - pod-template-hash
       labelSelector:
         matchLabels:
           application: horizon
