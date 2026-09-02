@@ -9,7 +9,14 @@ START_AT=${START_AT:-mariadb}
 ONLY_RELEASE=${ONLY_RELEASE:-}
 DCN_BAREMETAL_ADMIN_PROJECT_ID=${DCN_BAREMETAL_ADMIN_PROJECT_ID:-29789b94354b470f9a92d3069a114a57}
 BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
+HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
+HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-1056323b523544bf45b8@sha256:fcba0e71a33b5d873ea5fe595203bbdf811234ba88dee2c720a9f152f3a5f8fa
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
+
+if [[ -n "$HORIZON_IMAGE_OVERRIDE" && "$HORIZON_IMAGE_OVERRIDE" != "$HORIZON_ROLLBACK_IMAGE" ]]; then
+  echo "Horizon override is restricted to the production-approved rollback digest" >&2
+  exit 2
+fi
 
 for command in kubectl helm sops python3 sha256sum curl; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
@@ -182,6 +189,9 @@ install_release() {
       value_args+=( -f "$database_values" )
       ;;
   esac
+  if [[ "$release" == "horizon" && -n "$HORIZON_IMAGE_OVERRIDE" ]]; then
+    value_args+=( --set-string "images.tags.horizon=$HORIZON_IMAGE_OVERRIDE" )
+  fi
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
   if [[ "$release" == "horizon" ]]; then

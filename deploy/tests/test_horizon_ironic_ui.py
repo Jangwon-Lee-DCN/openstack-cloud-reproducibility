@@ -60,3 +60,10 @@ def test_every_horizon_builder_uses_baremetal_dashboard_repository():
         builder = (ROOT / relative).read_text()
         assert "BAREMETAL_ACCESS_DASHBOARD_REPO" in builder
         assert "openstack_baremetal_access_dashboard-*.whl" in builder
+
+
+def test_horizon_reconciler_allows_only_the_approved_rollback_override():
+    reconciler = (ROOT / "deploy/scripts/reconcile-full-stack.sh").read_text()
+    assert "HORIZON_IMAGE_OVERRIDE" in reconciler
+    assert "HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-1056323b523544bf45b8@sha256:fcba0e71a33b5d873ea5fe595203bbdf811234ba88dee2c720a9f152f3a5f8fa" in reconciler
+    assert "override is restricted to the production-approved rollback digest" in reconciler
