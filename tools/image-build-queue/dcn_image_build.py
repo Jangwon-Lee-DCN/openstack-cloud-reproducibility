@@ -38,6 +38,7 @@ COMPONENTS = {
     "aodh": ("platform-images", ("reproducibility",)),
     "keycloak": ("platform-images", ("reproducibility",)),
     "project-facade": ("platform-images", ("reproducibility",)),
+    "flavor-catalog": ("platform-images", ("reproducibility", "cloud_services")),
     "vpc-control-plane": ("platform-images", ("reproducibility", "vpc_control_plane")),
     "vpc-facade": ("platform-images", ("reproducibility", "vpc_control_plane")),
     "loki-tenant-gateway": ("platform-images", ("reproducibility",)),

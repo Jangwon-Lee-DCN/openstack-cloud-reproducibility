@@ -37,6 +37,15 @@ class QueueTests(unittest.TestCase):
             "baremetal_access_dashboard", queue.COMPONENTS["horizon-complete"][1],
         )
 
+    def test_flavor_catalog_requires_its_service_source(self):
+        self.assertEqual(
+            ("reproducibility", "cloud_services"),
+            queue.COMPONENTS["flavor-catalog"][1],
+        )
+        source = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("selected flavor-catalog", source)
+        self.assertIn("CLOUD_SERVICES_REPO", source)
+
     def test_service_supplies_a_build_capable_python(self):
         service = (ROOT / "dcn-image-build-queue.service").read_text()
         installer = (ROOT / "install.sh").read_text()

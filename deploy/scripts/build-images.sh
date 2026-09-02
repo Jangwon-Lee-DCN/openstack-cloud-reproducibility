@@ -27,6 +27,7 @@ MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
 NETBOX_IRONIC_CONTROLLER_REPO=${NETBOX_IRONIC_CONTROLLER_REPO:-$REPO_ROOT/../netbox-ironic-controller}
+CLOUD_SERVICES_REPO=${CLOUD_SERVICES_REPO:-$REPO_ROOT/../openstack-cloud-services}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -199,6 +200,19 @@ selected neutron-fwaas && simple_context neutron-fwaas neutron
 selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
 selected project-facade && simple_context project-facade
+
+build_flavor_catalog() {
+  local context="$WORK_DIR/flavor-catalog"
+  git -C "$CLOUD_SERVICES_REPO" diff --quiet \
+    && git -C "$CLOUD_SERVICES_REPO" diff --cached --quiet || {
+      echo "refusing dirty Flavor Catalog source: $CLOUD_SERVICES_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  cp -a "$CLOUD_SERVICES_REPO/services/flavor-catalog/." "$context/"
+  build_context flavor-catalog "$context" "$REGISTRY/flavor-catalog:source-$BUILD_ID"
+}
+selected flavor-catalog && build_flavor_catalog
 
 build_loki_tenant_gateway() {
   local context="$WORK_DIR/loki-tenant-gateway"
