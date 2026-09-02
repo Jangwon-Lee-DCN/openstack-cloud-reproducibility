@@ -37,7 +37,9 @@ class CatalogTest(unittest.TestCase):
         root = ROOT.parent / "images/horizon-complete/service_catalog"
         view = (root / "views.py").read_text()
         template = (root / "templates/service_catalog/index.html").read_text()
-        self.assertIn("list_flavors(self.request.user)", view)
+        self.assertIn("get_catalog(self.request.user)", view)
+        self.assertIn('catalog["accelerators"]', view)
+        self.assertIn('id="dcn-accelerator-catalog"', template)
         self.assertIn('LOG.exception("Flavor availability lookup failed")', view)
         self.assertIn('data-availability="{{ flavor.availability }}"', template)
         self.assertIn("Eligible hosts", template)
