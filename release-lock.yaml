@@ -124,7 +124,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: v1.0.0
     package: helm/packages/patched/libvirt-2026.1.0-dcn1.tgz
-    sha256: bbbf4ecf57a7dcbdfcec6b0a32938801ea3b2af18b9ea8841c342b9b764e7fed
+    sha256: 5ea792c615b9773b0b2a653d9491b95da488a677ad69fd03623010fe7adab234
     valuesSnapshot: deploy/releases/libvirt.values.sops.yaml
   - name: mariadb
     chart: mariadb

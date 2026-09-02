@@ -42,6 +42,20 @@ fi
 rm -f /var/run/libvirtd.pid
 
 if [[ -c /dev/kvm ]]; then
+    # /dev/kvm keeps the host's numeric kvm GID when mounted into this
+    # container.  Align the image's kvm group with that GID so newly spawned
+    # QEMU processes can open KVM even when host and image group databases use
+    # different IDs.  Existing guests may otherwise hide this defect because
+    # they retain an already-open KVM file descriptor.
+    host_kvm_gid=$(stat -c '%g' /dev/kvm)
+    container_kvm_gid=$(getent group kvm | cut -d: -f3)
+    if [[ -z "${container_kvm_gid}" ]]; then
+        echo "ERROR: the libvirt image does not define a kvm group" 1>&2
+        exit 1
+    fi
+    if [[ "${container_kvm_gid}" != "${host_kvm_gid}" ]]; then
+        groupmod --non-unique --gid "${host_kvm_gid}" kvm
+    fi
     chmod 660 /dev/kvm
     chown root:kvm /dev/kvm
 fi

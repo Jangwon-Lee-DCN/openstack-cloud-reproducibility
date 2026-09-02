@@ -23,7 +23,10 @@ RUNNER = os.environ.get("DCN_IMAGE_BUILD_RUNNER", "/usr/local/libexec/dcn-image-
 BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 
 COMPONENTS = {
-    "horizon-complete": ("horizon", ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard")),
+    "horizon-complete": (
+        "horizon",
+        ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard", "baremetal_access_dashboard"),
+    ),
     "keystone-oidc": ("keystone", ("reproducibility",)),
     "neutron-fwaas": ("neutron", ("reproducibility",)),
     "octavia-ovn": ("octavia", ("reproducibility",)),
@@ -35,6 +38,8 @@ COMPONENTS = {
     "aodh": ("platform-images", ("reproducibility",)),
     "keycloak": ("platform-images", ("reproducibility",)),
     "project-facade": ("platform-images", ("reproducibility",)),
+    "vpc-control-plane": ("platform-images", ("reproducibility", "vpc_control_plane")),
+    "vpc-facade": ("platform-images", ("reproducibility", "vpc_control_plane")),
     "loki-tenant-gateway": ("platform-images", ("reproducibility",)),
 }
 

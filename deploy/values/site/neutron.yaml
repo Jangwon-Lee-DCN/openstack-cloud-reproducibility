@@ -11,6 +11,9 @@ pod:
     # Rack 2/Rack 3 keep the API available without an unschedulable rollout.
     # Phase 61 restores three after Rack 1 passes its stability gate.
     server: 2
+    # OVN itself is RPC-less, but the SR-IOV NIC Switch agent reports state
+    # and receives port updates through Neutron RPC workers.
+    rpc_server: 2
   lifecycle:
     disruption_budget:
       server:
@@ -19,6 +22,9 @@ images:
   tags:
     neutron_db_sync: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
     neutron_server: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
+    # RPC workers load the same service plugins as the API and therefore must
+    # use the identical immutable image containing neutron-fwaas.
+    neutron_rpc_server: registry.dcn.ssu.ac.kr/openstack/neutron@sha256:85dfce6a687aac4df39e5cf5197dcee81a754a1da598225de9795cbbadfdca97
     neutron_sriov_agent: quay.io/airshipit/neutron:2026.1-ubuntu_noble
     neutron_sriov_agent_init: quay.io/airshipit/neutron:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
@@ -67,7 +73,7 @@ conf:
       ml2_type_vlan:
         # VLAN 141 is the Rack 2 SR-IOV pilot broadcast domain.  The range is
         # deliberately one VLAN wide until another rack passes qualification.
-        network_vlan_ranges: sriov-rack-2:141:141
+        network_vlan_ranges: sriov-provider:141:141
       ovn:
         ovn_l3_scheduler: leastloaded
         neutron_sync_mode: repair
@@ -82,7 +88,7 @@ conf:
       securitygroup:
         firewall_driver: neutron.agent.firewall.NoopFirewallDriver
       sriov_nic:
-        physical_device_mappings: sriov-rack-2:dcn-ovn0
+        physical_device_mappings: sriov-provider:dcn-ovn0
         exclude_devices: ""
 network:
   backend:
@@ -116,5 +122,6 @@ endpoints:
       api:
         public: 443
 manifests:
+  deployment_rpc_server: true
   ingress_server: false
   service_ingress_server: false
