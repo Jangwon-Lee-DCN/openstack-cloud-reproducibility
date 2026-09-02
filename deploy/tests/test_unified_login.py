@@ -94,6 +94,8 @@ def test_horizon_qoe_uses_csrf_endpoint_when_visible_login_redirects_to_oidc():
     assert "openssl rand -hex 16" in verifier
     assert '-b "csrftoken=$csrf"' in verifier
     assert "--data-urlencode auth_type=credentials" in verifier
+    assert "for attempt in 1 2 3 4 5 6" in verifier
+    assert "[[ $status == 302 || $status == 303 ]] && break" in verifier
     assert "Horizon login form has no CSRF token" not in verifier
 
 
