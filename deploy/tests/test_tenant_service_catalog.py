@@ -30,6 +30,8 @@ class CatalogTest(unittest.TestCase):
             'ADD_INSTALLED_APPS = ["openstack_dashboard.service_catalog"]',
             enabled,
         )
+        dockerfile = (ROOT.parent / "images/horizon-complete/Dockerfile").read_text()
+        self.assertIn("chmod 0644 /etc/openstack-dashboard/dcn-service-catalog.yaml", dockerfile)
 
     def test_instance_type_table_keeps_availability_separate_from_name(self):
         root = ROOT.parent / "images/horizon-complete/service_catalog"
