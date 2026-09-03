@@ -8,6 +8,7 @@ VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
 START_AT=${START_AT:-mariadb}
 ONLY_RELEASE=${ONLY_RELEASE:-}
 DCN_BAREMETAL_ADMIN_PROJECT_ID=${DCN_BAREMETAL_ADMIN_PROJECT_ID:-29789b94354b470f9a92d3069a114a57}
+DCN_BAREMETAL_DOMAIN_ID=${DCN_BAREMETAL_DOMAIN_ID:-6382db1740d64d879c93b59e1995ceba}
 BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
 FLAVOR_CATALOG_API_URL=${FLAVOR_CATALOG_API_URL:-http://flavor-catalog.openstack.svc.cluster.local:8080}
 HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
@@ -197,10 +198,12 @@ install_release() {
     --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
   if [[ "$release" == "horizon" ]]; then
     : "${DCN_BAREMETAL_ADMIN_PROJECT_ID:?exact DCN project UUID is required for Horizon}"
+    : "${DCN_BAREMETAL_DOMAIN_ID:?exact DCN domain UUID is required for Horizon}"
     : "${BAREMETAL_ACCESS_API_URL:?Bare Metal Access API URL is required for Horizon}"
     : "${FLAVOR_CATALOG_API_URL:?Flavor Catalog API URL is required for Horizon}"
     kubectl -n "$NAMESPACE" set env deployment/horizon \
       "DCN_BAREMETAL_ADMIN_PROJECT_ID=$DCN_BAREMETAL_ADMIN_PROJECT_ID" \
+      "DCN_BAREMETAL_DOMAIN_ID=$DCN_BAREMETAL_DOMAIN_ID" \
       "BAREMETAL_ACCESS_API_URL=$BAREMETAL_ACCESS_API_URL" \
       "FLAVOR_CATALOG_API_URL=$FLAVOR_CATALOG_API_URL"
   fi

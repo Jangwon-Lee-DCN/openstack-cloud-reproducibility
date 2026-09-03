@@ -37,6 +37,7 @@ def test_full_ironic_panel_policy_is_project_id_and_role_scoped():
     assert "openstack.roles.admin" not in policy
     assert 'getattr(settings, "DCN_BAREMETAL_ADMIN_PROJECT_ID", "")' in policy
     assert 'os.environ.get("DCN_BAREMETAL_ADMIN_PROJECT_ID", "")' in setting
+    assert 'os.environ.get("DCN_BAREMETAL_DOMAIN_ID", "")' in setting
     assert "project_name" not in policy
 
 
@@ -65,5 +66,5 @@ def test_every_horizon_builder_uses_baremetal_dashboard_repository():
 def test_horizon_reconciler_allows_only_the_approved_rollback_override():
     reconciler = (ROOT / "deploy/scripts/reconcile-full-stack.sh").read_text()
     assert "HORIZON_IMAGE_OVERRIDE" in reconciler
-    assert "HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-1056323b523544bf45b8@sha256:fcba0e71a33b5d873ea5fe595203bbdf811234ba88dee2c720a9f152f3a5f8fa" in reconciler
+    assert "HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-3b143ede50340f105785@sha256:4a763abde9c848fe1c2253acc32efeec0526011627e95e029363921cf4c6264a" in reconciler
     assert "override is restricted to the production-approved rollback digest" in reconciler
