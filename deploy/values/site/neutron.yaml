@@ -71,8 +71,8 @@ conf:
         vni_ranges: 1:65536
         max_header_size: 38
       ml2_type_vlan:
-        # VLAN 141 is the Rack 2 SR-IOV pilot broadcast domain.  The range is
-        # deliberately one VLAN wide until another rack passes qualification.
+        # VLAN 141 is carried only by the dedicated dcn-sriov0 PF. It is not
+        # present on the OVN/provider trunk.
         network_vlan_ranges: sriov-provider:141:141
       ovn:
         ovn_l3_scheduler: leastloaded
@@ -88,7 +88,7 @@ conf:
       securitygroup:
         firewall_driver: neutron.agent.firewall.NoopFirewallDriver
       sriov_nic:
-        physical_device_mappings: sriov-provider:dcn-ovn0
+        physical_device_mappings: sriov-provider:dcn-sriov0
         exclude_devices: ""
 network:
   backend:
@@ -96,8 +96,8 @@ network:
     - sriov
   interface:
     sriov:
-      dcn_ovn0:
-        device: dcn-ovn0
+      dcn_sriov0:
+        device: dcn-sriov0
         num_vfs: 8
         mtu: 1500
 labels:
