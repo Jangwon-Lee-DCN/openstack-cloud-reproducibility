@@ -254,6 +254,9 @@ if [[ -n "$ONLY_RELEASE" ]]; then
     kubectl apply -f "$REPO_ROOT/deploy/manifests/horizon-image-admission-lock.yaml"
   fi
   install_release "$ONLY_RELEASE"
+  if [[ "$ONLY_RELEASE" == "keystone" ]]; then
+    "$REPO_ROOT/deploy/scripts/reconcile-keystone-admin-credential.sh"
+  fi
   if [[ "$VERIFY_AFTER_RECONCILE" == "1" ]]; then
     case "$ONLY_RELEASE" in
       horizon) "$REPO_ROOT/deploy/scripts/verify-horizon-qoe.sh" ;;
@@ -269,6 +272,9 @@ for release in   mariadb rabbitmq memcached   keystone placement   glance cinder
   [[ "$release" == "$START_AT" ]] && resume=1
   [[ "$resume" == "1" ]] || continue
   install_release "$release"
+  if [[ "$release" == "keystone" ]]; then
+    "$REPO_ROOT/deploy/scripts/reconcile-keystone-admin-credential.sh"
+  fi
 done
 [[ "$resume" == "1" ]] || { echo "unknown START_AT release: $START_AT" >&2; exit 2; }
 
