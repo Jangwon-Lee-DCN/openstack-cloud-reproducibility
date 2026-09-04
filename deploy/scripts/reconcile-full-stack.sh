@@ -12,7 +12,7 @@ DCN_BAREMETAL_DOMAIN_ID=${DCN_BAREMETAL_DOMAIN_ID:-6382db1740d64d879c93b59e1995c
 BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
 FLAVOR_CATALOG_API_URL=${FLAVOR_CATALOG_API_URL:-http://flavor-catalog.openstack.svc.cluster.local:8080}
 HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
-HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-ab566138b30c69bd2da4@sha256:1fe19f68553a2a955ba65e0ca46f3edb652fac16a1e4821591bc86ca5bd6becd
+HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-a13cae5cb4bf14cff307@sha256:64e5a0af1cf10ca6d01403f1564f8522867cf6e0d2b898fd2e8ac554368cc37d
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
 if [[ -n "$HORIZON_IMAGE_OVERRIDE" && "$HORIZON_IMAGE_OVERRIDE" != "$HORIZON_ROLLBACK_IMAGE" ]]; then
