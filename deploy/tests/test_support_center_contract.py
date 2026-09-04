@@ -19,7 +19,9 @@ def test_support_center_is_internal_and_durable(tmp_path):
     rendered = output.read_text()
     assert image in rendered
     assert "kind: HTTPRoute" not in rendered
-    assert "PersistentVolumeClaim" in rendered
+    assert "replicas: 3" in rendered
+    assert "dcn-support-database" in rendered
+    assert "minAvailable: 2" in rendered
     assert "readOnlyRootFilesystem: true" in rendered
     assert "path: /readyz" in rendered
     assert "@NAMESPACE@" not in rendered
