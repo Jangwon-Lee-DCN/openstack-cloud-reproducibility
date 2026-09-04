@@ -24,6 +24,9 @@ def test_support_center_is_internal_and_durable(tmp_path):
     assert "minAvailable: 2" in rendered
     assert "readOnlyRootFilesystem: true" in rendered
     assert "path: /readyz" in rendered
+    assert "name: dcn-support-api-egress" in rendered
+    assert "port: 5000" in rendered
+    assert "port: 3306" in rendered
     assert "@NAMESPACE@" not in rendered
 
 
