@@ -12,12 +12,14 @@ DCN_BAREMETAL_DOMAIN_ID=${DCN_BAREMETAL_DOMAIN_ID:-6382db1740d64d879c93b59e1995c
 BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
 FLAVOR_CATALOG_API_URL=${FLAVOR_CATALOG_API_URL:-http://flavor-catalog.openstack.svc.cluster.local:8080}
 HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
-HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-ab566138b30c69bd2da4@sha256:1fe19f68553a2a955ba65e0ca46f3edb652fac16a1e4821591bc86ca5bd6becd
+DEPLOY_LOCK_HOLDER=${DCN_DEPLOY_LOCK_HOLDER:-}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
-if [[ -n "$HORIZON_IMAGE_OVERRIDE" && "$HORIZON_IMAGE_OVERRIDE" != "$HORIZON_ROLLBACK_IMAGE" ]]; then
-  echo "Horizon override is restricted to the production-approved rollback digest" >&2
-  exit 2
+if [[ -n "$HORIZON_IMAGE_OVERRIDE" ]]; then
+  grep -Fq "'$HORIZON_IMAGE_OVERRIDE'" "$REPO_ROOT/deploy/manifests/horizon-image-admission-lock.yaml" || {
+    echo "Horizon override is not present in the production admission lock" >&2
+    exit 2
+  }
 fi
 
 for command in kubectl helm sops python3 sha256sum curl; do
@@ -218,9 +220,10 @@ install_release() {
 
 WORK_DIR=$(mktemp -d /tmp/openstack-full-reconcile.XXXXXX)
 DEPLOY_LOCK=dcn-production-deploy-lock
-DEPLOY_HOLDER="$(hostname)-$$-$(date +%s)"
+DEPLOY_HOLDER=${DEPLOY_LOCK_HOLDER:-"$(hostname)-$$-$(date +%s)"}
+OWNS_DEPLOY_LOCK=true
 cleanup() {
-  if [[ "$(kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" \
+  if [[ "$OWNS_DEPLOY_LOCK" == true && "$(kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" \
       -o jsonpath='{.data.holder}' 2>/dev/null || true)" == "$DEPLOY_HOLDER" ]]; then
     kubectl -n "$NAMESPACE" delete configmap "$DEPLOY_LOCK" \
       --ignore-not-found --wait=false >/dev/null
@@ -230,13 +233,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! kubectl -n "$NAMESPACE" create configmap "$DEPLOY_LOCK" \
-    --from-literal="holder=$DEPLOY_HOLDER" \
-    --from-literal="release=${ONLY_RELEASE:-full-stack}" >/dev/null; then
-  echo "another production reconciliation owns $NAMESPACE/$DEPLOY_LOCK" >&2
-  kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" \
-    -o jsonpath='holder={.data.holder} release={.data.release}{"\n"}' >&2 || true
-  exit 1
+if [[ -n "$DEPLOY_LOCK_HOLDER" ]]; then
+  OWNS_DEPLOY_LOCK=false
+  actual_holder=$(kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" -o jsonpath='{.data.holder}' 2>/dev/null || true)
+  [[ "$actual_holder" == "$DEPLOY_LOCK_HOLDER" ]] || {
+    echo "inherited production deployment lock is absent or owned by another process" >&2
+    exit 1
+  }
+else
+  if ! kubectl -n "$NAMESPACE" create configmap "$DEPLOY_LOCK" \
+      --from-literal="holder=$DEPLOY_HOLDER" \
+      --from-literal="release=${ONLY_RELEASE:-full-stack}" >/dev/null; then
+    echo "another production reconciliation owns $NAMESPACE/$DEPLOY_LOCK" >&2
+    kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" \
+      -o jsonpath='holder={.data.holder} release={.data.release}{"\n"}' >&2 || true
+    exit 1
+  fi
 fi
 
 validate_admin_passwords
