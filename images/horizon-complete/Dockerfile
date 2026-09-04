@@ -166,7 +166,9 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_2210_admin_baremetal_approvals.py" \
     && test -f "$local_enabled/_3890_project_support_group.py" \
     && test -f "$local_enabled/_3900_project_support.py" \
-    && grep -q 'form.as_p' /var/lib/openstack/lib/python3.12/site-packages/support_dashboard/templates/support_center/create.html \
+    && ! grep -q 'form.as_p' /var/lib/openstack/lib/python3.12/site-packages/support_dashboard/templates/support_center/create.html \
+    && grep -q 'class="form-horizontal"' /var/lib/openstack/lib/python3.12/site-packages/support_dashboard/templates/support_center/create.html \
+    && grep -q 'class="form-group' /var/lib/openstack/lib/python3.12/site-packages/support_dashboard/templates/support_center/create.html \
     && ! grep -Rq '|bootstrap' /var/lib/openstack/lib/python3.12/site-packages/support_dashboard/templates \
     && grep -q "PANEL_DASHBOARD = 'admin'" "$local_enabled/_2200_ironic.py" \
     && grep -q "openstack.services.baremetal" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
