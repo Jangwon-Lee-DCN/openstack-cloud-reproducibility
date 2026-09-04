@@ -63,13 +63,11 @@ nova = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["conf"]["nova"]
 pci = nova["pci"]
 assert pci["report_in_placement"] is False
 device_specs = __import__("json").loads(pci["device_spec"])
-assert len(device_specs) == 3
-assert {
-    "vendor_id": "8086",
-    "product_id": "10ed",
-    "physical_network": "sriov-provider",
-    "managed": "yes",
-} in device_specs
+assert len(device_specs) == 4
+assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
+    "sriov-rack-1", "sriov-rack-2"
+}
+assert all(spec.get("product_id") != "10ed" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 assert pci["alias"].count("alias = ") == 1
 assert pci["alias"].count('"numa_policy":"legacy"') == 2
@@ -89,6 +87,8 @@ images = neutron["images"]["tags"]
 assert images["neutron_rpc_server"] == images["neutron_server"]
 assert "@sha256:" in images["neutron_rpc_server"]
 PY
+grep -Fq "with open('/tmp/pod-shared/sriov_agent.ini')" \
+  "$root/helm/openstack-helm/neutron/templates/bin/_health-probe.py.tpl"
 helm template nova "$nova_chart" -f "$root/deploy/values/site/nova.yaml" | \
   python3 -c '
 import base64, json, sys, yaml
@@ -99,8 +99,11 @@ assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
 assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
 device_specs = json.loads(device_line.split(" = ", 1)[1])
-assert len(device_specs) == 3
-assert any(spec.get("vendor_id") == "8086" and spec.get("product_id") == "10ed" and spec.get("physical_network") == "sriov-provider" for spec in device_specs)
+assert len(device_specs) == 4
+assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
+    "sriov-rack-1", "sriov-rack-2"
+}
+assert all(spec.get("product_id") != "10ed" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 '
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \

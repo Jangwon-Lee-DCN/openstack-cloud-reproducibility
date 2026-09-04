@@ -112,7 +112,10 @@ def check_agent_status(transport):
 def sriov_readiness_check():
     """Checks the sriov configuration on the sriov nic's"""
     return_status = 1
-    with open('/etc/neutron/plugins/ml2/sriov_agent.ini') as nic:
+    # The init container renders the node-specific physnet mapping into the
+    # shared volume. Probe the same effective configuration consumed by the
+    # agent rather than the immutable base file.
+    with open('/tmp/pod-shared/sriov_agent.ini') as nic:
         for phy in nic:
             if "physical_device_mappings" in phy:
                 phy_dev = phy.split('=', 1)[1]
