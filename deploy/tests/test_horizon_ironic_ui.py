@@ -63,8 +63,9 @@ def test_every_horizon_builder_uses_baremetal_dashboard_repository():
         assert "openstack_baremetal_access_dashboard-*.whl" in builder
 
 
-def test_horizon_reconciler_allows_only_the_approved_rollback_override():
+def test_horizon_reconciler_allows_only_admission_locked_override():
     reconciler = (ROOT / "deploy/scripts/reconcile-full-stack.sh").read_text()
     assert "HORIZON_IMAGE_OVERRIDE" in reconciler
-    assert "HORIZON_ROLLBACK_IMAGE=registry.dcn.ssu.ac.kr/openstack/horizon:source-a13cae5cb4bf14cff307@sha256:64e5a0af1cf10ca6d01403f1564f8522867cf6e0d2b898fd2e8ac554368cc37d" in reconciler
-    assert "override is restricted to the production-approved rollback digest" in reconciler
+    assert "override is not present in the production admission lock" in reconciler
+    assert "DCN_DEPLOY_LOCK_HOLDER" in reconciler
+    assert "inherited production deployment lock is absent or owned by another process" in reconciler
