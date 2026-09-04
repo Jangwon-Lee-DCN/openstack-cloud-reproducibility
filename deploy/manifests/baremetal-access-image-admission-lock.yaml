@@ -16,7 +16,10 @@ spec:
         object.metadata.name != 'baremetal-access' ||
         object.spec.template.spec.containers.exists(c,
           c.name == 'api' &&
-          c.image == 'registry.dcn.ssu.ac.kr/openstack/baremetal-access-service:source-124ab4b17005b3fb6e3c@sha256:cc1c7e54f4e14429572f886359712aedc789246d5c279eab0f4eebfd6772c7a5')
+          c.image in [
+            'registry.dcn.ssu.ac.kr/openstack/baremetal-access-service:source-c51617997ace4f7e84e7@sha256:7324bab657e260f299116899a943ca7c5914f8ae014bbcf68bf53d1578396a58',
+            'registry.dcn.ssu.ac.kr/openstack/baremetal-access-service:source-124ab4b17005b3fb6e3c@sha256:cc1c7e54f4e14429572f886359712aedc789246d5c279eab0f4eebfd6772c7a5'
+          ])
       message: Bare Metal Access may only run the production-approved immutable image digest.
 ---
 apiVersion: admissionregistration.k8s.io/v1
