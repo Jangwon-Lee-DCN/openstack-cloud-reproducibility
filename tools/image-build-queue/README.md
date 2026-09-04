@@ -77,6 +77,22 @@ dcn-image-build submit --component vpc-facade \
   --source vpc_control_plane=/path/to/vpc-control-plane@FULL_SHA --wait
 ```
 
+## Submit the NetBox Port Panel
+
+The NetBox image embeds the DCN Port Panel plugin from the controller source.
+Both inputs are mandatory and must identify pushed, full commit SHAs:
+
+```bash
+dcn-image-build submit --component netbox-port-panel \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source netbox_ironic_controller=/path/to/netbox-ironic-controller@FULL_SHA \
+  --wait
+```
+
+The resulting `registry.dcn.ssu.ac.kr/openstack/netbox:port-panel-*` reference
+must be promoted by digest. Building it does not enable the plugin or mutate a
+NetBox release.
+
 ## Operate
 
 ```bash

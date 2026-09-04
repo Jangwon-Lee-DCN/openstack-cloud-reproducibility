@@ -238,6 +238,22 @@ build_baremetal_access_service() {
 }
 selected baremetal-access-service && build_baremetal_access_service
 
+build_netbox_port_panel() {
+  local context="$WORK_DIR/netbox-port-panel"
+  git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --quiet \
+    && git -C "$NETBOX_IRONIC_CONTROLLER_REPO" diff --cached --quiet || {
+      echo "refusing dirty NetBox Port Panel source: $NETBOX_IRONIC_CONTROLLER_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  cp "$NETBOX_IRONIC_CONTROLLER_REPO/Dockerfile.netbox" "$context/Dockerfile"
+  cp "$NETBOX_IRONIC_CONTROLLER_REPO/port-panel-pyproject.toml" "$context/port-panel-pyproject.toml"
+  cp -a "$NETBOX_IRONIC_CONTROLLER_REPO/netbox_dcn_port_panel" "$context/"
+  build_context netbox-port-panel "$context" \
+    "$REGISTRY/netbox:port-panel-$BUILD_ID"
+}
+selected netbox-port-panel && build_netbox_port_panel
+
 build_vpc_git_component() {
   local name=$1 dockerfile=$2 tag=$3 context
   git -C "$VPC_CONTROL_PLANE_REPO" diff --quiet && git -C "$VPC_CONTROL_PLANE_REPO" diff --cached --quiet || {

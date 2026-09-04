@@ -45,6 +45,9 @@ COMPONENTS = {
     "baremetal-access-service": (
         "platform-images", ("reproducibility", "netbox_ironic_controller"),
     ),
+    "netbox-port-panel": (
+        "platform-images", ("reproducibility", "netbox_ironic_controller"),
+    ),
 }
 
 

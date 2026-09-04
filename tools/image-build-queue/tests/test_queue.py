@@ -37,6 +37,16 @@ class QueueTests(unittest.TestCase):
             "baremetal_access_dashboard", queue.COMPONENTS["horizon-complete"][1],
         )
 
+    def test_netbox_port_panel_has_exact_sources_and_build_path(self):
+        self.assertEqual(
+            queue.COMPONENTS["netbox-port-panel"],
+            ("platform-images", ("reproducibility", "netbox_ironic_controller")),
+        )
+        source = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("selected netbox-port-panel", source)
+        self.assertIn("Dockerfile.netbox", source)
+        self.assertIn("port-panel-pyproject.toml", source)
+
     def test_flavor_catalog_requires_its_service_source(self):
         self.assertEqual(
             ("reproducibility", "cloud_services"),
