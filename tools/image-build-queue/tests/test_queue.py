@@ -37,6 +37,16 @@ class QueueTests(unittest.TestCase):
             "baremetal_access_dashboard", queue.COMPONENTS["horizon-complete"][1],
         )
 
+    def test_support_api_and_horizon_require_support_source(self):
+        self.assertEqual(
+            queue.COMPONENTS["support-api"][1],
+            ("reproducibility", "support_dashboard"),
+        )
+        self.assertIn("support_dashboard", queue.COMPONENTS["horizon-complete"][1])
+        source = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("selected support-api", source)
+        self.assertIn("openstack_support_dashboard.whl", source)
+
     def test_flavor_catalog_requires_its_service_source(self):
         self.assertEqual(
             ("reproducibility", "cloud_services"),

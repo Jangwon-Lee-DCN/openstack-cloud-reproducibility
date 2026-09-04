@@ -25,7 +25,7 @@ BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 COMPONENTS = {
     "horizon-complete": (
         "horizon",
-        ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard", "baremetal_access_dashboard"),
+        ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard", "baremetal_access_dashboard", "support_dashboard"),
     ),
     "keystone-oidc": ("keystone", ("reproducibility",)),
     "neutron-fwaas": ("neutron", ("reproducibility",)),
@@ -45,6 +45,7 @@ COMPONENTS = {
     "baremetal-access-service": (
         "platform-images", ("reproducibility", "netbox_ironic_controller"),
     ),
+    "support-api": ("platform-images", ("reproducibility", "support_dashboard")),
 }
 
 

@@ -20,6 +20,7 @@ COPY openstack_vpc_dashboard.whl /tmp/openstack_vpc_dashboard.whl
 COPY openstack_telemetry_dashboard.whl /tmp/openstack_telemetry_dashboard.whl
 COPY openstack_s3_dashboard.whl /tmp/openstack_s3_dashboard.whl
 COPY openstack_baremetal_access_dashboard.whl /tmp/openstack_baremetal_access_dashboard.whl
+COPY openstack_support_dashboard.whl /tmp/openstack_support_dashboard.whl
 COPY magnum-ui/enhance_magnum_ui.py /tmp/enhance_magnum_ui.py
 COPY enhance_images_ui.py /tmp/enhance_images_ui.py
 COPY patch_federated_logout.py /tmp/patch_federated_logout.py
@@ -68,7 +69,9 @@ RUN chmod 0644 /etc/openstack-dashboard/dcn-service-catalog.yaml \
     && python3 -m zipfile -e /tmp/openstack_telemetry_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/openstack_s3_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && python3 -m zipfile -e /tmp/openstack_baremetal_access_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
+    && python3 -m zipfile -e /tmp/openstack_support_dashboard.whl /var/lib/openstack/lib/python3.12/site-packages \
     && cp /var/lib/openstack/lib/python3.12/site-packages/baremetal_access_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
+    && cp /var/lib/openstack/lib/python3.12/site-packages/support_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/octavia_dashboard/enabled/_*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/designatedashboard/enabled/_17*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
     && cp /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/enabled/_31*.py /var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/local/enabled/ \
@@ -147,7 +150,7 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && sed -i "s/region_name = request.COOKIES.get('services_region')/region_name = getattr(request.user, 'services_region', None) or request.COOKIES.get('services_region')/" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && sed -i "/region_name = getattr(request.user, 'services_region'/a\\    if region_name in ('RegionOne', 'RegionOne-VM'):\\n        region_name = None" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
     && grep -q "getattr(request.user, 'services_region'" /var/lib/openstack/lib/python3.12/site-packages/masakaridashboard/api/api.py \
-    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, ironic_ui, ironicclient, cloud_telemetry_dashboard, cloud_s3_dashboard, governance_dashboard, baremetal_access_dashboard" \
+    && python3 -c "import octavia_dashboard, designatedashboard, openstack_vpc_dashboard, project_selfservice_dashboard, magnum_ui, magnumclient, heatclient, manila_ui, manilaclient, masakaridashboard, ironic_ui, ironicclient, cloud_telemetry_dashboard, cloud_s3_dashboard, governance_dashboard, baremetal_access_dashboard, support_dashboard" \
     && grep -q 'remove_stock_actions(tables.InstancesTable, {"associate", "disassociate"})' /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/customization.py \
     && test ! -e /var/lib/openstack/lib/python3.12/site-packages/openstack_vpc_dashboard/api/native_inventory.py \
     && python3 -m compileall -q /var/lib/openstack/lib/python3.12/site-packages/project_selfservice_dashboard \
@@ -161,6 +164,8 @@ RUN enabled=/var/lib/openstack/lib/python3.12/site-packages/openstack_dashboard/
     && test -f "$local_enabled/_2200_ironic.py" \
     && test -f "$local_enabled/_1390_project_baremetal_access.py" \
     && test -f "$local_enabled/_2210_admin_baremetal_approvals.py" \
+    && test -f "$local_enabled/_3890_project_support_group.py" \
+    && test -f "$local_enabled/_3900_project_support.py" \
     && grep -q "PANEL_DASHBOARD = 'admin'" "$local_enabled/_2200_ironic.py" \
     && grep -q "openstack.services.baremetal" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
     && grep -q "DCN_BAREMETAL_ADMIN_PROJECT_ID" /var/lib/openstack/lib/python3.12/site-packages/ironic_ui/content/ironic/panel.py \
