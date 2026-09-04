@@ -20,7 +20,7 @@ exec:
     - --config-file
     - /etc/neutron/neutron.conf
     - --config-file
-    - /etc/neutron/sriov_agent.ini
+    - /tmp/pod-shared/sriov_agent.ini
 {{- if .Values.pod.use_fqdn.neutron_agent }}
     - --use-fqdn
 {{- end }}
@@ -89,6 +89,11 @@ spec:
 {{ dict "envAll" $envAll "application" "neutron_sriov_agent" "container" "neutron_sriov_agent_init" | include "helm-toolkit.snippets.kubernetes_container_security_context" | indent 10 }}
           command:
             - /tmp/neutron-sriov-agent-init.sh
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp
@@ -149,6 +154,10 @@ spec:
 {{ tuple $envAll $envAll.Values.pod.resources.agent.sriov | include "helm-toolkit.snippets.kubernetes_resources" | indent 10 }}
 {{ dict "envAll" $envAll "application" "neutron_sriov_agent" "container" "neutron_sriov_agent" | include "helm-toolkit.snippets.kubernetes_container_security_context" | indent 10 }}
           env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: RPC_PROBE_TIMEOUT
               value: "{{ .Values.pod.probes.rpc_timeout }}"
             - name: RPC_PROBE_RETRIES
@@ -195,7 +204,7 @@ spec:
               subPath: ml2_conf.ini
               readOnly: true
             - name: neutron-etc
-              mountPath: /etc/neutron/plugins/ml2/sriov_agent.ini
+              mountPath: /etc/neutron/plugins/ml2/sriov_agent.base.ini
               subPath: sriov_agent.ini
               readOnly: true
             {{- if .Values.conf.plugins.taas.taas.enabled }}

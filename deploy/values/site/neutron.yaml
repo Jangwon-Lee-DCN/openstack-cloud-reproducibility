@@ -73,7 +73,7 @@ conf:
       ml2_type_vlan:
         # VLAN 141 is carried only by the dedicated dcn-sriov0 PF. It is not
         # present on the OVN/provider trunk.
-        network_vlan_ranges: sriov-provider:141:141
+        network_vlan_ranges: sriov-rack-1:141:141,sriov-rack-2:141:141,sriov-rack-3:141:141
       ovn:
         ovn_l3_scheduler: leastloaded
         neutron_sync_mode: repair
@@ -88,7 +88,9 @@ conf:
       securitygroup:
         firewall_driver: neutron.agent.firewall.NoopFirewallDriver
       sriov_nic:
-        physical_device_mappings: sriov-provider:dcn-sriov0
+        # The DaemonSet derives the one effective mapping from its Kubernetes
+        # node name and writes it to the shared runtime configuration.
+        physical_device_mappings: sriov-rack-2:dcn-sriov0
         exclude_devices: ""
 network:
   backend:
@@ -100,6 +102,10 @@ network:
         device: dcn-sriov0
         num_vfs: 8
         mtu: 1500
+  sriov_node_physnets:
+    dcn-1a-compute-1: sriov-rack-1
+    dcn-1b-compute-0: sriov-rack-2
+    dcn-1c-compute-0: sriov-rack-3
 labels:
   sriov:
     node_selector_key: sriov

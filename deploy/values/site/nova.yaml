@@ -51,7 +51,7 @@ conf:
       # legacy policy is required to allow the documented no-affinity fallback.
       # The dedicated PFs are heterogeneous: R1/R2 i40e create 8086:154c VFs,
       # while R3 ixgbe creates 8086:10ed VFs. Neither rule names dcn-ovn0.
-      device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"},{"vendor_id":"8086","product_id":"154c","physical_network":"sriov-provider","managed":"yes"},{"vendor_id":"8086","product_id":"10ed","physical_network":"sriov-provider","managed":"yes"}]'
+      device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"},{"address":"0000:16:*.*","vendor_id":"8086","product_id":"154c","physical_network":"sriov-rack-1","managed":"yes"},{"address":"0000:18:*.*","vendor_id":"8086","product_id":"154c","physical_network":"sriov-rack-2","managed":"yes"},{"address":"0000:04:*.*","vendor_id":"8086","product_id":"10ed","physical_network":"sriov-rack-3","managed":"yes"}]'
       alias: |-
         {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"legacy"}
         alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"legacy"}

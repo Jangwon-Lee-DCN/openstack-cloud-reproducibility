@@ -23,6 +23,29 @@ set +e
 BESTEFFORT=true
 {{- end }}
 
+test -n "${NODE_NAME:-}"
+case "$NODE_NAME" in
+{{- range $node, $physnet := .Values.network.sriov_node_physnets }}
+  {{ $node }}) SRIOV_PHYSNET={{ $physnet | quote }} ;;
+{{- end }}
+  *) echo "SR-IOV node $NODE_NAME has no approved rack physnet" >&2; exit 1 ;;
+esac
+python3 - "$SRIOV_PHYSNET" <<'PY'
+import configparser
+import pathlib
+import sys
+
+source = pathlib.Path('/etc/neutron/plugins/ml2/sriov_agent.ini')
+target = pathlib.Path('/tmp/pod-shared/sriov_agent.ini')
+config = configparser.ConfigParser()
+config.read(source)
+if not config.has_section('sriov_nic'):
+    config.add_section('sriov_nic')
+config.set('sriov_nic', 'physical_device_mappings', sys.argv[1] + ':dcn-sriov0')
+with target.open('w') as stream:
+    config.write(stream)
+PY
+
 {{- range $k, $sriov := .Values.network.interface.sriov }}
 if [ "x{{ $sriov.num_vfs }}" != "x" ]; then
   echo "{{ $sriov.num_vfs }}" > /sys/class/net/{{ $sriov.device }}/device/sriov_numvfs
