@@ -22,7 +22,13 @@ REGISTRY_IP=${REGISTRY_IP:-$(getent ahostsv4 "$REGISTRY_HOST" | awk 'NR == 1 {pr
 BUILD_ID=${BUILD_ID:-$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)}
 VPC_DASHBOARD_REPO=${VPC_DASHBOARD_REPO:-$REPO_ROOT/../openstack-vpc-dashboard}
 BAREMETAL_ACCESS_DASHBOARD_REPO=${BAREMETAL_ACCESS_DASHBOARD_REPO:-$REPO_ROOT/../openstack-baremetal-access-dashboard}
-SUPPORT_DASHBOARD_REPO=${SUPPORT_DASHBOARD_REPO:-$REPO_ROOT/../openstack-support-dashboard}
+if [[ -z ${SUPPORT_DASHBOARD_REPO:-} ]]; then
+  if git -C "$REPO_ROOT/../support_dashboard" rev-parse --git-dir >/dev/null 2>&1; then
+    SUPPORT_DASHBOARD_REPO="$REPO_ROOT/../support_dashboard"
+  else
+    SUPPORT_DASHBOARD_REPO="$REPO_ROOT/../openstack-support-dashboard"
+  fi
+fi
 VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
