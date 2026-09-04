@@ -9,13 +9,14 @@ VPC_DASHBOARD_REPO=${VPC_DASHBOARD_REPO:-$REPO_ROOT/../openstack-vpc-dashboard}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
 BAREMETAL_ACCESS_DASHBOARD_REPO=${BAREMETAL_ACCESS_DASHBOARD_REPO:-$REPO_ROOT/../openstack-baremetal-access-dashboard}
+SUPPORT_DASHBOARD_REPO=${SUPPORT_DASHBOARD_REPO:-$REPO_ROOT/../openstack-support-dashboard}
 KANIKO_IMAGE=gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
 JOB=source-rebuild-horizon-complete
 
 for command in kubectl sops git tar python3; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
-for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$BAREMETAL_ACCESS_DASHBOARD_REPO"; do
+for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$BAREMETAL_ACCESS_DASHBOARD_REPO" "$SUPPORT_DASHBOARD_REPO"; do
   git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
     echo "refusing to build from dirty source repository: $repo" >&2; exit 1;
   }
@@ -31,6 +32,7 @@ mkdir -p "$context/octavia-workflow" "$context/project-selfservice" "$context/ma
 (cd "$TELEMETRY_DASHBOARD_REPO" && python3 -m build && make verify)
 (cd "$S3_DASHBOARD_REPO" && python3 -m build && make verify)
 (cd "$BAREMETAL_ACCESS_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
+(cd "$SUPPORT_DASHBOARD_REPO" && rm -rf build dist *.egg-info && python3 -m build)
 
 cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$context/Dockerfile"
 cp "$REPO_ROOT/images/horizon-complete/patch_federated_logout.py" "$context/patch_federated_logout.py"
@@ -48,6 +50,7 @@ cp "$VPC_DASHBOARD_REPO"/dist/openstack_vpc_dashboard-*.whl "$context/openstack_
 cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$context/openstack_telemetry_dashboard.whl"
 cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$context/openstack_s3_dashboard.whl"
 cp "$BAREMETAL_ACCESS_DASHBOARD_REPO"/dist/openstack_baremetal_access_dashboard-*.whl "$context/openstack_baremetal_access_dashboard.whl"
+cp "$SUPPORT_DASHBOARD_REPO"/dist/openstack_support_dashboard-*.whl "$context/openstack_support_dashboard.whl"
 cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$context/octavia-workflow/"
 cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$context/project-selfservice/"
 cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$context/magnum-ui/"

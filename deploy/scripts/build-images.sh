@@ -22,6 +22,13 @@ REGISTRY_IP=${REGISTRY_IP:-$(getent ahostsv4 "$REGISTRY_HOST" | awk 'NR == 1 {pr
 BUILD_ID=${BUILD_ID:-$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)}
 VPC_DASHBOARD_REPO=${VPC_DASHBOARD_REPO:-$REPO_ROOT/../openstack-vpc-dashboard}
 BAREMETAL_ACCESS_DASHBOARD_REPO=${BAREMETAL_ACCESS_DASHBOARD_REPO:-$REPO_ROOT/../openstack-baremetal-access-dashboard}
+if [[ -z ${SUPPORT_DASHBOARD_REPO:-} ]]; then
+  if git -C "$REPO_ROOT/../support_dashboard" rev-parse --git-dir >/dev/null 2>&1; then
+    SUPPORT_DASHBOARD_REPO="$REPO_ROOT/../support_dashboard"
+  else
+    SUPPORT_DASHBOARD_REPO="$REPO_ROOT/../openstack-support-dashboard"
+  fi
+fi
 VPC_CONTROL_PLANE_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 MAGNUM_GITOPS_REPO=${MAGNUM_GITOPS_REPO:-$REPO_ROOT/../magnum-capi-gitops}
 TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-telemetry-dashboard}
@@ -42,7 +49,7 @@ for command in kubectl sops git tar sha256sum go; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
 if [[ -z "$BUILD_COMPONENTS" ]]; then
-  for repo in "$VPC_DASHBOARD_REPO" "$VPC_CONTROL_PLANE_REPO" "$MAGNUM_GITOPS_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO"; do
+  for repo in "$VPC_DASHBOARD_REPO" "$VPC_CONTROL_PLANE_REPO" "$MAGNUM_GITOPS_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$SUPPORT_DASHBOARD_REPO"; do
     git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
       echo "refusing to build from dirty source repository: $repo" >&2; exit 1;
     }
@@ -153,7 +160,7 @@ simple_context() {
 
 build_horizon_complete() {
   local repo horizon_context
-  for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$BAREMETAL_ACCESS_DASHBOARD_REPO"; do
+  for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$BAREMETAL_ACCESS_DASHBOARD_REPO" "$SUPPORT_DASHBOARD_REPO"; do
     git -C "$repo" diff --quiet && git -C "$repo" diff --cached --quiet || {
       echo "refusing to build from dirty source repository: $repo" >&2
       exit 1
@@ -163,6 +170,7 @@ build_horizon_complete() {
   (cd "$TELEMETRY_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   (cd "$S3_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   (cd "$BAREMETAL_ACCESS_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
+  (cd "$SUPPORT_DASHBOARD_REPO" && rm -rf build dist *.egg-info && "$PYTHON_BINARY" -m build)
   horizon_context="$WORK_DIR/horizon-complete"
   mkdir -p "$horizon_context/octavia-workflow" "$horizon_context/project-selfservice" "$horizon_context/magnum-ui" "$horizon_context/enabled" "$horizon_context/settings" "$horizon_context/service_catalog" "$horizon_context/image_catalog" "$horizon_context/track-b"
   cp "$REPO_ROOT/images/horizon-complete/Dockerfile" "$horizon_context/Dockerfile"
@@ -183,12 +191,26 @@ build_horizon_complete() {
   cp "$TELEMETRY_DASHBOARD_REPO"/dist/openstack_telemetry_dashboard-*.whl "$horizon_context/openstack_telemetry_dashboard.whl"
   cp "$S3_DASHBOARD_REPO"/dist/openstack_s3_dashboard-*.whl "$horizon_context/openstack_s3_dashboard.whl"
   cp "$BAREMETAL_ACCESS_DASHBOARD_REPO"/dist/openstack_baremetal_access_dashboard-*.whl "$horizon_context/openstack_baremetal_access_dashboard.whl"
+  cp "$SUPPORT_DASHBOARD_REPO"/dist/openstack_support_dashboard-*.whl "$horizon_context/openstack_support_dashboard.whl"
   cp "$REPO_ROOT/images/horizon-octavia-dashboard"/{model.service.js,loadbalancer.html,loadbalancer.controller.js,listener.html,listener.controller.js,pool.html,pool.controller.js} "$horizon_context/octavia-workflow/"
   cp -a "$REPO_ROOT/images/horizon-project-selfservice-dashboard/pkg/." "$horizon_context/project-selfservice/"
   cp "$REPO_ROOT/images/horizon-magnum-dashboard/enhance_magnum_ui.py" "$horizon_context/magnum-ui/"
   cp -a "$REPO_ROOT/images/horizon-magnum-dashboard/overlay" "$horizon_context/magnum-ui/overlay"
   cp -a "$REPO_ROOT/images/horizon-governance-dashboard/governance_dashboard" "$horizon_context/track-b/"
   build_context horizon-complete "$horizon_context" "$REGISTRY/horizon:source-$BUILD_ID"
+}
+
+build_support_api() {
+  local context="$WORK_DIR/support-api"
+  git -C "$SUPPORT_DASHBOARD_REPO" diff --quiet \
+    && git -C "$SUPPORT_DASHBOARD_REPO" diff --cached --quiet || {
+      echo "refusing dirty Support Center source: $SUPPORT_DASHBOARD_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  cp "$SUPPORT_DASHBOARD_REPO/Dockerfile" "$SUPPORT_DASHBOARD_REPO/pyproject.toml" "$context/"
+  cp -a "$SUPPORT_DASHBOARD_REPO/support_service" "$SUPPORT_DASHBOARD_REPO/support_dashboard" "$context/"
+  build_context support-api "$context" "$REGISTRY/support-api:source-$BUILD_ID"
 }
 
 # Images whose parents are all public and digest-pinned.
@@ -199,6 +221,7 @@ selected keystone-oidc && simple_context keystone-oidc keystone
 selected neutron-fwaas && simple_context neutron-fwaas neutron
 selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
+selected support-api && build_support_api
 selected project-facade && simple_context project-facade
 
 build_flavor_catalog() {
