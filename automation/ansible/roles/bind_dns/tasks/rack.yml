@@ -85,6 +85,14 @@
   ansible.builtin.meta: flush_handlers
   when: not ansible_check_mode or bind_named_binary.stat.exists
 
+- name: Force secondary rack-aware zones to retransfer after primary reconciliation
+  ansible.builtin.command: "rndc retransfer {{ item }}"
+  loop: "{{ [dns_domain] + (dns_reverse_zones | map(attribute='zone') | list) }}"
+  when:
+    - dns_role == 'secondary'
+    - not ansible_check_mode
+  changed_when: false
+
 - name: Verify every inventory hostname locally
   ansible.builtin.command: "dig +short @127.0.0.1 {{ item }}.{{ dns_domain }} A"
   loop: "{{ dns_record_hosts }}"
