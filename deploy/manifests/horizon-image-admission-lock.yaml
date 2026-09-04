@@ -17,7 +17,7 @@ spec:
         object.spec.template.spec.containers.exists(c,
           c.name == 'horizon' &&
           c.image in [
-            'registry.dcn.ssu.ac.kr/openstack/horizon:source-8b0b599d902efd9f3a2d@sha256:4704e6363118c9126a1ee182625f47c2d000fe7791cbe745a6280b58fc0cffd0',
+            'registry.dcn.ssu.ac.kr/openstack/horizon:source-535337635ed44d8aa6cc@sha256:aa4c4d1d4f794df29bd32f384b0a94cbc7188c39fb926390264be92c8af8f4f9',
             'registry.dcn.ssu.ac.kr/openstack/horizon:source-a13cae5cb4bf14cff307@sha256:64e5a0af1cf10ca6d01403f1564f8522867cf6e0d2b898fd2e8ac554368cc37d'
           ])
       message: Horizon may only run the production-approved release or rollback image digest.
