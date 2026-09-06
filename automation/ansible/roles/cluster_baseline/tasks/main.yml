@@ -58,6 +58,21 @@
   ansible.builtin.command: kubectl -n kube-system rollout status daemonset/cilium --timeout=10m
   changed_when: false
 
+- name: Require the site authoritative DNS forwarding contract
+  ansible.builtin.assert:
+    that:
+      - authoritative_dns_zone | default('') | length > 0
+      - authoritative_dns_servers | default([]) | length >= 2
+
+- name: Reconcile the site authoritative zone in CoreDNS
+  ansible.builtin.command:
+    argv: >-
+      {{ [playbook_dir + '/../bin/reconcile-coredns-authoritative-zone.py', '--zone', authoritative_dns_zone]
+         + (authoritative_dns_servers | map('regex_replace', '^(.*)$', '--server=\\1') | list)
+         + (['--check'] if ansible_check_mode else []) }}
+  register: coredns_authoritative_forward
+  changed_when: "'reconciled' in coredns_authoritative_forward.stdout and 'already' not in coredns_authoritative_forward.stdout"
+
 - name: Spread CoreDNS across the three rack failure domains
   ansible.builtin.command:
     argv:
