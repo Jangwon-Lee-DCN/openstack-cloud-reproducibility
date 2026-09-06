@@ -18,6 +18,13 @@ git -C "$VPC_REPO" merge-base --is-ancestor "$locked_revision" HEAD &&
   echo "VPC source after the locked build differs outside the promoted image-pin file" >&2
   exit 1
 }
+# The controller follows the public OpenStack catalog and must verify its TLS
+# certificate. Copy only the public CA certificate into its own namespace;
+# never copy the Gateway private key or disable certificate verification.
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n openstack-gateway-system get secret openstack-public-ca -o json |
+  python3 -c 'import json,sys; source=json.load(sys.stdin); ca=source.get("data",{}).get("ca.crt"); assert ca, "openstack-public-ca lacks ca.crt"; print(json.dumps({"apiVersion":"v1","kind":"Secret","metadata":{"name":"openstack-public-ca","namespace":"vpc-control-plane-system"},"type":"Opaque","data":{"ca.crt":ca}}))' |
+  kubectl apply -f - >/dev/null
 # The facade validates caller tokens and creates project-scoped Application
 # Credentials through Keystone. Materialize its exact-name clouds.yaml Secret
 # from the already encrypted/reconciled Keystone administrator Secret; no
