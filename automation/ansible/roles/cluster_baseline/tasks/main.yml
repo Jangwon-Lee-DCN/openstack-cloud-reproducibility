@@ -71,6 +71,7 @@
          + (authoritative_dns_servers | map('regex_replace', '^(.*)$', '--server=\\1') | list)
          + (['--check'] if ansible_check_mode else []) }}
   register: coredns_authoritative_forward
+  check_mode: false
   changed_when: "'reconciled' in coredns_authoritative_forward.stdout and 'already' not in coredns_authoritative_forward.stdout"
 
 - name: Spread CoreDNS across the three rack failure domains
