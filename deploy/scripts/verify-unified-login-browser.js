@@ -85,7 +85,13 @@ const assert = require('node:assert/strict');
   await page.waitForURL(url => url.pathname.startsWith('/horizon/project/baremetal_access/'));
   await page.waitForLoadState('networkidle');
   const bareMetalBody = await page.locator('body').innerText();
-  assert(/Request nodes/i.test(bareMetalBody), `Bare Metal request UI did not render: ${bareMetalBody.slice(0, 1000)}`);
+  assert.equal(
+    await page.getByRole('button', {name: 'Request Bare Metal', exact: true}).count(),
+    1,
+    `Bare Metal request action did not render: ${bareMetalBody.slice(0, 1000)}`,
+  );
+  assert(/Bare Metal resources[\s\S]*Available capacity/i.test(bareMetalBody),
+    `Bare Metal resource and capacity tables did not render: ${bareMetalBody.slice(0, 1000)}`);
   assert(!/Bare Metal Approvals/i.test(bareMetalBody), 'baseline DCN member received approval UI');
   assert.equal(failures.length, 0, failures.join('\n'));
 
