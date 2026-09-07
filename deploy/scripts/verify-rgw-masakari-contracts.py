@@ -21,6 +21,8 @@ assert account_setting < account_check < runtime_restart < runtime_check < accep
     "AUTH_<project_id> handling must be persisted, loaded and runtime-verified before acceptance"
 )
 assert account_setting < url_setting < runtime_restart < url_runtime_check < accept
+assert script.count('for socket in /run/ceph/*client.rgw.openstack.object.store.a*.asok') == 2
+assert script.count("for attempt in $(seq 1 60)") == 2
 assert '"url":"http://keystone-api.openstack.svc.cluster.local:5000"' in script
 assert "method='PUT'" in script and "?format=json" in script and "method='DELETE'" in script
 assert script.index("method='PUT'") < script.index("?format=json") < script.index("method='DELETE'") < catalog

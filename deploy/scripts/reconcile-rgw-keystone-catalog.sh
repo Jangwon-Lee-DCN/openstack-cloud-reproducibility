@@ -44,14 +44,28 @@ kubectl -n rook-ceph rollout status deployment/rook-ceph-rgw-$store-a --timeout=
 rgw_pod="$(kubectl -n rook-ceph get pod -l app=rook-ceph-rgw,rgw=$store -o jsonpath='{.items[0].metadata.name}')"
 test -n "$rgw_pod"
 test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
-  socket=$(find /run/ceph -maxdepth 1 -name "*client.rgw.openstack.object.store.a*.asok" -print -quit)
-  test -n "$socket"
-  ceph daemon "$socket" config get rgw_swift_account_in_url
+  for attempt in $(seq 1 60); do
+    for socket in /run/ceph/*client.rgw.openstack.object.store.a*.asok; do
+      if ceph daemon "$socket" config get rgw_swift_account_in_url > /tmp/rgw-runtime-config.json 2>/dev/null; then
+        cat /tmp/rgw-runtime-config.json
+        exit 0
+      fi
+    done
+    sleep 2
+  done
+  exit 1
 ' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_swift_account_in_url"])')" = true
 test "$(kubectl -n rook-ceph exec "$rgw_pod" -c rgw -- sh -ceu '
-  socket=$(find /run/ceph -maxdepth 1 -name "*client.rgw.openstack.object.store.a*.asok" -print -quit)
-  test -n "$socket"
-  ceph daemon "$socket" config get rgw_keystone_url
+  for attempt in $(seq 1 60); do
+    for socket in /run/ceph/*client.rgw.openstack.object.store.a*.asok; do
+      if ceph daemon "$socket" config get rgw_keystone_url > /tmp/rgw-runtime-config.json 2>/dev/null; then
+        cat /tmp/rgw-runtime-config.json
+        exit 0
+      fi
+    done
+    sleep 2
+  done
+  exit 1
 ' | python3 -c 'import json,sys; print(json.load(sys.stdin)["rgw_keystone_url"])')" = \
   http://keystone-api.openstack.svc.cluster.local:5000
 
