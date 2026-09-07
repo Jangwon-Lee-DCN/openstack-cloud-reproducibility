@@ -166,7 +166,7 @@ install_release() {
   if [[ -f "$REPO_ROOT/deploy/values/site/$release.yaml" && "$values_file" != "deploy/values/site/$release.yaml" ]]; then
     value_args+=( -f "$REPO_ROOT/deploy/values/site/$release.yaml" )
   fi
-  if [[ "$release" == neutron ]] && kubectl -n openstack get deployment vpc-metadata-attestor >/dev/null 2>&1; then
+  if [[ "$release" == neutron ]] && kubectl -n openstack get daemonset vpc-metadata-attestor >/dev/null 2>&1; then
     value_args+=( -f "$REPO_ROOT/deploy/values/features/neutron-vpc-identity.yaml" )
   fi
   if [[ "$release" == "cinder" || "$release" == "manila" ]]; then

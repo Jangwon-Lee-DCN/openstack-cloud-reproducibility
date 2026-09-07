@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+CHECK_ONLY=false
+if [[ ${1:-} == --check ]]; then
+  CHECK_ONLY=true
+  shift
+fi
+if (($#)); then
+  echo "usage: $0 [--check]" >&2
+  exit 2
+fi
+
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 VPC_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 ATTESTOR_IMAGE=${METADATA_ATTESTOR_IMAGE:?set METADATA_ATTESTOR_IMAGE to an immutable @sha256 reference}
@@ -21,6 +31,27 @@ locked_image=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1
 git -C "$VPC_REPO" merge-base --is-ancestor "$locked_revision" HEAD &&
   git -C "$VPC_REPO" diff --quiet "$locked_revision" HEAD -- . ':(exclude)config/production/kustomization.yaml' &&
   [[ "$ATTESTOR_IMAGE" == "$locked_image" ]] || { echo "metadata attestor image/source does not match the production VPC image lock" >&2; exit 1; }
+
+render_attestor() {
+  python3 - "$VPC_REPO/config/production/metadata-attestor.yaml" "$ATTESTOR_IMAGE" <<'PY'
+import sys, yaml
+docs=list(yaml.safe_load_all(open(sys.argv[1])))
+for doc in docs:
+    if doc and doc.get("kind") == "DaemonSet":
+        doc["spec"]["template"]["spec"]["containers"][0]["image"] = sys.argv[2]
+yaml.safe_dump_all(docs, sys.stdout, sort_keys=False)
+PY
+}
+
+if $CHECK_ONLY; then
+  kubectl -n openstack get secret neutron-ovn-metadata-agent-default -o json |
+    python3 -c 'import json,sys; data=json.load(sys.stdin).get("data",{}); assert data.get("ovn_metadata_agent.ini"), "metadata agent Secret lacks ovn_metadata_agent.ini"'
+  test -f "$REPO_ROOT/deploy/values/features/neutron-vpc-identity.yaml"
+  render_attestor | kubectl apply --dry-run=server -f - >/dev/null
+  echo "VPC instance identity production preflight passed (no resources changed)"
+  exit 0
+fi
+
 kubectl create namespace vpc-control-plane-system --dry-run=client -o yaml | kubectl apply -f -
 
 # Reuse an existing VPC identity key on rerun, otherwise generate it. Extract
@@ -41,14 +72,7 @@ items=[secret("openstack","vpc-metadata-attestor-secrets",{"neutron-metadata-pro
 print(json.dumps({"apiVersion":"v1","kind":"List","items":items}))
 ' | kubectl apply -f -
 
-python3 - "$VPC_REPO/config/production/metadata-attestor.yaml" "$ATTESTOR_IMAGE" <<'PY' | kubectl apply -f -
-import sys, yaml
-docs=list(yaml.safe_load_all(open(sys.argv[1])))
-for doc in docs:
-    if doc and doc.get("kind") == "DaemonSet":
-        doc["spec"]["template"]["spec"]["containers"][0]["image"] = sys.argv[2]
-yaml.safe_dump_all(docs, sys.stdout, sort_keys=False)
-PY
+render_attestor | kubectl apply -f -
 kubectl -n openstack rollout status daemonset/vpc-metadata-attestor --timeout=10m
 
 # Cut over only after both proxy replicas are Ready. --reuse-values preserves

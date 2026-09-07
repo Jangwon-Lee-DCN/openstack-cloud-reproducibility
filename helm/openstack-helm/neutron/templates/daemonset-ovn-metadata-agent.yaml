@@ -103,7 +103,7 @@ spec:
 {{ dict "envAll" $envAll "application" "neutron_metadata_agent" "container" "neutron_metadata_agent_init" | include "helm-toolkit.snippets.kubernetes_container_security_context" | indent 10 }}
           env:
             - name: NEUTRON_USER_UID
-              value: "{{ .Values.pod.security_context.neutron_metadata_agent.pod.runAsUser }}"
+              value: "{{ .Values.pod.security_context.neutron_ovn_metadata_agent.pod.runAsUser }}"
           command:
             - /tmp/neutron-metadata-agent-init.sh
           volumeMounts:
