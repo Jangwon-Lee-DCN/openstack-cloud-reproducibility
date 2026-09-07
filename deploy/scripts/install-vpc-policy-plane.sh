@@ -23,7 +23,7 @@ git -C "$VPC_REPO" diff --quiet && git -C "$VPC_REPO" diff --cached --quiet || {
   exit 1
 }
 locked_revision=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["spec"]["sourceRevision"])' "$IMAGE_LOCK")
-git -C "$VPC_REPO" merge-base --is-ancestor "$locked_revision" HEAD &&
+git -C "$VPC_REPO" cat-file -e "${locked_revision}^{commit}" &&
   git -C "$VPC_REPO" diff --quiet "$locked_revision" HEAD -- . ':(exclude)config/production/kustomization.yaml' || {
   echo "VPC source after the locked build differs outside the promoted image-pin file" >&2
   exit 1

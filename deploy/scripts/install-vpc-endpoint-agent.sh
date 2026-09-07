@@ -16,7 +16,7 @@ test -f "$VPC_REPO/config/production/endpoint-agent.yaml"
 git -C "$VPC_REPO" diff --quiet && git -C "$VPC_REPO" diff --cached --quiet || { echo "refusing endpoint-agent cutover from dirty VPC source" >&2; exit 1; }
 locked_revision=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["spec"]["sourceRevision"])' "$IMAGE_LOCK")
 locked_image=$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["spec"].get("endpointAgentImage", ""))' "$IMAGE_LOCK")
-git -C "$VPC_REPO" merge-base --is-ancestor "$locked_revision" HEAD &&
+git -C "$VPC_REPO" cat-file -e "${locked_revision}^{commit}" &&
   git -C "$VPC_REPO" diff --quiet "$locked_revision" HEAD -- . ':(exclude)config/production/kustomization.yaml' &&
   [[ "$ENDPOINT_AGENT_IMAGE" == "$locked_image" ]] || { echo "endpoint agent image/source does not match the production VPC image lock" >&2; exit 1; }
 {
