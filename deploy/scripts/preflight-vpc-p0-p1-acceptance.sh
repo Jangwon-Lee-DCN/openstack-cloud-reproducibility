@@ -147,10 +147,10 @@ for secret_ref in openstack/vpc-endpoint-policy-hmac vpc-control-plane-system/vp
   fi
 done
 
-if exists -n openstack get deployment vpc-metadata-attestor; then
-  attestor_desired=$(kubectl -n openstack get deployment vpc-metadata-attestor -o jsonpath='{.spec.replicas}')
-  attestor_ready=$(kubectl -n openstack get deployment vpc-metadata-attestor -o jsonpath='{.status.readyReplicas}')
-  attestor_image=$(kubectl -n openstack get deployment vpc-metadata-attestor -o jsonpath='{.spec.template.spec.containers[0].image}')
+if exists -n openstack get daemonset vpc-metadata-attestor; then
+  attestor_desired=$(kubectl -n openstack get daemonset vpc-metadata-attestor -o jsonpath='{.status.desiredNumberScheduled}')
+  attestor_ready=$(kubectl -n openstack get daemonset vpc-metadata-attestor -o jsonpath='{.status.numberReady}')
+  attestor_image=$(kubectl -n openstack get daemonset vpc-metadata-attestor -o jsonpath='{.spec.template.spec.containers[0].image}')
   [[ "$attestor_desired" -gt 0 && "$attestor_ready" == "$attestor_desired" ]] && \
     pass "metadata attestor ready=$attestor_ready/$attestor_desired" || \
     fail "metadata attestor ready=${attestor_ready:-0}/${attestor_desired:-0}"

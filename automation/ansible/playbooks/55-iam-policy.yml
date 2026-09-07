@@ -4,6 +4,9 @@
   connection: local
   become: false
   gather_facts: false
+  vars:
+    metadata_attestor_image: >-
+      {{ (lookup('file', repro_repo_path + '/deploy/locks/vpc-policy-images.yaml') | from_yaml).spec.metadataAttestorImage }}
   environment:
     KUBECONFIG: "{{ playbook_dir }}/../artifacts/admin.conf"
     SOPS_AGE_KEY_FILE: "{{ lookup('env', 'SOPS_AGE_KEY_FILE') }}"
@@ -57,6 +60,25 @@
     - name: Preflight the exact VPC and OPA policy-plane production render
       ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-vpc-policy-plane.sh --check"
       args: {chdir: "{{ repro_repo_path }}"}
+      check_mode: false
+      changed_when: false
+      when: ansible_check_mode
+
+    - name: Reconcile the VPC trusted instance identity path
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-vpc-instance-identity.sh"
+      args: {chdir: "{{ repro_repo_path }}"}
+      environment:
+        APPROVE_VPC_IDENTITY_PATH: "yes"
+        METADATA_ATTESTOR_IMAGE: "{{ metadata_attestor_image }}"
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Preflight the VPC trusted instance identity path
+      ansible.builtin.command: "{{ repro_repo_path }}/deploy/scripts/install-vpc-instance-identity.sh --check"
+      args: {chdir: "{{ repro_repo_path }}"}
+      environment:
+        APPROVE_VPC_IDENTITY_PATH: "yes"
+        METADATA_ATTESTOR_IMAGE: "{{ metadata_attestor_image }}"
       check_mode: false
       changed_when: false
       when: ansible_check_mode
