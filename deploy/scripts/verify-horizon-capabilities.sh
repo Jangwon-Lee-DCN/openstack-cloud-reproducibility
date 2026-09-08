@@ -121,7 +121,7 @@ project = Horizon.get_dashboard("project")
 assert "core_orchestration" not in [panel.slug for panel in project.get_panels()]
 assert list(project.get_panel_groups()) == [
     "compute", "vpc", "volumes", "share", "object_store",
-    "container_infra", "dns", "observability", "default",
+    "container_infra", "dns", "observability", "default", "support",
 ]
 assert project.get_panel_group("share").panels == [
     "shares", "share_snapshots", "share_networks",
@@ -129,6 +129,7 @@ assert project.get_panel_group("share").panels == [
 assert project.get_panel_group("observability").panels == [
     "cloud_metrics", "cloud_alarms",
 ]
+assert project.get_panel_group("support").panels == ["support_center"]
 assert "network_operations" in project.get_panel_group("vpc").panels
 assert reverse("horizon:project:network_operations:index").startswith("/horizon/")
 assert str(project.get_panel_group("observability").name) == "Monitoring & Alarms"
