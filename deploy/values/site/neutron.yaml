@@ -49,7 +49,9 @@ conf:
       # created by CAPO must remain usable across racks unless the caller
       # explicitly supplies an availability-zone hint.
       default_availability_zones: ""
-      global_physnet_mtu: 1500
+      # The routed VLAN 130 tunnel fabric is qualified for 9000-byte IP MTU.
+      # Internet-facing provider physnets remain explicitly capped at 1500.
+      global_physnet_mtu: 9000
       router_distributed: true
       # Host-side privsep creates this socket with the host neutron UID, while
       # the container uses the image UID. Permit the OVN metadata proxy to
@@ -65,6 +67,7 @@ conf:
         tenant_network_types: geneve
         mechanism_drivers: ovn,sriovnicswitch
         extension_drivers: port_security
+        physical_network_mtus: external-rack-1:1500,external-rack-2:1500,external-rack-3:1500
       ml2_type_flat:
         flat_networks: external-rack-1,external-rack-2,external-rack-3
       ml2_type_geneve:
