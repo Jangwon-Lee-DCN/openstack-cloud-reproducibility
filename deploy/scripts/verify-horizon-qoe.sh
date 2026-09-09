@@ -4,6 +4,7 @@ set -euo pipefail
 NAMESPACE=${NAMESPACE:-openstack}
 HORIZON_URL=${HORIZON_URL:-https://cloud.dcn.ssu.ac.kr/horizon}
 HORIZON_RESOLVE=${HORIZON_RESOLVE:-cloud.dcn.ssu.ac.kr:443:10.67.10.6}
+KEYSTONE_URL=${KEYSTONE_URL:-${HORIZON_URL%/horizon}/identity/v3}
 SAMPLES=${SAMPLES:-5}
 work_dir=$(mktemp -d /tmp/horizon-qoe.XXXXXX)
 cleanup() {
@@ -35,6 +36,8 @@ cookie="$work_dir/cookies"
 username=$(secret_value OS_USERNAME)
 password=$(secret_value OS_PASSWORD)
 domain=$(secret_value OS_USER_DOMAIN_NAME)
+project=$(secret_value OS_PROJECT_NAME)
+project_domain=$(secret_value OS_PROJECT_DOMAIN_NAME)
 status=
 for attempt in 1 2 3 4 5 6; do
   csrf=$(openssl rand -hex 16)
@@ -51,7 +54,6 @@ for attempt in 1 2 3 4 5 6; do
   [[ $status == 302 || $status == 303 ]] && break
   sleep 2
 done
-unset username password domain
 if [[ "$status" != 302 && "$status" != 303 ]]; then
   echo "Horizon benchmark login failed: HTTP $status" >&2
   python3 - "$work_dir/auth-response" <<'PY' >&2
@@ -66,6 +68,50 @@ for message in messages:
 PY
   exit 1
 fi
+
+# Credential login can leave a domain administrator with a domain-scoped
+# token. Project panels, including Gnocchi/Aodh telemetry, require an explicit
+# project scope. Resolve the configured admin project through Keystone and
+# switch the Horizon session before exercising project pages.
+python3 - "$work_dir/project-auth.json" "$username" "$password" "$domain" "$project" "$project_domain" <<'PY'
+import json, pathlib, sys
+path, username, password, user_domain, project, project_domain = sys.argv[1:]
+payload = {
+    "auth": {
+        "identity": {
+            "methods": ["password"],
+            "password": {"user": {"name": username, "domain": {"name": user_domain}, "password": password}},
+        },
+        "scope": {"project": {"name": project, "domain": {"name": project_domain}}},
+    }
+}
+pathlib.Path(path).write_text(json.dumps(payload), encoding="utf-8")
+PY
+chmod 600 "$work_dir/project-auth.json"
+project_auth_status=$(curl "${curl_args[@]}" -D "$work_dir/project-auth.headers" \
+  -o "$work_dir/project-auth.response" -w '%{http_code}' \
+  -H 'Content-Type: application/json' --data-binary "@$work_dir/project-auth.json" \
+  "$KEYSTONE_URL/auth/tokens")
+unset username password domain project project_domain
+[[ "$project_auth_status" == 201 ]] || {
+  echo "Keystone project-scoped authentication failed: HTTP $project_auth_status" >&2
+  exit 1
+}
+project_id=$(python3 - "$work_dir/project-auth.response" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+project_id = data.get("token", {}).get("project", {}).get("id")
+if not project_id:
+    raise SystemExit("Keystone response has no scoped project ID")
+print(project_id)
+PY
+)
+switch_status=$(curl "${curl_args[@]}" -b "$cookie" -c "$cookie" -o /dev/null \
+  -w '%{http_code}' "$HORIZON_URL/auth/switch/$project_id/")
+[[ "$switch_status" == 302 || "$switch_status" == 303 ]] || {
+  echo "Horizon project scope switch failed: HTTP $switch_status" >&2
+  exit 1
+}
 
 affinity=$(kubectl get service -n "$NAMESPACE" horizon-int -o jsonpath='{.spec.sessionAffinity}')
 [[ "$affinity" == ClientIP ]] || {
