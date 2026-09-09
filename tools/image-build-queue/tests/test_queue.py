@@ -28,6 +28,19 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_cinder_compatibility_image_is_serialized(self):
+        self.assertEqual(
+            queue.COMPONENTS["cinder-powerstore-legacy-api"],
+            ("cinder", ("reproducibility",)),
+        )
+        source = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("selected cinder-powerstore-legacy-api", source)
+        groups = (ROOT / "init-groups").read_text()
+        self.assertIn('for group in $("$CLI" groups)', groups)
+        with redirect_stdout(StringIO()) as output:
+            self.assertEqual(queue.group_names(), 0)
+        self.assertIn("cinder", output.getvalue().splitlines())
+
     def test_baremetal_service_and_dashboard_sources_are_mandatory(self):
         self.assertEqual(
             queue.COMPONENTS["baremetal-access-service"][1],
@@ -62,6 +75,11 @@ class QueueTests(unittest.TestCase):
         self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
+        self.assertIn(
+            "/usr/local/libexec/dcn-image-build-queue/init-groups\n"
+            "/usr/local/bin/dcn-image-build health",
+            installer,
+        )
 
     def test_pueue_environment_is_allow_listed(self):
         captured = {}

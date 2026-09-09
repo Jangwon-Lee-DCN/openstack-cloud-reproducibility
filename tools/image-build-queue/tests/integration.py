@@ -97,7 +97,7 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
                 "DCN_IMAGE_BUILD_RUNNER": str(fake_runner),
                 "DCN_TEST_SECRET": "must-not-enter-pueue",
             }
-            for group in ("keystone", "horizon", "nova", "neutron", "octavia", "magnum", "platform-images"):
+            for group in ("keystone", "horizon", "nova", "neutron", "octavia", "magnum", "cinder", "platform-images"):
                 command([str(pueue), "-c", str(config), "group", "add", "--parallel", "1", group])
             cli = str(ROOT / "dcn_image_build.py")
             first_submit = json.loads(command([cli, "submit", "--component", "keystone-oidc", "--source", f"reproducibility={repository}@{first}"], env=base_env).stdout)
@@ -126,7 +126,7 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
             horizon_sources = []
             for source_name in (
                 "reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard",
-                "baremetal_access_dashboard",
+                "baremetal_access_dashboard", "support_dashboard",
             ):
                 horizon_sources.extend(["--source", f"{source_name}={repository}@{parallel_revision}"])
             parallel_b = json.loads(command([cli, "submit", "--component", "horizon-complete", *horizon_sources], env=base_env).stdout)

@@ -58,4 +58,7 @@ ln -sfn /usr/local/libexec/dcn-image-build-queue/dcn-image-build /usr/local/bin/
 systemctl daemon-reload
 systemctl enable --now dcn-image-build-queue.service
 systemctl is-active --quiet dcn-image-build-queue.service
+# enable --now does not rerun ExecStartPost when the daemon is already active.
+# Synchronize newly added groups without restarting or interrupting queued work.
+/usr/local/libexec/dcn-image-build-queue/init-groups
 /usr/local/bin/dcn-image-build health

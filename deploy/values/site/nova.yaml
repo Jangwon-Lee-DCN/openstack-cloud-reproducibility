@@ -20,6 +20,9 @@ images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
+  # PowerStore-backed Cinder volumes use iSCSI. Mount the host initiator and
+  # iscsiadm wrapper into nova-compute so os-brick can build a valid connector.
+  enable_iscsi: true
   ceph:
     enabled: false
   # Read-only exporter access. No create, update, or delete rule is granted.
