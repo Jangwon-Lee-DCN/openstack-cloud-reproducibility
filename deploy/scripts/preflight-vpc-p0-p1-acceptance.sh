@@ -194,8 +194,11 @@ for rack, contract in racks.items():
     assert prefix.prefixlen < 32 and str(prefix) != "10.67.20.0/24"
 workers = inventory["all"]["children"]["workers"]["hosts"]
 computes = [host for host in workers.values() if "compute" in host.get("node_roles", [])]
-assert computes and all("ovn_gateway" in host.get("node_roles", []) for host in computes)
-router_ids = [str(ipaddress.IPv4Address(host["node_ip"])) for host in computes]
+participants = [host for host in computes if host.get("ovn_bgp_participation", True)]
+assert computes and participants
+assert all("ovn_gateway" in host.get("node_roles", []) for host in participants)
+assert set(host["rack"] for host in participants) == set(racks)
+router_ids = [str(ipaddress.IPv4Address(host["node_ip"])) for host in participants]
 assert len(router_ids) == len(set(router_ids))
 PY
 then
