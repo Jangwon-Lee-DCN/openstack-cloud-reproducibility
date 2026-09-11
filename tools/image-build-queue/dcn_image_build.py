@@ -71,6 +71,9 @@ def pueue(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "PUEUE_CONFIG_PATH": CONFIG,
+        "LIBGUESTFS_CACHEDIR": str(STATE / "libguestfs"),
+        "SUPERMIN_KERNEL": str(STATE / "kernels" / f"vmlinuz-{os.uname().release}"),
+        "SUPERMIN_MODULES": f"/lib/modules/{os.uname().release}",
     }
     python_binary = os.environ.get("PYTHON_BINARY")
     if not python_binary and BUILD_PYTHON_CONFIG.is_file():

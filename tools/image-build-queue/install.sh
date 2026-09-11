@@ -8,6 +8,7 @@ build_group=${DCN_IMAGE_BUILD_GROUP:-$(id -gn "$build_user")}
 build_home=$(getent passwd "$build_user" | cut -d: -f6)
 [[ -n "$build_home" ]] || { echo "cannot resolve home for $build_user" >&2; exit 1; }
 build_python=${DCN_IMAGE_BUILD_PYTHON:-$build_home/openstack-production-datacenter/.venv/bin/python}
+kernel_version=$(uname -r)
 [[ -x "$build_python" ]] || { echo "image build Python is not executable: $build_python" >&2; exit 1; }
 "$build_python" -c 'import build' || {
   echo "image build Python does not provide the required build module: $build_python" >&2
@@ -42,6 +43,9 @@ done
 install -d -m 0755 /usr/local/libexec/dcn-image-build-queue /etc/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue/libguestfs
+install -d -o root -g "$build_group" -m 0750 /var/lib/dcn-image-build-queue/kernels
+install -o root -g "$build_group" -m 0640 "/boot/vmlinuz-$kernel_version" \
+  "/var/lib/dcn-image-build-queue/kernels/vmlinuz-$kernel_version"
 install -m 0755 "$stage/pueue-$target" /usr/local/libexec/dcn-image-build-queue/pueue
 install -m 0755 "$stage/pueued-$target" /usr/local/libexec/dcn-image-build-queue/pueued
 install -m 0755 "$root/dcn_image_build.py" /usr/local/libexec/dcn-image-build-queue/dcn-image-build
@@ -52,6 +56,7 @@ printf '%s\n' "$build_python" >"$stage/build-python"
 install -m 0644 "$stage/build-python" /etc/dcn-image-build-queue/build-python
 sed -e "s#@BUILD_USER@#$build_user#g" -e "s#@BUILD_GROUP@#$build_group#g" \
   -e "s#@BUILD_HOME@#$build_home#g" -e "s#@BUILD_PYTHON@#$build_python#g" \
+  -e "s#@KERNEL_VERSION@#$kernel_version#g" \
   "$root/dcn-image-build-queue.service" >"$stage/dcn-image-build-queue.service"
 install -m 0644 "$stage/dcn-image-build-queue.service" /etc/systemd/system/dcn-image-build-queue.service
 ln -sfn /usr/local/libexec/dcn-image-build-queue/dcn-image-build /usr/local/bin/dcn-image-build
