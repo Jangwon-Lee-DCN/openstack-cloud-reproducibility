@@ -37,9 +37,9 @@ qemu-img create -f qcow2 "$image" 32G
 virt-resize --expand /dev/sda1 "$base" "$image"
 repo=ubuntu${ubuntu/./}
 guest_network="ip link set eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; rm -f /etc/resolv.conf; printf 'nameserver 169.254.2.3\\n' > /etc/resolv.conf"
-virt-customize -a "$image" --network \
+virt-customize -a "$image" --network --memsize 4096 --smp 8 \
   --run-command 'rm -f /etc/machine-id; touch /etc/machine-id' \
-  --run-command "$guest_network; curl -fsSLo /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$repo/x86_64/cuda-keyring_1.1-1_all.deb; dpkg -i /tmp/cuda-keyring.deb; apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '$driver_package' '$cuda_package' '$cudnn_package' 'libnccl2=$nccl_version' 'libnccl-dev=$nccl_version' nvidia-container-toolkit" \
+  --run-command "$guest_network; curl -fsSLo /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$repo/x86_64/cuda-keyring_1.1-1_all.deb; dpkg -i /tmp/cuda-keyring.deb; apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '$driver_package' '$cuda_package' '$cudnn_package' 'libnccl2=$nccl_version' 'libnccl-dev=$nccl_version' nvidia-container-toolkit python3-venv fio" \
   --run-command "printf '%s\n' 'profile=$profile' 'cuda_package=$cuda_package' 'cudnn_package=$cudnn_package' 'nccl_version=$nccl_version' 'driver_package=$driver_package' > /etc/dcn-gpu-runtime-release" \
   --run-command 'ln -sfn ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf' \
   --run-command 'apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/cuda-keyring.deb /var/lib/cloud/*'
