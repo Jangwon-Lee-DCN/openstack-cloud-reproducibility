@@ -38,7 +38,7 @@ qemu-img resize "$image" 32G
 repo=ubuntu${ubuntu/./}
 virt-customize -a "$image" --network \
   --run-command 'rm -f /etc/machine-id; touch /etc/machine-id' \
-  --run-command "rm -f /etc/resolv.conf; printf 'nameserver 10.0.2.3\\n' > /etc/resolv.conf" \
+  --run-command "ip link set eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; rm -f /etc/resolv.conf; printf 'nameserver 169.254.2.3\\n' > /etc/resolv.conf" \
   --run-command "curl -fsSLo /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$repo/x86_64/cuda-keyring_1.1-1_all.deb" \
   --run-command 'dpkg -i /tmp/cuda-keyring.deb && apt-get update' \
   --run-command "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '$driver_package' '$cuda_package' '$cudnn_package' 'libnccl2=$nccl_version' 'libnccl-dev=$nccl_version' nvidia-container-toolkit" \
