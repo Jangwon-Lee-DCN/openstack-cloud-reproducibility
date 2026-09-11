@@ -54,6 +54,13 @@ class QueueTests(unittest.TestCase):
         self.assertFalse(any("legacy" in name for name in profiles))
         for name in expected:
             self.assertEqual(queue.COMPONENTS[name], ("glance-images", ("reproducibility",)))
+        builder = (ROOT.parent.parent / "images/gpu-runtime/build.sh").read_text()
+        self.assertIn("ip address replace 169.254.2.15/16", builder)
+        self.assertIn("nameserver 169.254.2.3", builder)
+        self.assertEqual(builder.count("--run-command \"$guest_network; curl"), 1)
+        self.assertIn("stub-resolv.conf", builder)
+        self.assertIn("virt-resize --expand /dev/sda1", builder)
+        self.assertIn("DCN_GPU_BASE_CACHE", builder)
 
     def test_disk_artifact_is_checksum_verified_and_persisted(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -103,11 +110,13 @@ class QueueTests(unittest.TestCase):
         self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
         self.assertIn("Environment=LIBGUESTFS_CACHEDIR=/var/lib/dcn-image-build-queue/libguestfs", service)
         self.assertIn("Environment=SUPERMIN_KERNEL=/var/lib/dcn-image-build-queue/kernels/vmlinuz-@KERNEL_VERSION@", service)
+        self.assertIn("Environment=SUPERMIN_MODULES=/var/lib/dcn-image-build-queue/kernels/modules-@KERNEL_VERSION@", service)
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
         self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
         self.assertIn("/var/lib/dcn-image-build-queue/libguestfs", installer)
         self.assertIn('"/boot/vmlinuz-$kernel_version"', installer)
+        self.assertIn('cp -aT "/lib/modules/$kernel_version"', installer)
 
     def test_pueue_environment_is_allow_listed(self):
         captured = {}
@@ -127,7 +136,8 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(captured["PUEUE_CONFIG_PATH"], queue.CONFIG)
         self.assertEqual(captured["LIBGUESTFS_CACHEDIR"], str(queue.STATE / "libguestfs"))
         self.assertEqual(captured["SUPERMIN_KERNEL"], str(queue.STATE / "kernels" / f"vmlinuz-{os.uname().release}"))
-        self.assertEqual(captured["SUPERMIN_MODULES"], f"/lib/modules/{os.uname().release}")
+        self.assertEqual(captured["SUPERMIN_MODULES"], str(queue.STATE / "kernels" / f"modules-{os.uname().release}"))
+        self.assertEqual(captured["DCN_GPU_BASE_CACHE"], str(queue.STATE / "cache" / "ubuntu"))
         self.assertEqual(captured["PYTHON_BINARY"], "/opt/dcn-build/bin/python")
 
     def test_pueue_reads_build_python_when_submitter_environment_is_empty(self):

@@ -43,9 +43,14 @@ done
 install -d -m 0755 /usr/local/libexec/dcn-image-build-queue /etc/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue/libguestfs
+install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue/cache/ubuntu
 install -d -o root -g "$build_group" -m 0750 /var/lib/dcn-image-build-queue/kernels
 install -o root -g "$build_group" -m 0640 "/boot/vmlinuz-$kernel_version" \
   "/var/lib/dcn-image-build-queue/kernels/vmlinuz-$kernel_version"
+install -d -o root -g "$build_group" -m 0750 \
+  "/var/lib/dcn-image-build-queue/kernels/modules-$kernel_version"
+cp -aT "/lib/modules/$kernel_version" \
+  "/var/lib/dcn-image-build-queue/kernels/modules-$kernel_version"
 install -m 0755 "$stage/pueue-$target" /usr/local/libexec/dcn-image-build-queue/pueue
 install -m 0755 "$stage/pueued-$target" /usr/local/libexec/dcn-image-build-queue/pueued
 install -m 0755 "$root/dcn_image_build.py" /usr/local/libexec/dcn-image-build-queue/dcn-image-build

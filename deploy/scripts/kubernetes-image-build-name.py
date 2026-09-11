@@ -19,4 +19,3 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         raise SystemExit("usage: kubernetes-image-build-name.py COMPONENT BUILD_ID")
     print(build_name(sys.argv[1], sys.argv[2]))
-

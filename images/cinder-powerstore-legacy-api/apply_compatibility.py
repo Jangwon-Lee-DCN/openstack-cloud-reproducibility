@@ -46,4 +46,3 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         raise SystemExit("usage: apply_compatibility.py POWERSTORE_DRIVER_DIR")
     patch_driver(Path(sys.argv[1]))
-

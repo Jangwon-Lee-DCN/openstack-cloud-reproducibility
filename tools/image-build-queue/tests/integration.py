@@ -146,6 +146,7 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
                     "PUEUE_GROUP", "PUEUE_WORKER_ID", "PYTHON_BINARY",
                     "LIBGUESTFS_CACHEDIR",
                     "SUPERMIN_KERNEL", "SUPERMIN_MODULES",
+                    "DCN_GPU_BASE_CACHE",
                 }
                 if unexpected:
                     raise RuntimeError(f"submission environment leaked into Pueue state: {sorted(unexpected)}; raw={envs!r}")
