@@ -54,7 +54,18 @@ def atomic_json(path: Path, value: dict) -> None:
 
 
 def clone_at(source: dict[str, str], destination: Path) -> None:
-    subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", source["repository"], str(destination)], check=True)
+    repository = source["repository"]
+    origin = subprocess.run(
+        ["git", "-C", repository, "remote", "get-url", "origin"],
+        check=False, text=True, capture_output=True,
+    )
+    if origin.returncode == 0 and origin.stdout.strip():
+        # A source worktree may itself be a partial clone. Cloning it with
+        # --shared cannot lazily obtain missing objects inside the hardened
+        # service. Fetch the already-validated pushed revision from origin.
+        subprocess.run(["git", "clone", "--quiet", "--filter=blob:none", "--no-checkout", origin.stdout.strip(), str(destination)], check=True)
+    else:
+        subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", repository, str(destination)], check=True)
     subprocess.run(["git", "-C", str(destination), "checkout", "--quiet", "--detach", source["revision"]], check=True)
 
 
