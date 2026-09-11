@@ -43,6 +43,7 @@ done
 install -d -m 0755 /usr/local/libexec/dcn-image-build-queue /etc/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue/libguestfs
+install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue/cache/ubuntu
 install -d -o root -g "$build_group" -m 0750 /var/lib/dcn-image-build-queue/kernels
 install -o root -g "$build_group" -m 0640 "/boot/vmlinuz-$kernel_version" \
   "/var/lib/dcn-image-build-queue/kernels/vmlinuz-$kernel_version"

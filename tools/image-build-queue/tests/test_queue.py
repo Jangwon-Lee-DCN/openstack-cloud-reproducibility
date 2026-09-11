@@ -41,6 +41,10 @@ class QueueTests(unittest.TestCase):
         self.assertFalse(any("legacy" in name for name in profiles))
         for name in expected:
             self.assertEqual(queue.COMPONENTS[name], ("glance-images", ("reproducibility",)))
+        builder = (ROOT.parent.parent / "images/gpu-runtime/build.sh").read_text()
+        self.assertIn("nameserver 10.64.20.12", builder)
+        self.assertIn("stub-resolv.conf", builder)
+        self.assertIn("DCN_GPU_BASE_CACHE", builder)
 
     def test_disk_artifact_is_checksum_verified_and_persisted(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,6 +121,7 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(captured["LIBGUESTFS_CACHEDIR"], str(queue.STATE / "libguestfs"))
         self.assertEqual(captured["SUPERMIN_KERNEL"], str(queue.STATE / "kernels" / f"vmlinuz-{os.uname().release}"))
         self.assertEqual(captured["SUPERMIN_MODULES"], str(queue.STATE / "kernels" / f"modules-{os.uname().release}"))
+        self.assertEqual(captured["DCN_GPU_BASE_CACHE"], str(queue.STATE / "cache" / "ubuntu"))
         self.assertEqual(captured["PYTHON_BINARY"], "/opt/dcn-build/bin/python")
 
     def test_pueue_reads_build_python_when_submitter_environment_is_empty(self):
