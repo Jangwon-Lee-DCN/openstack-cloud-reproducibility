@@ -28,6 +28,34 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_gpu_profiles_are_version_named_and_serialized(self):
+        expected = {
+            "ubuntu-22.04-cuda-11.8", "ubuntu-22.04-cuda-12.4",
+            "ubuntu-22.04-cuda-12.8", "ubuntu-24.04-cuda-12.8",
+            "ubuntu-24.04-cuda-12.9", "ubuntu-24.04-cuda-13.0",
+        }
+        profiles = json.loads((ROOT.parent.parent / "images/gpu-runtime/profiles.json").read_text())
+        nccl = json.loads((ROOT.parent.parent / "images/gpu-runtime/nccl-packages.json").read_text())
+        self.assertEqual(expected, set(profiles))
+        self.assertEqual(expected, set(nccl))
+        self.assertFalse(any("legacy" in name for name in profiles))
+        for name in expected:
+            self.assertEqual(queue.COMPONENTS[name], ("glance-images", ("reproducibility",)))
+
+    def test_disk_artifact_is_checksum_verified_and_persisted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            artifact = workspace / "image.qcow2"
+            artifact.write_bytes(b"disk-image")
+            digest = "sha256:" + __import__("hashlib").sha256(b"disk-image").hexdigest()
+            result = workspace / "result.env"
+            result.write_text(f"image={artifact}@{digest}\n")
+            ref, actual = runner.persist_disk_artifact(workspace, result, root, "request-1")
+            self.assertEqual(actual, digest)
+            self.assertTrue(ref.startswith(f"file://{root}/artifacts/request-1/image.qcow2@"))
+
     def test_baremetal_service_and_dashboard_sources_are_mandatory(self):
         self.assertEqual(
             queue.COMPONENTS["baremetal-access-service"][1],
