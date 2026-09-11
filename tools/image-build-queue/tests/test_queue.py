@@ -177,6 +177,18 @@ class QueueTests(unittest.TestCase):
             self.assertEqual(result["digest"], "sha256:" + "a" * 64)
             self.assertTrue(result["immutable_ref"].endswith("@sha256:" + "a" * 64))
 
+    def test_clone_uses_origin_instead_of_sharing_a_source_worktree(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bare = root / "origin.git"
+            subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+            source = self.make_repository(root / "source", success=True)
+            subprocess.run(["git", "-C", str(source), "remote", "add", "origin", str(bare)], check=True)
+            subprocess.run(["git", "-C", str(source), "push", "-q", "origin", "HEAD:main"], check=True)
+            destination = root / "clone"
+            runner.clone_at({"repository": str(source), "revision": self.head(source)}, destination)
+            self.assertEqual(self.head(source), self.head(destination))
+
     def test_runner_fails_closed_without_digest(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
