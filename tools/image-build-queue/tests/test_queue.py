@@ -41,6 +41,34 @@ class QueueTests(unittest.TestCase):
             self.assertEqual(queue.group_names(), 0)
         self.assertIn("cinder", output.getvalue().splitlines())
 
+    def test_gpu_profiles_are_version_named_and_serialized(self):
+        expected = {
+            "ubuntu-22.04-cuda-11.8", "ubuntu-22.04-cuda-12.4",
+            "ubuntu-22.04-cuda-12.8", "ubuntu-24.04-cuda-12.8",
+            "ubuntu-24.04-cuda-12.9", "ubuntu-24.04-cuda-13.0",
+        }
+        profiles = json.loads((ROOT.parent.parent / "images/gpu-runtime/profiles.json").read_text())
+        nccl = json.loads((ROOT.parent.parent / "images/gpu-runtime/nccl-packages.json").read_text())
+        self.assertEqual(expected, set(profiles))
+        self.assertEqual(expected, set(nccl))
+        self.assertFalse(any("legacy" in name for name in profiles))
+        for name in expected:
+            self.assertEqual(queue.COMPONENTS[name], ("glance-images", ("reproducibility",)))
+
+    def test_disk_artifact_is_checksum_verified_and_persisted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            artifact = workspace / "image.qcow2"
+            artifact.write_bytes(b"disk-image")
+            digest = "sha256:" + __import__("hashlib").sha256(b"disk-image").hexdigest()
+            result = workspace / "result.env"
+            result.write_text(f"image={artifact}@{digest}\n")
+            ref, actual = runner.persist_disk_artifact(workspace, result, root, "request-1")
+            self.assertEqual(actual, digest)
+            self.assertTrue(ref.startswith(f"file://{root}/artifacts/request-1/image.qcow2@"))
+
     def test_baremetal_service_and_dashboard_sources_are_mandatory(self):
         self.assertEqual(
             queue.COMPONENTS["baremetal-access-service"][1],
@@ -73,13 +101,13 @@ class QueueTests(unittest.TestCase):
         service = (ROOT / "dcn-image-build-queue.service").read_text()
         installer = (ROOT / "install.sh").read_text()
         self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
+        self.assertIn("Environment=LIBGUESTFS_CACHEDIR=/var/lib/dcn-image-build-queue/libguestfs", service)
+        self.assertIn("Environment=SUPERMIN_KERNEL=/var/lib/dcn-image-build-queue/kernels/vmlinuz-@KERNEL_VERSION@", service)
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
-        self.assertIn(
-            "/usr/local/libexec/dcn-image-build-queue/init-groups\n"
-            "/usr/local/bin/dcn-image-build health",
-            installer,
-        )
+        self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
+        self.assertIn("/var/lib/dcn-image-build-queue/libguestfs", installer)
+        self.assertIn('"/boot/vmlinuz-$kernel_version"', installer)
 
     def test_pueue_environment_is_allow_listed(self):
         captured = {}
@@ -97,6 +125,9 @@ class QueueTests(unittest.TestCase):
         self.assertNotIn("GH_TOKEN", captured)
         self.assertNotIn("SOPS_AGE_KEY_FILE", captured)
         self.assertEqual(captured["PUEUE_CONFIG_PATH"], queue.CONFIG)
+        self.assertEqual(captured["LIBGUESTFS_CACHEDIR"], str(queue.STATE / "libguestfs"))
+        self.assertEqual(captured["SUPERMIN_KERNEL"], str(queue.STATE / "kernels" / f"vmlinuz-{os.uname().release}"))
+        self.assertEqual(captured["SUPERMIN_MODULES"], f"/lib/modules/{os.uname().release}")
         self.assertEqual(captured["PYTHON_BINARY"], "/opt/dcn-build/bin/python")
 
     def test_pueue_reads_build_python_when_submitter_environment_is_empty(self):
@@ -165,6 +196,18 @@ class QueueTests(unittest.TestCase):
             self.assertEqual(result["status"], "succeeded")
             self.assertEqual(result["digest"], "sha256:" + "a" * 64)
             self.assertTrue(result["immutable_ref"].endswith("@sha256:" + "a" * 64))
+
+    def test_clone_uses_origin_instead_of_sharing_a_source_worktree(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bare = root / "origin.git"
+            subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+            source = self.make_repository(root / "source", success=True)
+            subprocess.run(["git", "-C", str(source), "remote", "add", "origin", str(bare)], check=True)
+            subprocess.run(["git", "-C", str(source), "push", "-q", "origin", "HEAD:main"], check=True)
+            destination = root / "clone"
+            runner.clone_at({"repository": str(source), "revision": self.head(source)}, destination)
+            self.assertEqual(self.head(source), self.head(destination))
 
     def test_runner_fails_closed_without_digest(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -24,6 +24,12 @@ BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 
 COMPONENTS = {
     "cinder-powerstore-legacy-api": ("cinder", ("reproducibility",)),
+    "ubuntu-22.04-cuda-11.8": ("glance-images", ("reproducibility",)),
+    "ubuntu-22.04-cuda-12.4": ("glance-images", ("reproducibility",)),
+    "ubuntu-22.04-cuda-12.8": ("glance-images", ("reproducibility",)),
+    "ubuntu-24.04-cuda-12.8": ("glance-images", ("reproducibility",)),
+    "ubuntu-24.04-cuda-12.9": ("glance-images", ("reproducibility",)),
+    "ubuntu-24.04-cuda-13.0": ("glance-images", ("reproducibility",)),
     "horizon-complete": (
         "horizon",
         ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard", "baremetal_access_dashboard", "support_dashboard"),
@@ -66,6 +72,9 @@ def pueue(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         "LC_ALL": "C.UTF-8",
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "PUEUE_CONFIG_PATH": CONFIG,
+        "LIBGUESTFS_CACHEDIR": str(STATE / "libguestfs"),
+        "SUPERMIN_KERNEL": str(STATE / "kernels" / f"vmlinuz-{os.uname().release}"),
+        "SUPERMIN_MODULES": f"/lib/modules/{os.uname().release}",
     }
     python_binary = os.environ.get("PYTHON_BINARY")
     if not python_binary and BUILD_PYTHON_CONFIG.is_file():

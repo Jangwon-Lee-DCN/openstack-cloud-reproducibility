@@ -15,7 +15,8 @@ Kubernetes controller, CRD, database, or web API is introduced.
   present on an `origin/*` branch.
 - The request fingerprint includes every source repository and revision.
   Duplicate queued, running, or successful requests reuse the same task.
-- The queue result is an immutable registry reference containing a digest.
+- OCI builds return an immutable registry reference. Glance disk builds return
+  a queue-owned `file://` artifact. Both contain a verified SHA-256 digest.
   A failed build never returns a digest.
 - Building does not update a Helm value, release lock, Deployment, or running
   Pod. Promotion remains a separately reviewed workflow.
@@ -98,6 +99,24 @@ running builds. Use `queue --all` when completed and failed history is needed.
 Do not call the bundled Pueue client directly for routine builds. The wrapper
 provides source validation, environment scrubbing, deduplication, and digest
 validation that raw Pueue does not.
+
+## Build versioned Ubuntu GPU images
+
+The six supported component names are the public Glance image names; no
+generation label is added to the name. CUDA (including cuBLAS), cuDNN, NCCL
+runtime/development libraries, driver, NVIDIA Container Toolkit, base-image
+checksum, and minimum compute capability are pinned under `images/gpu-runtime/`.
+
+```bash
+dcn-image-build submit --component ubuntu-22.04-cuda-11.8 \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA --wait
+dcn-image-build submit --component ubuntu-24.04-cuda-13.0 \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA --wait
+```
+
+Builds in the `glance-images` group are serialized. A successful result is a
+queue-owned QCOW2 path plus its verified digest; it is not automatically
+uploaded or made public in Glance.
 
 ## Validation
 

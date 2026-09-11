@@ -4,12 +4,41 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+
+
+DISK_COMPONENT_PREFIX = "ubuntu-"
+
+
+def persist_disk_artifact(workspace: Path, result_file: Path, state: Path, request_id: str) -> tuple[str, str]:
+    rows = [line.strip() for line in result_file.read_text().splitlines() if line.strip()]
+    if len(rows) != 1 or "=" not in rows[0]:
+        raise RuntimeError(f"expected exactly one disk result, got: {rows}")
+    _, value = rows[0].split("=", 1)
+    if "@sha256:" not in value:
+        raise RuntimeError("disk result does not contain sha256 digest")
+    raw_path, digest = value.rsplit("@", 1)
+    artifact = Path(raw_path).resolve()
+    if workspace.resolve() not in artifact.parents or not artifact.is_file():
+        raise RuntimeError("disk artifact is absent or outside the build workspace")
+    checksum = hashlib.sha256()
+    with artifact.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            checksum.update(chunk)
+    actual = "sha256:" + checksum.hexdigest()
+    if actual != digest:
+        raise RuntimeError(f"disk artifact checksum mismatch: declared={digest} actual={actual}")
+    destination_dir = state / "artifacts" / request_id
+    destination_dir.mkdir(parents=True, exist_ok=False)
+    destination = destination_dir / artifact.name
+    shutil.move(str(artifact), destination)
+    return f"file://{destination}@{digest}", digest
 
 
 def atomic_json(path: Path, value: dict) -> None:
@@ -25,7 +54,18 @@ def atomic_json(path: Path, value: dict) -> None:
 
 
 def clone_at(source: dict[str, str], destination: Path) -> None:
-    subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", source["repository"], str(destination)], check=True)
+    repository = source["repository"]
+    origin = subprocess.run(
+        ["git", "-C", repository, "remote", "get-url", "origin"],
+        check=False, text=True, capture_output=True,
+    )
+    if origin.returncode == 0 and origin.stdout.strip():
+        # A source worktree may itself be a partial clone. Cloning it with
+        # --shared cannot lazily obtain missing objects inside the hardened
+        # service. Fetch the already-validated pushed revision from origin.
+        subprocess.run(["git", "clone", "--quiet", "--filter=blob:none", "--no-checkout", origin.stdout.strip(), str(destination)], check=True)
+    else:
+        subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", repository, str(destination)], check=True)
     subprocess.run(["git", "-C", str(destination), "checkout", "--quiet", "--detach", source["revision"]], check=True)
 
 
@@ -63,6 +103,19 @@ def execute(path: Path) -> int:
         for name, variable in mappings.items():
             if name in checkouts:
                 environment[variable] = str(checkouts[name])
+        if request["component"].startswith(DISK_COMPONENT_PREFIX) and "-cuda-" in request["component"]:
+            subprocess.run([
+                str(repro / "images/gpu-runtime/build.sh"),
+                request["component"], str(workspace / "output"),
+            ], cwd=repro, env=environment, check=True)
+            immutable_ref, digest = persist_disk_artifact(
+                workspace, result_file, path.parent.parent,
+                request.get("request_id", "test-request"),
+            )
+            request.update({"status": "succeeded", "immutable_ref": immutable_ref, "digest": digest})
+            atomic_json(path, request)
+            print(immutable_ref)
+            return 0
         subprocess.run([str(repro / "deploy/scripts/build-images.sh")], cwd=repro, env=environment, check=True)
         rows = [line.strip() for line in result_file.read_text().splitlines() if line.strip()]
         if len(rows) != 1 or "=" not in rows[0] or "@sha256:" not in rows[0]:
