@@ -8,7 +8,7 @@ manifest=$root/profiles.json
 nccl_manifest=$root/nccl-packages.json
 result_file=${RESULT_FILE:?RESULT_FILE required}
 base_cache=${DCN_GPU_BASE_CACHE:?DCN_GPU_BASE_CACHE required}
-for command in curl python3 qemu-img sha256sum virt-customize; do
+for command in curl python3 qemu-img sha256sum virt-customize virt-resize; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
 done
 
@@ -33,8 +33,8 @@ if [[ ! -f "$base" ]]; then
   mv "$base.partial" "$base"
 fi
 printf '%s  %s\n' "$base_sha256" "$base" | sha256sum --check --status
-cp --reflink=auto "$base" "$image"
-qemu-img resize "$image" 32G
+qemu-img create -f qcow2 "$image" 32G
+virt-resize --expand /dev/sda1 "$base" "$image"
 repo=ubuntu${ubuntu/./}
 guest_network="ip link set eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; rm -f /etc/resolv.conf; printf 'nameserver 169.254.2.3\\n' > /etc/resolv.conf"
 virt-customize -a "$image" --network \
