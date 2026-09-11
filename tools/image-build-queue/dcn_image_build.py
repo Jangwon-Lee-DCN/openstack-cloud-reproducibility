@@ -23,6 +23,12 @@ RUNNER = os.environ.get("DCN_IMAGE_BUILD_RUNNER", "/usr/local/libexec/dcn-image-
 BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 
 COMPONENTS = {
+    "ubuntu-22.04-cuda-11.8": ("glance-images", ("reproducibility",)),
+    "ubuntu-22.04-cuda-12.4": ("glance-images", ("reproducibility",)),
+    "ubuntu-22.04-cuda-12.8": ("glance-images", ("reproducibility",)),
+    "ubuntu-24.04-cuda-12.8": ("glance-images", ("reproducibility",)),
+    "ubuntu-24.04-cuda-12.9": ("glance-images", ("reproducibility",)),
+    "ubuntu-24.04-cuda-13.0": ("glance-images", ("reproducibility",)),
     "horizon-complete": (
         "horizon",
         ("reproducibility", "vpc_dashboard", "telemetry_dashboard", "s3_dashboard", "baremetal_access_dashboard", "support_dashboard"),
