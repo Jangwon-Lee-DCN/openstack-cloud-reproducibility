@@ -44,6 +44,7 @@ class QueueTests(unittest.TestCase):
         builder = (ROOT.parent.parent / "images/gpu-runtime/build.sh").read_text()
         self.assertIn("ip address replace 169.254.2.15/16", builder)
         self.assertIn("nameserver 169.254.2.3", builder)
+        self.assertEqual(builder.count("--run-command \"$guest_network; curl"), 1)
         self.assertIn("stub-resolv.conf", builder)
         self.assertIn("DCN_GPU_BASE_CACHE", builder)
 
