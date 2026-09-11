@@ -42,7 +42,7 @@ class QueueTests(unittest.TestCase):
         for name in expected:
             self.assertEqual(queue.COMPONENTS[name], ("glance-images", ("reproducibility",)))
         builder = (ROOT.parent.parent / "images/gpu-runtime/build.sh").read_text()
-        self.assertIn("nameserver 10.64.20.12", builder)
+        self.assertIn("nameserver 10.0.2.3", builder)
         self.assertIn("stub-resolv.conf", builder)
         self.assertIn("DCN_GPU_BASE_CACHE", builder)
 
