@@ -74,6 +74,7 @@ def pueue(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         "LIBGUESTFS_CACHEDIR": str(STATE / "libguestfs"),
         "SUPERMIN_KERNEL": str(STATE / "kernels" / f"vmlinuz-{os.uname().release}"),
         "SUPERMIN_MODULES": str(STATE / "kernels" / f"modules-{os.uname().release}"),
+        "DCN_GPU_BASE_CACHE": str(STATE / "cache" / "ubuntu"),
     }
     python_binary = os.environ.get("PYTHON_BINARY")
     if not python_binary and BUILD_PYTHON_CONFIG.is_file():
