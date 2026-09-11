@@ -12,6 +12,8 @@ UMask=0007
 Environment=PUEUE_CONFIG_PATH=/etc/dcn-image-build-queue/pueue.yml
 Environment=DCN_IMAGE_BUILD_STATE=/var/lib/dcn-image-build-queue
 Environment=LIBGUESTFS_CACHEDIR=/var/lib/dcn-image-build-queue/libguestfs
+Environment=SUPERMIN_KERNEL=/var/lib/dcn-image-build-queue/kernels/vmlinuz-@KERNEL_VERSION@
+Environment=SUPERMIN_MODULES=/lib/modules/@KERNEL_VERSION@
 Environment=PYTHON_BINARY=@BUILD_PYTHON@
 ExecStart=/usr/local/libexec/dcn-image-build-queue/pueued --config /etc/dcn-image-build-queue/pueue.yml
 ExecStartPost=/usr/local/libexec/dcn-image-build-queue/init-groups

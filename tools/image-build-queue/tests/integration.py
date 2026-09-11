@@ -144,6 +144,8 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
                 unexpected = env_names - {
                     "HOME", "LANG", "LC_ALL", "PATH", "PUEUE_CONFIG_PATH",
                     "PUEUE_GROUP", "PUEUE_WORKER_ID", "PYTHON_BINARY",
+                    "LIBGUESTFS_CACHEDIR",
+                    "SUPERMIN_KERNEL", "SUPERMIN_MODULES",
                 }
                 if unexpected:
                     raise RuntimeError(f"submission environment leaked into Pueue state: {sorted(unexpected)}; raw={envs!r}")
