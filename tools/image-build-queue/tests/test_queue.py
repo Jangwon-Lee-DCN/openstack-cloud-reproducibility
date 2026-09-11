@@ -46,6 +46,7 @@ class QueueTests(unittest.TestCase):
         self.assertIn("nameserver 169.254.2.3", builder)
         self.assertEqual(builder.count("--run-command \"$guest_network; curl"), 1)
         self.assertIn("stub-resolv.conf", builder)
+        self.assertIn("virt-resize --expand /dev/sda1", builder)
         self.assertIn("DCN_GPU_BASE_CACHE", builder)
 
     def test_disk_artifact_is_checksum_verified_and_persisted(self):
