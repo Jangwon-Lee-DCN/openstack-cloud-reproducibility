@@ -59,7 +59,13 @@
     content: |
       # Managed by the gpu_vfio_passthrough role.
       options vfio-pci ids={{ gpu_vfio_device_id_list | join(',') }} disable_vga=1
-      softdep nvidia pre: vfio-pci
+      # NVIDIA's package udev rules issue explicit modprobe calls.  A softdep
+      # alone cannot prevent those calls from contending with vfio-pci and
+      # keeping the udev queue busy while Nova prepares a passthrough guest.
+      install nvidia /bin/false
+      install nvidia_modeset /bin/false
+      install nvidia_drm /bin/false
+      install nvidia_uvm /bin/false
       softdep snd_hda_intel pre: vfio-pci
   notify: gpu passthrough changed
 
