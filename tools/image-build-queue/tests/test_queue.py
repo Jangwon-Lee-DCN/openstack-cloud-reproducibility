@@ -88,9 +88,11 @@ class QueueTests(unittest.TestCase):
         service = (ROOT / "dcn-image-build-queue.service").read_text()
         installer = (ROOT / "install.sh").read_text()
         self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
+        self.assertIn("Environment=LIBGUESTFS_CACHEDIR=/var/lib/dcn-image-build-queue/libguestfs", service)
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
         self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
+        self.assertIn("/var/lib/dcn-image-build-queue/libguestfs", installer)
 
     def test_pueue_environment_is_allow_listed(self):
         captured = {}
