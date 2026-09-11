@@ -41,6 +41,7 @@ done
 
 install -d -m 0755 /usr/local/libexec/dcn-image-build-queue /etc/dcn-image-build-queue
 install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue
+install -d -o "$build_user" -g "$build_group" -m 0770 /var/lib/dcn-image-build-queue/libguestfs
 install -m 0755 "$stage/pueue-$target" /usr/local/libexec/dcn-image-build-queue/pueue
 install -m 0755 "$stage/pueued-$target" /usr/local/libexec/dcn-image-build-queue/pueued
 install -m 0755 "$root/dcn_image_build.py" /usr/local/libexec/dcn-image-build-queue/dcn-image-build
