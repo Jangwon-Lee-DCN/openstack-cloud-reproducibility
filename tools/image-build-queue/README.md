@@ -10,7 +10,7 @@ Kubernetes controller, CRD, database, or web API is introduced.
   release and verified against the committed SHA-256 values.
 - One persistent systemd service runs as the existing `ubuntu` operator.
 - Pueue groups have parallelism one. Horizon, Nova, Neutron, Keystone,
-  Octavia, Magnum, and other platform images have independent groups.
+  Cinder, Octavia, Magnum, and other platform images have independent groups.
 - Requests accept only allow-listed components and exact Git commits that are
   present on an `origin/*` branch.
 - The request fingerprint includes every source repository and revision.
