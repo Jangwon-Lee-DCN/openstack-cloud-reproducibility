@@ -90,6 +90,7 @@ class QueueTests(unittest.TestCase):
         self.assertIn("Environment=PYTHON_BINARY=@BUILD_PYTHON@", service)
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
+        self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
 
     def test_pueue_environment_is_allow_listed(self):
         captured = {}

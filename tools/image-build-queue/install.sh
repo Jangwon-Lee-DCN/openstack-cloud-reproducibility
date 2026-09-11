@@ -56,6 +56,9 @@ install -m 0644 "$stage/dcn-image-build-queue.service" /etc/systemd/system/dcn-i
 ln -sfn /usr/local/libexec/dcn-image-build-queue/dcn-image-build /usr/local/bin/dcn-image-build
 
 systemctl daemon-reload
-systemctl enable --now dcn-image-build-queue.service
+systemctl enable dcn-image-build-queue.service
+# The service may already be running with older group definitions. Restart is
+# required so ExecStartPost reconciles every group from this exact revision.
+systemctl restart dcn-image-build-queue.service
 systemctl is-active --quiet dcn-image-build-queue.service
 /usr/local/bin/dcn-image-build health
