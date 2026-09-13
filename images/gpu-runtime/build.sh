@@ -16,13 +16,13 @@ readarray -t values < <(python3 - "$manifest" "$nccl_manifest" "$profile" <<'PY'
 import json, shlex, sys
 p=json.load(open(sys.argv[1]))[sys.argv[3]]
 n=json.load(open(sys.argv[2]))[sys.argv[3]]
-for key in ("base_url", "base_sha256", "ubuntu", "cuda_package", "cudnn_package", "driver_package"):
+for key in ("base_url", "base_sha256", "ubuntu", "cuda_package", "cudnn_package", "cudnn_packages", "driver_package"):
     print(shlex.quote(p[key]))
 print(shlex.quote(n))
 PY
 )
-(( ${#values[@]} == 7 )) || { echo "unknown profile: $profile" >&2; exit 2; }
-eval "base_url=${values[0]} base_sha256=${values[1]} ubuntu=${values[2]} cuda_package=${values[3]} cudnn_package=${values[4]} driver_package=${values[5]} nccl_version=${values[6]}"
+(( ${#values[@]} == 8 )) || { echo "unknown profile: $profile" >&2; exit 2; }
+eval "base_url=${values[0]} base_sha256=${values[1]} ubuntu=${values[2]} cuda_package=${values[3]} cudnn_package=${values[4]} cudnn_packages=${values[5]} driver_package=${values[6]} nccl_version=${values[7]}"
 mkdir -p "$output_dir"
 mkdir -p "$base_cache"
 base=$base_cache/$base_sha256.qcow2
@@ -39,8 +39,8 @@ repo=ubuntu${ubuntu/./}
 guest_network="ip link set eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; rm -f /etc/resolv.conf; printf 'nameserver 169.254.2.3\\n' > /etc/resolv.conf"
 virt-customize -a "$image" --network --memsize 4096 --smp 8 \
   --run-command 'rm -f /etc/machine-id; touch /etc/machine-id' \
-  --run-command "$guest_network; curl -fsSLo /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$repo/x86_64/cuda-keyring_1.1-1_all.deb; dpkg -i /tmp/cuda-keyring.deb; apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '$driver_package' '$cuda_package' '$cudnn_package' 'libnccl2=$nccl_version' 'libnccl-dev=$nccl_version' nvidia-container-toolkit python3-venv fio" \
-  --run-command "printf '%s\n' 'profile=$profile' 'cuda_package=$cuda_package' 'cudnn_package=$cudnn_package' 'nccl_version=$nccl_version' 'driver_package=$driver_package' > /etc/dcn-gpu-runtime-release" \
+  --run-command "$guest_network; curl -fsSLo /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$repo/x86_64/cuda-keyring_1.1-1_all.deb; dpkg -i /tmp/cuda-keyring.deb; apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '$driver_package' '$cuda_package' $cudnn_packages 'libnccl2=$nccl_version' 'libnccl-dev=$nccl_version' nvidia-container-toolkit python3-venv fio; for spec in '$driver_package' '$cuda_package' $cudnn_packages 'libnccl2=$nccl_version' 'libnccl-dev=$nccl_version'; do package=\${spec%%=*}; expected=\${spec#*=}; actual=\$(dpkg-query -W -f='\${Version}' \"\$package\"); test \"\$actual\" = \"\$expected\" || { echo \"version mismatch: \$package expected \$expected actual \$actual\" >&2; exit 1; }; done" \
+  --run-command "printf '%s\n' 'profile=$profile' 'cuda_package=$cuda_package' 'cudnn_package=$cudnn_package' 'cudnn_packages=$cudnn_packages' 'nccl_version=$nccl_version' 'driver_package=$driver_package' > /etc/dcn-gpu-runtime-release" \
   --run-command 'ln -sfn ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf' \
   --run-command 'apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/cuda-keyring.deb /var/lib/cloud/*'
 qemu-img convert -p -O qcow2 -c "$image" "$image.compacted"

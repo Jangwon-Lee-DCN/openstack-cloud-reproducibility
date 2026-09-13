@@ -41,6 +41,9 @@ class QueueTests(unittest.TestCase):
         self.assertFalse(any("legacy" in name for name in profiles))
         for name in expected:
             self.assertEqual(queue.COMPONENTS[name], ("glance-images", ("reproducibility",)))
+            self.assertIn("cudnn_packages", profiles[name])
+            self.assertIn(profiles[name]["cudnn_package"], profiles[name]["cudnn_packages"].split())
+            self.assertTrue(all("=" in package for package in profiles[name]["cudnn_packages"].split()))
         builder = (ROOT.parent.parent / "images/gpu-runtime/build.sh").read_text()
         self.assertIn("ip address replace 169.254.2.15/16", builder)
         self.assertIn("nameserver 169.254.2.3", builder)
@@ -49,6 +52,8 @@ class QueueTests(unittest.TestCase):
         self.assertIn("virt-resize --expand /dev/sda1", builder)
         self.assertIn("--memsize 4096 --smp 8", builder)
         self.assertIn("nvidia-container-toolkit python3-venv fio", builder)
+        self.assertIn("version mismatch:", builder)
+        self.assertIn("dpkg-query -W", builder)
         self.assertIn("DCN_GPU_BASE_CACHE", builder)
 
     def test_disk_artifact_is_checksum_verified_and_persisted(self):
