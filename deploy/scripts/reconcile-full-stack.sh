@@ -5,6 +5,7 @@ REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NAMESPACE=${NAMESPACE:-openstack}
 BUILD_IMAGES=${BUILD_IMAGES:-0}
 VERIFY_AFTER_RECONCILE=${VERIFY_AFTER_RECONCILE:-1}
+WAIT_AFTER_RECONCILE=${WAIT_AFTER_RECONCILE:-1}
 START_AT=${START_AT:-mariadb}
 ONLY_RELEASE=${ONLY_RELEASE:-}
 DCN_BAREMETAL_ADMIN_PROJECT_ID=${DCN_BAREMETAL_ADMIN_PROJECT_ID:-29789b94354b470f9a92d3069a114a57}
@@ -215,7 +216,12 @@ install_release() {
   if [[ "$release" == "keystone" ]]; then
     "$REPO_ROOT/deploy/scripts/fix-keystone-fernet-permissions.sh"
   fi
-  wait_release "$release"
+  if [[ "$WAIT_AFTER_RECONCILE" == "1" ]]; then
+    wait_release "$release"
+  elif [[ "$WAIT_AFTER_RECONCILE" != "0" ]]; then
+    echo "WAIT_AFTER_RECONCILE must be 0 or 1" >&2
+    exit 1
+  fi
 }
 
 WORK_DIR=$(mktemp -d /tmp/openstack-full-reconcile.XXXXXX)
