@@ -18,10 +18,14 @@ volume:
     enabled: true
     class_name: dcn-local-rwo
     size: 5Gi
+    # The pinned OVN image reads and writes ovnnb_db.db below /etc/ovn.
+    # Mount the retained local PV at that exact runtime path.
+    path: /etc/ovn
   ovn_ovsdb_sb:
     enabled: true
     class_name: dcn-local-rwo
     size: 5Gi
+    path: /etc/ovn
 network:
   interface:
     tunnel: dcn-geneve
