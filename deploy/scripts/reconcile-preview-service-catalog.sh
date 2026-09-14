@@ -71,7 +71,8 @@ endpoint, token, flavor_id, admin_project_id = sys.argv[1:]
 # may still publish either /v2.1 or legacy /v2.1/%(project_id)s endpoints, so
 # deliberately discard the optional project suffix before constructing it.
 api_root = re.sub(r"/v2\.1(?:/.*)?$", "/v2.1", endpoint.rstrip("/"))
-url = f"{api_root}/flavors/{flavor_id}/os-flavor-access"
+access_url = f"{api_root}/flavors/{flavor_id}/os-flavor-access"
+action_url = f"{api_root}/flavors/{flavor_id}/action"
 headers = {
     "Content-Type": "application/json",
     "OpenStack-API-Version": "compute 2.1",
@@ -79,13 +80,13 @@ headers = {
 }
 
 def access_ids():
-    request = urllib.request.Request(url, headers=headers)
+    request = urllib.request.Request(access_url, headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
         return {item["tenant_id"] for item in json.load(response)["flavor_access"]}
 
 for project_id in access_ids() - {admin_project_id}:
     request = urllib.request.Request(
-        url,
+        action_url,
         data=json.dumps({"removeTenantAccess": {"tenant": project_id}}).encode(),
         headers=headers,
         method="POST",
