@@ -57,6 +57,9 @@ kubectl -n openstack patch deployment prometheus-openstack-exporter \
   -p '{"spec":{"template":{"spec":{"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
 kubectl -n openstack rollout status \
   deployment/prometheus-openstack-exporter --timeout=600s
+kubectl -n openstack delete pod \
+  -l application=prometheus-openstack-exporter,component=exporter \
+  --field-selector=status.phase=Failed --ignore-not-found --wait=false
 
 helm upgrade --install prometheus-blackbox-exporter \
   prometheus-community/prometheus-blackbox-exporter --version 11.15.1 \

@@ -2,6 +2,9 @@ images:
   tags:
     prometheus_openstack_exporter: ghcr.io/openstack-exporter/openstack-exporter:1.7.0
 labels:
+  openstack_exporter:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
   # The chart does not expose Job tolerations; run the short-lived Keystone
   # bootstrap on any Linux node instead of the tainted control-plane nodes.
   job:
@@ -9,16 +12,15 @@ labels:
     node_selector_value: linux
 pod:
   replicas:
-    # The exporter authenticates once per OpenStack collector when its cache
-    # expires. Multiple replicas synchronize those expensive password checks
-    # and can starve interactive Keystone/Horizon requests.
-    prometheus_openstack_exporter: 1
+    # Three rack-spread replicas retain collection through one controller rack
+    # failure. The five-minute polling interval bounds Keystone load.
+    prometheus_openstack_exporter: 3
   affinity:
     anti:
       type:
         default: requiredDuringSchedulingIgnoredDuringExecution
       topologyKey:
-        default: kubernetes.io/hostname
+        default: topology.kubernetes.io/zone
 conf:
   prometheus_openstack_exporter:
     OS_POLLING_INTERVAL: 300

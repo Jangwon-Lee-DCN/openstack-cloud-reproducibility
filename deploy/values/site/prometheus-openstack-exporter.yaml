@@ -1,13 +1,19 @@
-# The upstream chart does not expose pod tolerations. Run the stateless
-# exporter and its Keystone bootstrap job on non-tainted Compute workers.
+# The upstream chart does not expose pod tolerations. The installer adds the
+# control-plane toleration after Helm renders this controller-1-only workload.
 labels:
   openstack_exporter:
-    node_selector_key: openstack-compute-node
+    node_selector_key: openstack-control-plane
     node_selector_value: enabled
   job:
     node_selector_key: openstack-compute-node
     node_selector_value: enabled
 
 pod:
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: topology.kubernetes.io/zone
   replicas:
-    prometheus_openstack_exporter: 1
+    prometheus_openstack_exporter: 3
