@@ -5,7 +5,15 @@ python3 "$(dirname "$0")/test-dashboard-json.py"
 
 kubectl -n openstack get deployment prometheus-openstack-exporter
 [[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.replicas}')" == "1" ]]
+[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.status.availableReplicas}')" == "1" ]]
 [[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OS_POLLING_INTERVAL")].value}')" == "300" ]]
+exporter_pod=$(kubectl -n openstack get pods \
+  -l application=prometheus-openstack-exporter,component=exporter \
+  --field-selector=status.phase=Running \
+  -o jsonpath='{.items[0].metadata.name}')
+test -n "$exporter_pod"
+! kubectl -n openstack logs "$exporter_pod" --tail=500 | grep -Fq \
+  'x509: certificate signed by unknown authority'
 [[ "$(kubectl -n monitoring get servicemonitor openstack-exporter -o jsonpath='{.spec.endpoints[0].interval}')" == "300s" ]]
 printf 'PASS OpenStack exporter collection is rate-limited away from interactive Keystone traffic\n'
 kubectl -n monitoring get deployment \
