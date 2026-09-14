@@ -63,6 +63,8 @@ token=$(openstack token issue -f value -c id)
 python3 - "$compute_endpoint" "$token" "$gpu_flavor_id" "$admin_project_id" <<'PY'
 import json, sys, urllib.request
 endpoint, token, flavor_id, admin_project_id = sys.argv[1:]
+endpoint = endpoint.replace("%(project_id)s", admin_project_id)
+endpoint = endpoint.replace("%(tenant_id)s", admin_project_id)
 url = endpoint.rstrip("/") + "/flavors/" + flavor_id + "/os-flavor-access"
 headers = {"Content-Type": "application/json", "X-Auth-Token": token}
 
