@@ -1,4 +1,14 @@
+labels:
+  server:
+    node_selector_key: openstack-database
+    node_selector_value: enabled
 pod:
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: topology.kubernetes.io/zone
   tolerations:
     mariadb:
       enabled: true

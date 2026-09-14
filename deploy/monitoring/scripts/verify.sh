@@ -4,7 +4,17 @@ set -euo pipefail
 python3 "$(dirname "$0")/test-dashboard-json.py"
 
 kubectl -n openstack get deployment prometheus-openstack-exporter
-[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.replicas}')" == "1" ]]
+[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.replicas}')" == "3" ]]
+[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.status.availableReplicas}')" == "3" ]]
+[[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.template.spec.nodeSelector.openstack-control-plane}')" == "enabled" ]]
+exporter_zones=$(kubectl -n openstack get pods \
+  -l application=prometheus-openstack-exporter,component=exporter \
+  --field-selector=status.phase=Running -o json | jq -r \
+  '[.items[] | select(.status.containerStatuses[0].ready == true) | .spec.nodeName] | unique[]' |
+  while read -r node; do
+    kubectl get node "$node" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}'
+  done | sort -u | wc -l)
+[[ "$exporter_zones" -eq 3 ]]
 [[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OS_POLLING_INTERVAL")].value}')" == "300" ]]
 [[ "$(kubectl -n monitoring get servicemonitor openstack-exporter -o jsonpath='{.spec.endpoints[0].interval}')" == "300s" ]]
 printf 'PASS OpenStack exporter collection is rate-limited away from interactive Keystone traffic\n'
