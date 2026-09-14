@@ -43,7 +43,7 @@ images:
     cinder_backup: quay.io/airshipit/cinder:2026.1-ubuntu_noble
     cinder_db_sync: quay.io/airshipit/cinder:2026.1-ubuntu_noble
     cinder_scheduler: quay.io/airshipit/cinder:2026.1-ubuntu_noble
-    cinder_volume: quay.io/airshipit/cinder:2026.1-ubuntu_noble
+    cinder_volume: registry.dcn.ssu.ac.kr/openstack/cinder:source-5e3de403d1752b998fc2@sha256:7c43e51df1c1db210f1b5537e31528cd9f9f5a9bdb6fe68e7e0945961beaa1fa
     cinder_volume_usage_audit: quay.io/airshipit/cinder:2026.1-ubuntu_noble
     cinder_db_purge: quay.io/airshipit/cinder:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management

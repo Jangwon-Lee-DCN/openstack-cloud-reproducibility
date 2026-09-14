@@ -79,7 +79,7 @@ selected() {
 build_context() {
   local name=$1 context=$2 image=$3 job safe_build_id
   safe_build_id=$(printf '%s' "$BUILD_ID" | tr -cs 'a-zA-Z0-9-' '-' | tr 'A-Z' 'a-z' | cut -c1-20)
-  job="source-rebuild-${name}-${safe_build_id}"
+  job=$("$PYTHON_BINARY" "$REPO_ROOT/deploy/scripts/kubernetes-image-build-name.py" "$name" "$safe_build_id")
   local archive="$WORK_DIR/${name}.tar.gz" digest
   tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
   kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
@@ -244,6 +244,7 @@ build_loki_tenant_gateway() {
   build_context loki-tenant-gateway "$context" "$REGISTRY/loki-tenant-gateway:source-$BUILD_ID"
 }
 selected loki-tenant-gateway && build_loki_tenant_gateway
+selected cinder-powerstore-legacy-api && simple_context cinder-powerstore-legacy-api cinder
 
 build_baremetal_access_service() {
   local context="$WORK_DIR/baremetal-access-service"

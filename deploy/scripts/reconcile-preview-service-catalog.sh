@@ -61,18 +61,32 @@ compute_endpoint=$(openstack endpoint list --service nova --interface internal \
   --region "${OS_REGION_NAME:?}" -f value -c URL | head -n1)
 token=$(openstack token issue -f value -c id)
 python3 - "$compute_endpoint" "$token" "$gpu_flavor_id" "$admin_project_id" <<'PY'
-import json, sys, urllib.request
+import json
+import re
+import sys
+import urllib.request
+
 endpoint, token, flavor_id, admin_project_id = sys.argv[1:]
-url = endpoint.rstrip("/") + "/flavors/" + flavor_id + "/os-flavor-access"
-headers = {"Content-Type": "application/json", "X-Auth-Token": token}
+# Nova's current flavor-access API is project-independent. Keystone catalogs
+# may still publish either /v2.1 or legacy /v2.1/%(project_id)s endpoints, so
+# deliberately discard the optional project suffix before constructing it.
+api_root = re.sub(r"/v2\.1(?:/.*)?$", "/v2.1", endpoint.rstrip("/"))
+access_url = f"{api_root}/flavors/{flavor_id}/os-flavor-access"
+action_url = f"{api_root}/flavors/{flavor_id}/action"
+headers = {
+    "Content-Type": "application/json",
+    "OpenStack-API-Version": "compute 2.1",
+    "X-Auth-Token": token,
+}
 
 def access_ids():
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
+    request = urllib.request.Request(access_url, headers=headers)
+    with urllib.request.urlopen(request, timeout=60) as response:
         return {item["tenant_id"] for item in json.load(response)["flavor_access"]}
 
 for project_id in access_ids() - {admin_project_id}:
     request = urllib.request.Request(
-        url,
+        action_url,
         data=json.dumps({"removeTenantAccess": {"tenant": project_id}}).encode(),
         headers=headers,
         method="POST",

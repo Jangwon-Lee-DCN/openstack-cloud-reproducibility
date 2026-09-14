@@ -97,7 +97,7 @@ with open({str(trace)!r}, "a") as f: f.write("end "+marker+"\\n")
                 "DCN_IMAGE_BUILD_RUNNER": str(fake_runner),
                 "DCN_TEST_SECRET": "must-not-enter-pueue",
             }
-            for group in ("keystone", "horizon", "nova", "neutron", "octavia", "magnum", "platform-images", "glance-images"):
+            for group in ("keystone", "horizon", "nova", "neutron", "octavia", "magnum", "cinder", "platform-images", "glance-images"):
                 command([str(pueue), "-c", str(config), "group", "add", "--parallel", "1", group])
             cli = str(ROOT / "dcn_image_build.py")
             first_submit = json.loads(command([cli, "submit", "--component", "keystone-oidc", "--source", f"reproducibility={repository}@{first}"], env=base_env).stdout)

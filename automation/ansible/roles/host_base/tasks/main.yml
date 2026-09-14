@@ -83,6 +83,24 @@
     enabled: true
     state: started
 
+- name: Check the host iSCSI initiator identity
+  ansible.builtin.stat:
+    path: /etc/iscsi/initiatorname.iscsi
+  register: iscsi_initiator_identity
+
+- name: Generate a stable host iSCSI initiator identity
+  ansible.builtin.command: iscsi-iname
+  register: generated_iscsi_initiator
+  changed_when: true
+  when: not iscsi_initiator_identity.stat.exists or iscsi_initiator_identity.stat.size == 0
+
+- name: Persist the generated host iSCSI initiator identity
+  ansible.builtin.copy:
+    dest: /etc/iscsi/initiatorname.iscsi
+    mode: '0644'
+    content: "InitiatorName={{ generated_iscsi_initiator.stdout | trim }}\n"
+  when: generated_iscsi_initiator is changed
+
 - name: Enable iSCSI for Cinder attachment
   ansible.builtin.systemd_service:
     name: iscsid

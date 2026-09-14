@@ -23,6 +23,7 @@ RUNNER = os.environ.get("DCN_IMAGE_BUILD_RUNNER", "/usr/local/libexec/dcn-image-
 BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 
 COMPONENTS = {
+    "cinder-powerstore-legacy-api": ("cinder", ("reproducibility",)),
     "ubuntu-22.04-cuda-11.8": ("glance-images", ("reproducibility",)),
     "ubuntu-22.04-cuda-12.4": ("glance-images", ("reproducibility",)),
     "ubuntu-22.04-cuda-12.8": ("glance-images", ("reproducibility",)),
@@ -257,6 +258,12 @@ def health() -> int:
     return 0
 
 
+def group_names() -> int:
+    """Print the execution groups required by the installed component map."""
+    print("\n".join(sorted({value[0] for value in COMPONENTS.values()})))
+    return 0
+
+
 def queue_view(*, include_finished: bool = False) -> int:
     """Print a stable, human-readable view without exposing raw Pueue state."""
     requests = []
@@ -306,6 +313,7 @@ def main() -> int:
     queue_parser = sub.add_parser("queue", help="show queued and running image builds")
     queue_parser.add_argument("--all", action="store_true", help="include completed and failed builds")
     sub.add_parser("health")
+    sub.add_parser("groups")
     args = parser.parse_args()
     if args.command == "submit":
         return submit(args)
@@ -324,6 +332,8 @@ def main() -> int:
         return 0
     if args.command == "queue":
         return queue_view(include_finished=args.all)
+    if args.command == "groups":
+        return group_names()
     return health()
 
 
