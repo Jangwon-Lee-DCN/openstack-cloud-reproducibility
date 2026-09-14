@@ -84,6 +84,10 @@ spec:
             - containerPort: {{ tuple "ovn-ovsdb-sb" "internal" "ovsdb" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
             - containerPort: {{ tuple "ovn-ovsdb-sb" "internal" "raft" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
           env:
+            # Keep ovn-ctl's database directory identical to the persistent
+            # volume path inspected by ovnkube.sh before Raft startup.
+            - name: OVN_DBDIR
+              value: {{ $envAll.Values.volume.ovn_ovsdb_sb.path | quote }}
             - name: OVN_SB_PORT
               value: {{ tuple "ovn-ovsdb-sb" "internal" "ovsdb" . | include "helm-toolkit.endpoints.endpoint_port_lookup" | quote }}
             - name: OVN_SB_RAFT_PORT

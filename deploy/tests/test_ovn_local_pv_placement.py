@@ -22,6 +22,18 @@ class OVNLocalPVPlacementTest(unittest.TestCase):
             labels["ovn_northd"]["node_selector_key"],
         )
 
+    def test_raft_runtime_uses_the_persistent_volume_directory(self):
+        for component in ("nb", "sb"):
+            template = (
+                ROOT
+                / f"helm/openstack-helm/ovn/templates/statefulset-ovsdb-{component}.yaml"
+            ).read_text()
+            self.assertIn("- name: OVN_DBDIR", template)
+            self.assertIn(
+                f"Values.volume.ovn_ovsdb_{component}.path | quote",
+                template,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
