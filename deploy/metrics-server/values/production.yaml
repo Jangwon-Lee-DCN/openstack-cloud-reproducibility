@@ -1,0 +1,29 @@
+image:
+  repository: registry.k8s.io/metrics-server/metrics-server
+  tag: v0.8.0@sha256:89258156d0e9af60403eafd44da9676fd66f600c7934d468ccc17e42b199aee2
+  pullPolicy: IfNotPresent
+
+replicas: 2
+
+nodeSelector:
+  node-role.kubernetes.io/infra-control: "true"
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: metrics-server
+        topologyKey: kubernetes.io/hostname
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+args:
+  - --kubelet-insecure-tls
