@@ -104,8 +104,10 @@ validation that raw Pueue does not.
 
 The six supported component names are the public Glance image names; no
 generation label is added to the name. CUDA (including cuBLAS), cuDNN, NCCL
-runtime/development libraries, driver, NVIDIA Container Toolkit, base-image
-checksum, and minimum compute capability are pinned under `images/gpu-runtime/`.
+runtime/development libraries, driver, NVIDIA Container Toolkit, containerd/ctr,
+base-image checksum, and minimum compute capability are pinned under
+`images/gpu-runtime/`. Including the runtime prevents each workload from
+downloading and installing it before using the internal registry.
 
 ```bash
 dcn-image-build submit --component ubuntu-22.04-cuda-11.8 \
