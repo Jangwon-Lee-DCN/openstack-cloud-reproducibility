@@ -1,0 +1,6 @@
+schema: dcn.ssu.ac.kr/gpu-runtime-container/v1
+source: docker://docker.io/nvidia/cuda@sha256:133c78a0575303be34164d0b90137a042172bdf60696af01a3c424ab402d86e2
+destination_tag: registry.dcn.ssu.ac.kr/openstack/nvidia-cuda:12.8.1-base-ubuntu24.04
+destination: registry.dcn.ssu.ac.kr/openstack/nvidia-cuda@sha256:133c78a0575303be34164d0b90137a042172bdf60696af01a3c424ab402d86e2
+platform: linux/amd64
+purpose: GPU guest acceptance and locally cached CUDA runtime workloads
