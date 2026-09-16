@@ -16,4 +16,8 @@ for group in horizon nova neutron keystone octavia magnum platform-images glance
   "$PUEUE" --config "$CONFIG" group --json | python3 -c \
     'import json,sys; raise SystemExit(0 if sys.argv[1] in json.load(sys.stdin) else 1)' "$group" ||
     "$PUEUE" --config "$CONFIG" group add --parallel 1 "$group"
+  # A daemon restart marks the group containing an interrupted task Paused.
+  # The installer has already proved that no build is running, so restore the
+  # supported serialized groups and let their preserved queued work continue.
+  "$PUEUE" --config "$CONFIG" group start "$group"
 done

@@ -155,6 +155,9 @@ def effective_status(request: dict) -> str:
     if isinstance(raw_status, dict) and "Done" in raw_status:
         result = str(raw_status["Done"].get("result", "unknown")).lower()
         return {"success": "succeeded", "failed": "failed", "killed": "killed"}.get(result, result)
+    if isinstance(raw_status, dict) and len(raw_status) == 1:
+        status = str(next(iter(raw_status))).lower()
+        return {"success": "succeeded"}.get(status, status)
     return str(raw_status).lower()
 
 
@@ -257,7 +260,7 @@ def health() -> int:
     return 0
 
 
-def queue_view(*, include_finished: bool = False) -> int:
+def queue_view(*, include_finished: bool = False, require_no_running: bool = False) -> int:
     """Print a stable, human-readable view without exposing raw Pueue state."""
     requests = []
     for path in request_files():
@@ -265,6 +268,7 @@ def queue_view(*, include_finished: bool = False) -> int:
         request["status"] = effective_status(request)
         requests.append(request)
     requests.sort(key=lambda item: int(item.get("task_id", -1)))
+    has_running = any(item["status"] == "running" for item in requests)
     if not include_finished:
         requests = [item for item in requests if item["status"] not in {"succeeded", "failed", "killed"}]
     if not requests:
@@ -286,7 +290,7 @@ def queue_view(*, include_finished: bool = False) -> int:
     print("  ".join(value.ljust(widths[index]) for index, value in enumerate(columns)))
     for row in rows:
         print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
-    return 0
+    return 1 if require_no_running and has_running else 0
 
 
 def main() -> int:
@@ -305,6 +309,10 @@ def main() -> int:
     sub.add_parser("list")
     queue_parser = sub.add_parser("queue", help="show queued and running image builds")
     queue_parser.add_argument("--all", action="store_true", help="include completed and failed builds")
+    queue_parser.add_argument(
+        "--require-no-running", action="store_true",
+        help="return non-zero when a build is currently running",
+    )
     sub.add_parser("health")
     args = parser.parse_args()
     if args.command == "submit":
@@ -323,7 +331,7 @@ def main() -> int:
             print(json.dumps({**request, "status": effective_status(request)}, sort_keys=True))
         return 0
     if args.command == "queue":
-        return queue_view(include_finished=args.all)
+        return queue_view(include_finished=args.all, require_no_running=args.require_no_running)
     return health()
 
 

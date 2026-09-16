@@ -25,6 +25,20 @@ for command in curl install sha256sum systemctl; do
 done
 [[ $(id -u) -eq 0 ]] || { echo "install.sh must run as root" >&2; exit 1; }
 
+# Replacing the daemon terminates every running child build.  Refuse before
+# downloading or installing anything when the live queue has work in flight;
+# the caller must wait for the serialized queue to drain and rerun the phase.
+if systemctl is-active --quiet dcn-image-build-queue.service; then
+  [[ -x /usr/local/bin/dcn-image-build ]] || {
+    echo "active image build queue has no supported control client" >&2
+    exit 1
+  }
+  /usr/local/bin/dcn-image-build queue --require-no-running || {
+    echo "refusing to restart dcn-image-build-queue.service while builds are active" >&2
+    exit 1
+  }
+fi
+
 stage=$(mktemp -d /tmp/dcn-image-build-queue-install.XXXXXX)
 cleanup() { find "$stage" -type f -delete; find "$stage" -depth -type d -empty -delete; }
 trap cleanup EXIT

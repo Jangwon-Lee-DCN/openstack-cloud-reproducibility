@@ -57,7 +57,10 @@ manifests:
   service_ingress_api: false
 volume:
   class_name: powerstore-rwo-single-path
-  size: 100Gi
+  # Six validated GPU runtime images occupy about 82 GiB in addition to the
+  # existing catalogue. Keep upload/replace headroom instead of filling the
+  # filesystem to its failure boundary.
+  size: 200Gi
   accessModes:
     - ReadWriteOnce
 labels:
