@@ -103,6 +103,15 @@ secret = next(x for x in objects if x and x.get("kind") == "Secret" and x.get("m
 config = base64.b64decode(secret["data"]["nova.conf"]).decode()
 assert "volume_use_multipath = true" in config
 assert "volume_enforce_multipath = true" in config
+compute = next(x for x in objects if x and x.get("kind") == "DaemonSet" and x.get("metadata", {}).get("name") == "nova-compute-default")
+pod = compute["spec"]["template"]["spec"]
+volumes = {item["name"]: item for item in pod["volumes"]}
+assert volumes["host-rootfs"]["hostPath"]["path"] == "/"
+container = next(item for item in pod["containers"] if item["name"] == "nova-compute")
+mounts = {item["mountPath"]: item for item in container["volumeMounts"]}
+assert mounts["/mnt/host-rootfs"]["name"] == "host-rootfs"
+assert mounts["/usr/local/sbin/multipath"]["subPath"] == "multipath"
+assert mounts["/usr/local/sbin/multipathd"]["subPath"] == "multipathd"
 assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
 assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
