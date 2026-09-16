@@ -40,6 +40,11 @@ conf:
       enforce_scope: false
     libvirt:
       images_type: qcow2
+      # PowerStore advertises both ALUA controller paths. Fail closed instead
+      # of silently attaching an individual /dev/sdX path when multipathd is
+      # missing or unhealthy on a Compute node.
+      volume_use_multipath: true
+      volume_enforce_multipath: true
     # The Rack 1 GPU host exposes one complete RTX 3090 Ti IOMMU group.  Both
     # the display and HDMI-audio functions must be requested together.
     pci:

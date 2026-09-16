@@ -19,6 +19,7 @@
       - gpg
       - jq
       - lvm2
+      - multipath-tools
       - nfs-common
       - open-iscsi
       - python3-yaml
@@ -86,5 +87,11 @@
 - name: Enable iSCSI for Cinder attachment
   ansible.builtin.systemd_service:
     name: iscsid
+    enabled: true
+    state: started
+
+- name: Enable multipath for Cinder and PowerStore attachment
+  ansible.builtin.systemd_service:
+    name: multipathd
     enabled: true
     state: started

@@ -101,6 +101,8 @@ import base64, json, sys, yaml
 objects = list(yaml.safe_load_all(sys.stdin))
 secret = next(x for x in objects if x and x.get("kind") == "Secret" and x.get("metadata", {}).get("name") == "nova-etc")
 config = base64.b64decode(secret["data"]["nova.conf"]).decode()
+assert "volume_use_multipath = true" in config
+assert "volume_enforce_multipath = true" in config
 assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
 assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
