@@ -19,5 +19,5 @@ for group in horizon nova neutron keystone octavia magnum platform-images glance
   # A daemon restart marks the group containing an interrupted task Paused.
   # The installer has already proved that no build is running, so restore the
   # supported serialized groups and let their preserved queued work continue.
-  "$PUEUE" --config "$CONFIG" group start "$group"
+  "$PUEUE" --config "$CONFIG" start --group "$group"
 done
