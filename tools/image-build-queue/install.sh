@@ -29,11 +29,10 @@ done
 # downloading or installing anything when the live queue has work in flight;
 # the caller must wait for the serialized queue to drain and rerun the phase.
 if systemctl is-active --quiet dcn-image-build-queue.service; then
-  [[ -x /usr/local/bin/dcn-image-build ]] || {
-    echo "active image build queue has no supported control client" >&2
-    exit 1
-  }
-  /usr/local/bin/dcn-image-build queue --require-no-running || {
+  # Use the candidate client against the live persisted state.  The currently
+  # installed client can legitimately predate --require-no-running during an
+  # in-place upgrade and therefore cannot enforce the new safety gate.
+  "$root/dcn_image_build.py" queue --require-no-running || {
     echo "refusing to restart dcn-image-build-queue.service while builds are active" >&2
     exit 1
   }
