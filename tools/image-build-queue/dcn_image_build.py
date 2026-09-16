@@ -155,6 +155,9 @@ def effective_status(request: dict) -> str:
     if isinstance(raw_status, dict) and "Done" in raw_status:
         result = str(raw_status["Done"].get("result", "unknown")).lower()
         return {"success": "succeeded", "failed": "failed", "killed": "killed"}.get(result, result)
+    if isinstance(raw_status, dict) and len(raw_status) == 1:
+        status = str(next(iter(raw_status))).lower()
+        return {"success": "succeeded"}.get(status, status)
     return str(raw_status).lower()
 
 
@@ -257,7 +260,7 @@ def health() -> int:
     return 0
 
 
-def queue_view(*, include_finished: bool = False) -> int:
+def queue_view(*, include_finished: bool = False, require_empty: bool = False) -> int:
     """Print a stable, human-readable view without exposing raw Pueue state."""
     requests = []
     for path in request_files():
@@ -286,7 +289,7 @@ def queue_view(*, include_finished: bool = False) -> int:
     print("  ".join(value.ljust(widths[index]) for index, value in enumerate(columns)))
     for row in rows:
         print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
-    return 0
+    return 1 if require_empty else 0
 
 
 def main() -> int:
@@ -305,6 +308,10 @@ def main() -> int:
     sub.add_parser("list")
     queue_parser = sub.add_parser("queue", help="show queued and running image builds")
     queue_parser.add_argument("--all", action="store_true", help="include completed and failed builds")
+    queue_parser.add_argument(
+        "--require-empty", action="store_true",
+        help="return non-zero when a queued or running build exists",
+    )
     sub.add_parser("health")
     args = parser.parse_args()
     if args.command == "submit":
@@ -323,7 +330,7 @@ def main() -> int:
             print(json.dumps({**request, "status": effective_status(request)}, sort_keys=True))
         return 0
     if args.command == "queue":
-        return queue_view(include_finished=args.all)
+        return queue_view(include_finished=args.all, require_empty=args.require_empty)
     return health()
 
 

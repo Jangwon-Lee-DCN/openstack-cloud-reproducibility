@@ -28,6 +28,19 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_pueue_v4_status_variants_are_normalized(self):
+        variants = {
+            "Queued": "queued",
+            "Running": "running",
+            "Failed": "failed",
+            "Killed": "killed",
+        }
+        for raw, expected in variants.items():
+            with self.subTest(raw=raw), mock.patch.object(
+                queue, "pueue_task", return_value={"status": {raw: {}}},
+            ):
+                self.assertEqual(queue.effective_status({"task_id": 1}), expected)
+
     def test_gpu_profiles_are_version_named_and_serialized(self):
         expected = {
             "ubuntu-22.04-cuda-11.8", "ubuntu-22.04-cuda-12.4",
@@ -110,6 +123,8 @@ class QueueTests(unittest.TestCase):
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
         self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
+        self.assertIn("queue --require-empty", installer)
+        self.assertIn("refusing to restart dcn-image-build-queue.service while builds are active", installer)
         self.assertIn("/var/lib/dcn-image-build-queue/libguestfs", installer)
         self.assertIn('"/boot/vmlinuz-$kernel_version"', installer)
         self.assertIn('cp -aT "/lib/modules/$kernel_version"', installer)
@@ -173,6 +188,7 @@ class QueueTests(unittest.TestCase):
             output = StringIO()
             with redirect_stdout(output):
                 self.assertEqual(queue.queue_view(), 0)
+                self.assertEqual(queue.queue_view(require_empty=True), 1)
         self.assertIn("horizon-complete", output.getvalue())
         self.assertNotIn("keystone-oidc", output.getvalue())
 
