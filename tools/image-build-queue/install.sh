@@ -33,7 +33,7 @@ if systemctl is-active --quiet dcn-image-build-queue.service; then
     echo "active image build queue has no supported control client" >&2
     exit 1
   }
-  /usr/local/bin/dcn-image-build queue --require-empty || {
+  /usr/local/bin/dcn-image-build queue --require-no-running || {
     echo "refusing to restart dcn-image-build-queue.service while builds are active" >&2
     exit 1
   }

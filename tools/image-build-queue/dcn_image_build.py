@@ -260,7 +260,7 @@ def health() -> int:
     return 0
 
 
-def queue_view(*, include_finished: bool = False, require_empty: bool = False) -> int:
+def queue_view(*, include_finished: bool = False, require_no_running: bool = False) -> int:
     """Print a stable, human-readable view without exposing raw Pueue state."""
     requests = []
     for path in request_files():
@@ -268,6 +268,7 @@ def queue_view(*, include_finished: bool = False, require_empty: bool = False) -
         request["status"] = effective_status(request)
         requests.append(request)
     requests.sort(key=lambda item: int(item.get("task_id", -1)))
+    has_running = any(item["status"] == "running" for item in requests)
     if not include_finished:
         requests = [item for item in requests if item["status"] not in {"succeeded", "failed", "killed"}]
     if not requests:
@@ -289,7 +290,7 @@ def queue_view(*, include_finished: bool = False, require_empty: bool = False) -
     print("  ".join(value.ljust(widths[index]) for index, value in enumerate(columns)))
     for row in rows:
         print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
-    return 1 if require_empty else 0
+    return 1 if require_no_running and has_running else 0
 
 
 def main() -> int:
@@ -309,8 +310,8 @@ def main() -> int:
     queue_parser = sub.add_parser("queue", help="show queued and running image builds")
     queue_parser.add_argument("--all", action="store_true", help="include completed and failed builds")
     queue_parser.add_argument(
-        "--require-empty", action="store_true",
-        help="return non-zero when a queued or running build exists",
+        "--require-no-running", action="store_true",
+        help="return non-zero when a build is currently running",
     )
     sub.add_parser("health")
     args = parser.parse_args()
@@ -330,7 +331,7 @@ def main() -> int:
             print(json.dumps({**request, "status": effective_status(request)}, sort_keys=True))
         return 0
     if args.command == "queue":
-        return queue_view(include_finished=args.all, require_empty=args.require_empty)
+        return queue_view(include_finished=args.all, require_no_running=args.require_no_running)
     return health()
 
 

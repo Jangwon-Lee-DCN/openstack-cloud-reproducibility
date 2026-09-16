@@ -123,8 +123,10 @@ class QueueTests(unittest.TestCase):
         self.assertIn("-c 'import build'", installer)
         self.assertIn('s#@BUILD_PYTHON@#$build_python#g', installer)
         self.assertIn("systemctl restart dcn-image-build-queue.service", installer)
-        self.assertIn("queue --require-empty", installer)
+        self.assertIn("queue --require-no-running", installer)
         self.assertIn("refusing to restart dcn-image-build-queue.service while builds are active", installer)
+        groups = (ROOT / "init-groups").read_text()
+        self.assertIn('group start "$group"', groups)
         self.assertIn("/var/lib/dcn-image-build-queue/libguestfs", installer)
         self.assertIn('"/boot/vmlinuz-$kernel_version"', installer)
         self.assertIn('cp -aT "/lib/modules/$kernel_version"', installer)
@@ -188,7 +190,7 @@ class QueueTests(unittest.TestCase):
             output = StringIO()
             with redirect_stdout(output):
                 self.assertEqual(queue.queue_view(), 0)
-                self.assertEqual(queue.queue_view(require_empty=True), 1)
+                self.assertEqual(queue.queue_view(require_no_running=True), 1)
         self.assertIn("horizon-complete", output.getvalue())
         self.assertNotIn("keystone-oidc", output.getvalue())
 
@@ -199,6 +201,21 @@ class QueueTests(unittest.TestCase):
             with redirect_stdout(output):
                 self.assertEqual(queue.queue_view(), 0)
         self.assertEqual(output.getvalue(), "Image build queue is empty.\n")
+
+    def test_queued_work_does_not_block_safe_daemon_update(self):
+        request = {
+            "task_id": 2, "group": "glance-images",
+            "component": "ubuntu-24.04-cuda-12.9",
+            "request_id": "queued-request", "status": "queued",
+        }
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(queue, "STATE", Path(temporary)), \
+                mock.patch.object(queue, "effective_status", return_value="queued"):
+            request_dir = Path(temporary) / "requests"
+            request_dir.mkdir()
+            (request_dir / "request.json").write_text(json.dumps(request))
+            with redirect_stdout(StringIO()):
+                self.assertEqual(queue.queue_view(require_no_running=True), 0)
 
     def test_runner_returns_exact_immutable_digest(self):
         with tempfile.TemporaryDirectory() as temporary:
