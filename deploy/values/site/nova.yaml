@@ -22,6 +22,9 @@ images:
 conf:
   ceph:
     enabled: false
+  # PowerStore volumes use host iSCSI and dm-multipath. Expose the chart's
+  # host-rootfs helpers so nova-compute checks and operates on the host daemon.
+  enable_iscsi: true
   # Read-only exporter access. No create, update, or delete rule is granted.
   policy:
     "os_compute_api:os-services:list": "role:admin or role:monitoring"
