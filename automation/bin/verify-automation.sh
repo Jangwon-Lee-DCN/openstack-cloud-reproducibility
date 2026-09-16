@@ -95,6 +95,11 @@ assert "@sha256:" in images["neutron_rpc_server"]
 PY
 grep -Fq "with open('/tmp/pod-shared/sriov_agent.ini')" \
   "$root/helm/openstack-helm/neutron/templates/bin/_health-probe.py.tpl"
+grep -Fq '60-dcn-powerstore-ioscheduler.rules' \
+  "$root/automation/ansible/roles/host_base/tasks/main.yml"
+grep -Fq 'ATTRS{model}==\"PowerStore\"' \
+  "$root/automation/ansible/roles/host_base/files/60-dcn-powerstore-ioscheduler.rules"
+bash -n "$root/automation/ansible/roles/host_base/files/dcn-powerstore-block-scheduler"
 helm template nova "$nova_chart" -f "$root/deploy/values/site/nova.yaml" | \
   python3 -c '
 import base64, json, sys, yaml
