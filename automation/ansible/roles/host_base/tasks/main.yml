@@ -95,3 +95,32 @@
     name: multipathd
     enabled: true
     state: started
+
+- name: Install the PowerStore multipath scheduler helper
+  ansible.builtin.copy:
+    src: dcn-powerstore-block-scheduler
+    dest: /usr/local/sbin/dcn-powerstore-block-scheduler
+    mode: '0755'
+
+- name: Persist the low-overhead scheduler for PowerStore multipath devices
+  ansible.builtin.copy:
+    src: 60-dcn-powerstore-ioscheduler.rules
+    dest: /etc/udev/rules.d/60-dcn-powerstore-ioscheduler.rules
+    mode: '0644'
+
+- name: Reload PowerStore block scheduler rules
+  ansible.builtin.command: udevadm control --reload-rules
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Apply the PowerStore scheduler to existing paths and maps
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for device in /sys/class/block/sd* /sys/class/block/dm-*; do
+      [[ -e "$device" ]] || continue
+      /usr/local/sbin/dcn-powerstore-block-scheduler "${device##*/}"
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: not ansible_check_mode

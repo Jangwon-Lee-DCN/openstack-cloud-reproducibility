@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+name=${1:?block device name required}
+device=/sys/class/block/$name
+[[ -d "$device" ]] || exit 0
+paths=("$device")
+if [[ $name == dm-* ]]; then
+  paths=("$device"/slaves/*)
+fi
+for path in "${paths[@]}"; do
+  [[ -r "$path/device/vendor" && -r "$path/device/model" ]] || continue
+  vendor=$(xargs < "$path/device/vendor")
+  model=$(xargs < "$path/device/model")
+  if [[ "$vendor" == DellEMC && "$model" == PowerStore ]]; then
+    echo none > "$device/queue/scheduler"
+    exit 0
+  fi
+done

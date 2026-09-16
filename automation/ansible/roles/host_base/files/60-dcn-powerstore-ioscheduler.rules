@@ -1,0 +1,2 @@
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="sd*", ATTRS{vendor}=="DellEMC", ATTRS{model}=="PowerStore", ATTR{queue/scheduler}="none"
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="dm-*", ENV{DM_UUID}=="mpath-*", RUN+="/usr/local/sbin/dcn-powerstore-block-scheduler %k"
