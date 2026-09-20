@@ -24,11 +24,18 @@ def main() -> None:
     array = next((item for item in config["arrays"] if item.get("isDefault")), config["arrays"][0])
     host = array["endpoint"].split("//", 1)[-1].split("/", 1)[0]
     if service == "cinder":
-        values = {"conf": {"backends": {"rbd1": {
+        backends = {"rbd1": {
             "san_ip": host,
             "san_login": array["username"],
             "san_password": array["password"],
-        }}}}
+        }}
+        if os.environ.get("ENABLE_POWERSTORE_FC") == "1":
+            backends["powerstore_fc"] = {
+                "san_ip": host,
+                "san_login": array["username"],
+                "san_password": array["password"],
+            }
+        values = {"conf": {"backends": backends}}
     else:
         values = {"conf": {"manila": {"powerstore": {
             "dell_nas_login": array["username"],

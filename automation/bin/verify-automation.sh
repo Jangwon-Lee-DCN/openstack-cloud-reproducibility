@@ -24,6 +24,7 @@ yamllint -d \
 
 bash -n bin/*.sh ../bin/*.sh ../lab/*.sh
 python3 "$root/deploy/tests/test_gpu_image_contract.py"
+python3 "$root/deploy/tests/test_powerstore_fc_contract.py"
 bin/verify-expansion-contract.sh
 
 set +e
@@ -127,6 +128,20 @@ assert {spec["physical_network"] for spec in device_specs if "physical_network" 
 }
 assert all(spec.get("product_id") != "10ed" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
+'
+helm template cinder "$root/helm/packages/patched/cinder-2026.1.0.tgz" \
+  -f "$root/deploy/values/site/cinder.yaml" \
+  -f "$root/deploy/values/features/cinder-powerstore-fc.yaml" | \
+  python3 -c '
+import base64, sys, yaml
+objects = [item for item in yaml.safe_load_all(sys.stdin) if item]
+secret = next(item for item in objects if item.get("kind") == "Secret" and item.get("metadata", {}).get("name") == "cinder-etc")
+config = base64.b64decode(secret["data"]["cinder.conf"]).decode()
+backends = base64.b64decode(secret["data"]["backends.conf"]).decode()
+assert "enabled_backends = rbd1,powerstore_fc" in config
+assert "[powerstore_fc]" in backends
+assert "storage_protocol = FC" in backends
+assert "volume_backend_name = POWERSTORE_FC" in backends
 '
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
   awk '/node_selector_key: openstack-compute-node/{found=1} END{exit !found}'
