@@ -113,6 +113,18 @@ class QueueTests(unittest.TestCase):
         self.assertIn("selected flavor-catalog", source)
         self.assertIn("CLOUD_SERVICES_REPO", source)
 
+    def test_nova_build_requires_both_pinned_sources(self):
+        self.assertEqual(
+            ("nova", ("reproducibility", "nova_extended")),
+            queue.COMPONENTS["nova-extended"],
+        )
+        runner_source = (ROOT / "run_image_build.py").read_text()
+        self.assertIn('"nova_extended": "NOVA_EXTENDED_REPO"', runner_source)
+        builder = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        dockerfile = (ROOT.parent.parent / "images/nova-extended/Dockerfile").read_text()
+        self.assertIn('-m build --sdist', builder)
+        self.assertIn('COPY nova-*.tar.gz', dockerfile)
+
     def test_service_supplies_a_build_capable_python(self):
         service = (ROOT / "dcn-image-build-queue.service").read_text()
         installer = (ROOT / "install.sh").read_text()

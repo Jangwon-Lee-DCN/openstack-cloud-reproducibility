@@ -35,6 +35,7 @@ TELEMETRY_DASHBOARD_REPO=${TELEMETRY_DASHBOARD_REPO:-$REPO_ROOT/../openstack-tel
 S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
 NETBOX_IRONIC_CONTROLLER_REPO=${NETBOX_IRONIC_CONTROLLER_REPO:-$REPO_ROOT/../netbox-ironic-controller}
 CLOUD_SERVICES_REPO=${CLOUD_SERVICES_REPO:-$REPO_ROOT/../openstack-cloud-services}
+NOVA_EXTENDED_REPO=${NOVA_EXTENDED_REPO:-$REPO_ROOT/../nova-extended-compute}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -219,6 +220,20 @@ for component in gnocchi ceilometer aodh keycloak; do
 done
 selected keystone-oidc && simple_context keystone-oidc keystone
 selected neutron-fwaas && simple_context neutron-fwaas neutron
+build_nova_extended() {
+  local context="$WORK_DIR/nova-extended"
+  git -C "$NOVA_EXTENDED_REPO" diff --quiet &&
+    git -C "$NOVA_EXTENDED_REPO" diff --cached --quiet || {
+      echo "refusing to build from dirty Nova source repository: $NOVA_EXTENDED_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  cp "$REPO_ROOT/images/nova-extended/Dockerfile" "$context/Dockerfile"
+  "$PYTHON_BINARY" -m build --sdist --outdir "$context" "$NOVA_EXTENDED_REPO"
+  test "$(find "$context" -maxdepth 1 -type f -name 'nova-*.tar.gz' | wc -l)" -eq 1
+  build_context nova-extended "$context" "$REGISTRY/nova:source-$BUILD_ID"
+}
+selected nova-extended && build_nova_extended
 selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
 selected support-api && build_support_api
