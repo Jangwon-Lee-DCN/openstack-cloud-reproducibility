@@ -35,6 +35,7 @@ COMPONENTS = {
     ),
     "keystone-oidc": ("keystone", ("reproducibility",)),
     "neutron-fwaas": ("neutron", ("reproducibility",)),
+    "nova-extended": ("nova", ("reproducibility", "nova_extended")),
     "octavia-ovn": ("octavia", ("reproducibility",)),
     "magnum-capi": ("magnum", ("reproducibility",)),
     "magnum-capi-gitops": ("magnum", ("reproducibility", "magnum_gitops")),

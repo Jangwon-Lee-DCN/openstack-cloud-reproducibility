@@ -99,6 +99,7 @@ def execute(path: Path) -> int:
             "vpc_control_plane": "VPC_CONTROL_PLANE_REPO",
             "netbox_ironic_controller": "NETBOX_IRONIC_CONTROLLER_REPO",
             "cloud_services": "CLOUD_SERVICES_REPO",
+            "nova_extended": "NOVA_EXTENDED_REPO",
         }
         for name, variable in mappings.items():
             if name in checkouts:
