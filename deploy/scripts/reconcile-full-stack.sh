@@ -12,6 +12,7 @@ DCN_BAREMETAL_DOMAIN_ID=${DCN_BAREMETAL_DOMAIN_ID:-6382db1740d64d879c93b59e1995c
 BAREMETAL_ACCESS_API_URL=${BAREMETAL_ACCESS_API_URL:-http://baremetal-access.netbox-ironic-controller.svc.cluster.local:8080}
 FLAVOR_CATALOG_API_URL=${FLAVOR_CATALOG_API_URL:-http://flavor-catalog.openstack.svc.cluster.local:8080}
 HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
+ENABLE_POWERSTORE_FC=${ENABLE_POWERSTORE_FC:-0}
 DEPLOY_LOCK_HOLDER=${DCN_DEPLOY_LOCK_HOLDER:-}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
 
@@ -175,6 +176,9 @@ install_release() {
     powerstore_values="$WORK_DIR/$release.powerstore.yaml"
     "$REPO_ROOT/deploy/scripts/generate-powerstore-overrides.py" "$release" "$powerstore_values"
     value_args+=( -f "$powerstore_values" )
+  fi
+  if [[ "$release" == "cinder" && "$ENABLE_POWERSTORE_FC" == "1" ]]; then
+    value_args+=( -f "$REPO_ROOT/deploy/values/features/cinder-powerstore-fc.yaml" )
   fi
   if [[ "$release" == "barbican" ]]; then
     barbican_kek_values="$WORK_DIR/barbican.kek.yaml"

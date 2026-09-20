@@ -1,0 +1,18 @@
+# Opt-in PowerStore Fibre Channel backend. The production reconciler includes
+# this file only after the site Phase verifies two independent 32G FC fabrics.
+# The existing iSCSI backend remains available during qualification and rollback.
+conf:
+  cinder:
+    DEFAULT:
+      enabled_backends: rbd1,powerstore_fc
+  backends:
+    powerstore_fc:
+      volume_driver: cinder.volume.drivers.dell_emc.powerstore.driver.PowerStoreDriver
+      volume_backend_name: POWERSTORE_FC
+      storage_protocol: FC
+      report_discard_supported: true
+      image_volume_cache_enabled: true
+bootstrap:
+  volume_types:
+    powerstore-fc:
+      volume_backend_name: POWERSTORE_FC
