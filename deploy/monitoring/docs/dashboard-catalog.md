@@ -10,7 +10,7 @@ Kube-prometheus-stack and Loki upstream dashboards remain separately managed.
 | OpenStack / Neutron Network Operations | Network API, inactive routers/ports/FIPs, OVN readiness, inventory, VPC drift and conflicts |
 | OpenStack / Nova Compute Operations | Nova API/control plane, VM inventory, compute agents and Placement capacity |
 | OpenStack / Octavia Load Balancer Operations | Octavia components, LB inventory, OVN state audit and provisioning alerts |
-| OpenStack / Cinder Storage Operations | Cinder API/components, volume status, inventory and service CPU/memory |
+| OpenStack / Cinder Storage Operations | Cinder API/components, volume status, inventory, service resources and per-host Storage-link utilization/errors |
 | OpenStack / Keystone Identity Operations | Identity API, project credential bindings/lifecycle and identity alerts |
 | OpenStack / MariaDB & RabbitMQ Operations | Galera latency/locks and RabbitMQ alarms, backlog, redelivery and saturation |
 

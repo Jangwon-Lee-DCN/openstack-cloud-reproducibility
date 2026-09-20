@@ -24,6 +24,7 @@ yamllint -d \
 
 bash -n bin/*.sh ../bin/*.sh ../lab/*.sh
 python3 "$root/deploy/tests/test_gpu_image_contract.py"
+python3 "$root/deploy/tests/test_cinder_general_storage.py"
 bin/verify-expansion-contract.sh
 
 set +e

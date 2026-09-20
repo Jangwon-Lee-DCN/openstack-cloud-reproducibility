@@ -101,3 +101,16 @@ kubectl -n monitoring logs deployment/alertmanager-webhook-audit
 kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093
 curl -fsS http://127.0.0.1:9093/api/v2/status
 ```
+
+## Storage fabric
+
+`StorageFabricLinkSaturation` means one host's `dcn-storage0` receive or
+transmit direction has remained above 85% of its negotiated line rate for ten
+minutes. Identify the VM, image-copy, backup or storage maintenance activity on
+that host before moving workload or starting another bulk operation. It is a
+shared-link capacity warning, not proof that PowerStore media is saturated.
+
+`StorageFabricPacketErrors` means interface errors or drops increased during a
+ten-minute window. Check the host NIC counters, optics/cable and HP switch port
+before tuning Cinder or the guest. Cumulative counters alone do not establish a
+current fault; this alert is based on increases.

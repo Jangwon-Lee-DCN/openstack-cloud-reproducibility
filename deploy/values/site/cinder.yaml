@@ -6,6 +6,22 @@ labels:
     node_selector_key: openstack-cinder-volume
     node_selector_value: enabled
 pod:
+  mounts:
+    cinder_volume:
+      cinder_volume:
+        volumeMounts:
+          - name: powerstore-legacy-host-api
+            mountPath: /var/lib/openstack/lib/python3.12/site-packages/cinder_powerstore_compat.py
+            subPath: cinder_powerstore_compat.py
+            readOnly: true
+          - name: powerstore-legacy-host-api
+            mountPath: /var/lib/openstack/lib/python3.12/site-packages/cinder-powerstore-compat.pth
+            subPath: cinder-powerstore-compat.pth
+            readOnly: true
+        volumes:
+          - name: powerstore-legacy-host-api
+            configMap:
+              name: cinder-powerstore-legacy-host-api
   security_context:
     cinder_backup:
       container:
@@ -48,6 +64,11 @@ images:
     cinder_db_purge: quay.io/airshipit/cinder:2026.1-ubuntu_noble
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
 conf:
+  # PowerStore image-to-volume and cache population temporarily attach the LUN
+  # on cinder-volume. Expose host iSCSI, /dev, /sys and multipath helpers to
+  # os-brick; without this the array creates a LUN but image copy fails with
+  # VolumeDeviceNotFound.
+  enable_iscsi: true
   # Add provider monitoring without removing the upstream project-reader
   # access used by ordinary Horizon users in their own project.
   policy:
@@ -61,6 +82,9 @@ conf:
       # The pinned chart ships a map key named rbd1 that Helm cannot delete by
       # overlay. Repurpose that key; the advertised backend remains POWERSTORE.
       enabled_backends: rbd1
+      # Public service default. Keep the internal Helm backend key out of the
+      # tenant-facing volume contract.
+      default_volume_type: general-purpose
   backends:
     rbd1:
       volume_driver: cinder.volume.drivers.dell_emc.powerstore.driver.PowerStoreDriver
@@ -72,7 +96,16 @@ conf:
       rbd_secret_uuid: ""
       rbd_flatten_volume_from_snapshot: false
       report_discard_supported: true
-      image_volume_cache_enabled: false
+      # PowerStore reports cacheable=True and supports array-side clones. Keep
+      # the cache bounded so repeated image-to-volume boots avoid full copies
+      # without allowing cached images to consume the backend indefinitely.
+      image_volume_cache_enabled: true
+      image_volume_cache_max_size_gb: 500
+      image_volume_cache_max_count: 20
+bootstrap:
+  volume_types:
+    general-purpose:
+      volume_backend_name: POWERSTORE
 endpoints:
   identity:
     auth:
@@ -97,3 +130,66 @@ manifests:
   job_backup_storage_init: false
   job_storage_init: false
   pvc_backup: false
+
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cinder-powerstore-legacy-host-api
+    data:
+      cinder-powerstore-compat.pth: |
+        import cinder_powerstore_compat
+      cinder_powerstore_compat.py: |
+        """Compatibility bridge for PowerStore releases without host_connectivity."""
+        import builtins
+        import sys
+        _original_import = builtins.__import__
+        _patched_client = False
+        _patched_adapter = False
+        def _patch_if_ready():
+            global _patched_client, _patched_adapter
+            client = sys.modules.get("cinder.volume.drivers.dell_emc.powerstore.client")
+            if client is not None and not _patched_client and hasattr(client, "PowerStoreClient"):
+                original_create_host = client.PowerStoreClient.create_host
+                def unknown_host_connectivity(response):
+                    messages = response.get("messages", []) if isinstance(response, dict) else []
+                    return any("host_connectivity" in str(item.get("message_l10n", "")) for item in messages)
+                def get_all_hosts(self, protocol):
+                    response_status, response = self._send_get_request(
+                        "/host", params={"select": "id,name,host_initiators,host_connectivity",
+                        "host_initiators->0->>port_type": "eq.%s" % protocol})
+                    if response_status.status_code not in self.ok_codes:
+                        if not unknown_host_connectivity(response):
+                            raise client.exception.VolumeBackendAPIException(data="Failed to query PowerStore hosts.")
+                        self._dcn_legacy_host_api = True
+                        response_status, response = self._send_get_request(
+                            "/host", params={"select": "id,name,host_initiators",
+                            "host_initiators->0->>port_type": "eq.%s" % protocol})
+                        if response_status.status_code not in self.ok_codes:
+                            raise client.exception.VolumeBackendAPIException(data="Failed to query PowerStore hosts.")
+                    return response
+                def create_host(self, name, ports, connectivity="Local_Only"):
+                    if not getattr(self, "_dcn_legacy_host_api", False):
+                        return original_create_host(self, name, ports, connectivity)
+                    response_status, response = self._send_post_request(
+                        "/host", payload={"name": name, "os_type": "Linux", "initiators": ports})
+                    if response_status.status_code not in self.ok_codes:
+                        raise client.exception.VolumeBackendAPIException(data="Failed to create PowerStore host %s." % name)
+                    return response
+                client.PowerStoreClient.get_all_hosts = get_all_hosts
+                client.PowerStoreClient.create_host = create_host
+                _patched_client = True
+            adapter = sys.modules.get("cinder.volume.drivers.dell_emc.powerstore.adapter")
+            if adapter is not None and not _patched_adapter and hasattr(adapter, "CommonAdapter"):
+                original_modify_connectivity = adapter.CommonAdapter._modify_host_connectivity
+                def modify_host_connectivity(self, host):
+                    if getattr(self.client, "_dcn_legacy_host_api", False):
+                        return None
+                    return original_modify_connectivity(self, host)
+                adapter.CommonAdapter._modify_host_connectivity = modify_host_connectivity
+                _patched_adapter = True
+        def _compat_import(name, globals=None, locals=None, fromlist=(), level=0):
+            result = _original_import(name, globals, locals, fromlist, level)
+            _patch_if_ready()
+            return result
+        builtins.__import__ = _compat_import
