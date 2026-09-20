@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+interface=${1:?usage: dcn-storage-nic-ring INTERFACE RX_TARGET TX_TARGET}
+rx_target=${2:?usage: dcn-storage-nic-ring INTERFACE RX_TARGET TX_TARGET}
+tx_target=${3:?usage: dcn-storage-nic-ring INTERFACE RX_TARGET TX_TARGET}
+
+[[ $interface =~ ^[a-zA-Z0-9_.:-]+$ ]]
+[[ $rx_target =~ ^[1-9][0-9]*$ ]]
+[[ $tx_target =~ ^[1-9][0-9]*$ ]]
+test -e "/sys/class/net/$interface/device"
+
+ring=$(ethtool -g "$interface")
+max_rx=$(awk '/Pre-set maximums:/{maximum=1; next} /Current hardware settings:/{maximum=0} maximum && $1 == "RX:" {print $2; exit}' <<<"$ring")
+max_tx=$(awk '/Pre-set maximums:/{maximum=1; next} /Current hardware settings:/{maximum=0} maximum && $1 == "TX:" {print $2; exit}' <<<"$ring")
+[[ $max_rx =~ ^[1-9][0-9]*$ ]]
+[[ $max_tx =~ ^[1-9][0-9]*$ ]]
+
+(( rx_target > max_rx )) && rx_target=$max_rx
+(( tx_target > max_tx )) && tx_target=$max_tx
+ethtool -G "$interface" rx "$rx_target" tx "$tx_target"
+
+current=$(ethtool -g "$interface")
+current_rx=$(awk '/Current hardware settings:/{current=1; next} current && $1 == "RX:" {print $2; exit}' <<<"$current")
+current_tx=$(awk '/Current hardware settings:/{current=1; next} current && $1 == "TX:" {print $2; exit}' <<<"$current")
+test "$current_rx" = "$rx_target"
+test "$current_tx" = "$tx_target"

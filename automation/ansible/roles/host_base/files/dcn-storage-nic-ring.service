@@ -1,0 +1,13 @@
+[Unit]
+Description=Apply the accepted DCN Storage NIC descriptor rings
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/dcn-storage-nic-ring
+ExecStart=/usr/local/sbin/dcn-storage-nic-ring ${INTERFACE} ${RX_TARGET} ${TX_TARGET}
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
