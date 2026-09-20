@@ -12,7 +12,18 @@ data:
     volume_id=""
     success=0
     cleanup() {
-      [[ -z "${volume_id}" ]] || openstack volume delete "${volume_id}" >/dev/null 2>&1 || true
+      # A backend failure may create an error volume but return no ID to the
+      # create command. Resolve the unique test name as a fallback and force
+      # delete only resources owned by this run.
+      while read -r stale_volume_id; do
+        [[ -z "${stale_volume_id}" ]] || \
+          openstack volume delete --force "${stale_volume_id}" >/dev/null 2>&1 || true
+      done < <(openstack volume list --name "${name}" -f value -c ID 2>/dev/null || true)
+      [[ -z "${volume_id}" ]] || openstack volume delete --force "${volume_id}" >/dev/null 2>&1 || true
+      while read -r stale_network_id; do
+        [[ -z "${stale_network_id}" ]] || \
+          openstack network delete "${stale_network_id}" >/dev/null 2>&1 || true
+      done < <(openstack network list --name "${name}" -f value -c ID 2>/dev/null || true)
       [[ -z "${network_id}" ]] || openstack network delete "${network_id}" >/dev/null 2>&1 || true
       now="$(date +%s)"
       body="# TYPE openstack_synthetic_success gauge
@@ -26,7 +37,8 @@ data:
     trap cleanup EXIT
     openstack token issue >/dev/null || exit 1
     network_id="$(openstack network create -f value -c id "${name}")" || exit 1
-    volume_id="$(openstack volume create --size 1 -f value -c id "${name}")" || exit 1
+    volume_id="$(openstack volume create --size 1 \
+      --property dcn_synthetic_test=true -f value -c id "${name}")" || exit 1
     openstack volume show "${volume_id}" >/dev/null || exit 1
     success=1
 ---
@@ -75,4 +87,3 @@ spec:
               configMap:
                 name: openstack-synthetic-test
                 defaultMode: 0555
-

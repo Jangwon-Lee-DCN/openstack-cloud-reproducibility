@@ -61,6 +61,31 @@ spec:
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
     - name: platform.hardware
       rules:
+        - alert: StorageFabricLinkSaturation
+          expr: |
+            max by (instance, device) (
+              rate(node_network_receive_bytes_total{device="dcn-storage0"}[5m])
+              or rate(node_network_transmit_bytes_total{device="dcn-storage0"}[5m])
+            )
+            / max by (instance, device) (node_network_speed_bytes{device="dcn-storage0"}) > 0.85
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: Storage fabric link is persistently saturated
+            description: "{{ $labels.instance }} {{ $labels.device }} has exceeded 85% of negotiated link speed for ten minutes."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#storage-fabric
+        - alert: StorageFabricPacketErrors
+          expr: |
+            increase(node_network_receive_errs_total{device="dcn-storage0"}[10m])
+            + increase(node_network_transmit_errs_total{device="dcn-storage0"}[10m])
+            + increase(node_network_receive_drop_total{device="dcn-storage0"}[10m])
+            + increase(node_network_transmit_drop_total{device="dcn-storage0"}[10m]) > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: Storage fabric errors or drops are increasing
+            description: "{{ $labels.instance }} {{ $labels.device }} has new errors or drops in the last ten minutes."
+            runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#storage-fabric
         - alert: ControllerCPUTemperatureHigh
           expr: max by (instance) (node_hwmon_temp_celsius{chip="platform_coretemp_0"}) > 90
           for: 5m
