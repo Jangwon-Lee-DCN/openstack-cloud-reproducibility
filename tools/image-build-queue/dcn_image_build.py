@@ -23,6 +23,7 @@ RUNNER = os.environ.get("DCN_IMAGE_BUILD_RUNNER", "/usr/local/libexec/dcn-image-
 BUILD_PYTHON_CONFIG = Path("/etc/dcn-image-build-queue/build-python")
 
 COMPONENTS = {
+    "ubuntu-24.04-storage-acceptance": ("glance-images", ("reproducibility",)),
     "ubuntu-22.04-cuda-11.8": ("glance-images", ("reproducibility",)),
     "ubuntu-22.04-cuda-12.4": ("glance-images", ("reproducibility",)),
     "ubuntu-22.04-cuda-12.8": ("glance-images", ("reproducibility",)),

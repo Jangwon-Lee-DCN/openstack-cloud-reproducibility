@@ -117,6 +117,19 @@ def execute(path: Path) -> int:
             atomic_json(path, request)
             print(immutable_ref)
             return 0
+        if request["component"] == "ubuntu-24.04-storage-acceptance":
+            subprocess.run([
+                str(repro / "images/storage-acceptance/build.sh"),
+                request["component"], str(workspace / "output"),
+            ], cwd=repro, env=environment, check=True)
+            immutable_ref, digest = persist_disk_artifact(
+                workspace, result_file, path.parent.parent,
+                request.get("request_id", "test-request"),
+            )
+            request.update({"status": "succeeded", "immutable_ref": immutable_ref, "digest": digest})
+            atomic_json(path, request)
+            print(immutable_ref)
+            return 0
         subprocess.run([str(repro / "deploy/scripts/build-images.sh")], cwd=repro, env=environment, check=True)
         rows = [line.strip() for line in result_file.read_text().splitlines() if line.strip()]
         if len(rows) != 1 or "=" not in rows[0] or "@sha256:" not in rows[0]:

@@ -28,6 +28,17 @@ runner = load("run_image_build", "run_image_build.py")
 
 
 class QueueTests(unittest.TestCase):
+    def test_storage_acceptance_image_is_serialized_and_preserves_base_partitioning(self):
+        self.assertEqual(
+            queue.COMPONENTS["ubuntu-24.04-storage-acceptance"],
+            ("glance-images", ("reproducibility",)),
+        )
+        builder = (ROOT.parent.parent / "images/storage-acceptance/build.sh").read_text()
+        self.assertIn("cp --reflink=auto", builder)
+        self.assertNotIn("virt-resize", builder)
+        self.assertIn("fio qemu-guest-agent", builder)
+        self.assertIn("qemu-img check", builder)
+
     def test_pueue_v4_status_variants_are_normalized(self):
         variants = {
             "Queued": "queued",
