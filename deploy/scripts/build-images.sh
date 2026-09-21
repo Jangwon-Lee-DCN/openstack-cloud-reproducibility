@@ -45,6 +45,7 @@ fi
 # Space-separated source component names. Empty means the complete rebuild.
 BUILD_COMPONENTS=${BUILD_COMPONENTS:-}
 KANIKO_IMAGE=gcr.io/kaniko-project/executor:v1.23.2-debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
+NOVA_BASE_VERSION=33.0.3.dev9
 
 for command in kubectl sops git tar sha256sum go; do
   command -v "$command" >/dev/null || { echo "missing command: $command" >&2; exit 1; }
@@ -81,13 +82,32 @@ build_context() {
   local name=$1 context=$2 image=$3 job safe_build_id
   safe_build_id=$(printf '%s' "$BUILD_ID" | tr -cs 'a-zA-Z0-9-' '-' | tr 'A-Z' 'a-z' | cut -c1-20)
   job="source-rebuild-${name}-${safe_build_id}"
-  local archive="$WORK_DIR/${name}.tar.gz" digest
+  local archive="$WORK_DIR/${name}.tar.gz" digest chunk_dir chunk_path chunk_name chunk_index
+  local projected_sources="" projected_source
   tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "$context" -czf "$archive" .
   kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
-  # A binary build context can exceed the 256 KiB annotation limit added by
-  # `kubectl apply`. Recreate this disposable, job-scoped ConfigMap directly.
-  kubectl delete configmap "$job" -n "$NAMESPACE" --ignore-not-found --wait=true
-  kubectl create configmap "$job" -n "$NAMESPACE" --from-file=context.tar.gz="$archive"
+  # Kubernetes stores an entire ConfigMap in one API object. Split compressed
+  # contexts so large source distributions remain below the API server request
+  # limit even after JSON/base64 encoding. A projected volume reconstructs the
+  # ordered byte stream without requiring object storage or node-local state.
+  kubectl delete configmap -n "$NAMESPACE" \
+    -l "dcn.ssu.ac.kr/image-build-job=$job" --ignore-not-found --wait=true
+  chunk_dir="$WORK_DIR/${name}-context-parts"
+  mkdir -p "$chunk_dir"
+  split -b 700K -d -a 4 "$archive" "$chunk_dir/part-"
+  chunk_index=0
+  for chunk_path in "$chunk_dir"/part-*; do
+    chunk_name="${job}-context-$(printf '%04d' "$chunk_index")"
+    kubectl create configmap "$chunk_name" -n "$NAMESPACE" \
+      --from-file=chunk="$chunk_path"
+    kubectl label configmap "$chunk_name" -n "$NAMESPACE" \
+      "dcn.ssu.ac.kr/image-build-job=$job" --overwrite >/dev/null
+    printf -v projected_source \
+      '              - configMap:\n                  name: %s\n                  items:\n                    - {key: chunk, path: parts/%04d}\n' \
+      "$chunk_name" "$chunk_index"
+    projected_sources+="$projected_source"
+    chunk_index=$((chunk_index + 1))
+  done
   kubectl apply -f - <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -111,7 +131,7 @@ spec:
       initContainers:
         - name: extract-context
           image: $KANIKO_IMAGE
-          command: [/busybox/sh, -c, 'cd /workspace && /busybox/tar xzf /archive/context.tar.gz']
+          command: [/busybox/sh, -c, 'cat /archive/parts/* > /workspace/.context.tar.gz && cd /workspace && /busybox/tar xzf .context.tar.gz && rm .context.tar.gz']
           volumeMounts:
             - {name: archive, mountPath: /archive, readOnly: true}
             - {name: workspace, mountPath: /workspace}
@@ -131,7 +151,10 @@ spec:
             - {name: workspace, mountPath: /workspace}
             - {name: registry-auth, mountPath: /kaniko/.docker, readOnly: true}
       volumes:
-        - {name: archive, configMap: {name: $job}}
+        - name: archive
+          projected:
+            sources:
+$projected_sources
         - {name: workspace, emptyDir: {}}
         - name: registry-auth
           secret: {secretName: $REGISTRY_SECRET, items: [{key: .dockerconfigjson, path: config.json}]}
@@ -139,7 +162,7 @@ EOF
   deadline=$((SECONDS + 1800))
   until [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.succeeded}' 2>/dev/null) == 1 ]]; do
     [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.failed}' 2>/dev/null) != 1 ]] || {
-      kubectl logs -n "$NAMESPACE" "job/$job" --tail=200 >&2 || true
+      kubectl logs -n "$NAMESPACE" "job/$job" --all-containers=true --tail=200 >&2 || true
       echo "$job failed" >&2
       exit 1
     }
@@ -229,7 +252,11 @@ build_nova_extended() {
     }
   mkdir -p "$context"
   cp "$REPO_ROOT/images/nova-extended/Dockerfile" "$context/Dockerfile"
-  "$PYTHON_BINARY" -m build --sdist --outdir "$context" "$NOVA_EXTENDED_REPO"
+  # A source checkout without upstream Git tags otherwise receives PBR's
+  # fallback 0.1.dev version. Preserve the package version of the digest-pinned
+  # Airship base so dependency and upgrade checks continue to see Nova 33.
+  PBR_VERSION="$NOVA_BASE_VERSION" \
+    "$PYTHON_BINARY" -m build --sdist --outdir "$context" "$NOVA_EXTENDED_REPO"
   test "$(find "$context" -maxdepth 1 -type f -name 'nova-*.tar.gz' | wc -l)" -eq 1
   build_context nova-extended "$context" "$REGISTRY/nova:source-$BUILD_ID"
 }
