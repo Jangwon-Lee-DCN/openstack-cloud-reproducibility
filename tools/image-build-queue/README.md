@@ -78,6 +78,16 @@ dcn-image-build submit --component vpc-facade \
   --source vpc_control_plane=/path/to/vpc-control-plane@FULL_SHA --wait
 ```
 
+The Operations Portal is built from its own pushed source revision. Building
+does not expose it or update a development/production Deployment:
+
+```bash
+dcn-image-build submit --component operations-portal \
+  --source reproducibility=/path/to/openstack-cloud-reproducibility@FULL_SHA \
+  --source operations_portal=/path/to/dcn-cloud-operations-portal@FULL_SHA \
+  --wait
+```
+
 ## Operate
 
 ```bash

@@ -113,6 +113,21 @@ class QueueTests(unittest.TestCase):
         self.assertIn("selected flavor-catalog", source)
         self.assertIn("CLOUD_SERVICES_REPO", source)
 
+    def test_operations_portal_requires_its_source(self):
+        self.assertEqual(
+            ("platform-images", ("reproducibility", "operations_portal")),
+            queue.COMPONENTS["operations-portal"],
+        )
+        source = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        runner_source = (ROOT / "run_image_build.py").read_text()
+        self.assertIn("selected operations-portal", source)
+        self.assertIn("OPERATIONS_PORTAL_REPO", source)
+        self.assertIn(
+            'cp "$OPERATIONS_PORTAL_REPO/Dockerfile" "$context/Dockerfile"',
+            source,
+        )
+        self.assertIn('"operations_portal": "OPERATIONS_PORTAL_REPO"', runner_source)
+
     def test_nova_build_requires_both_pinned_sources(self):
         self.assertEqual(
             ("nova", ("reproducibility", "nova_extended")),

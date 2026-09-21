@@ -53,6 +53,9 @@ COMPONENTS = {
         "platform-images", ("reproducibility", "netbox_ironic_controller"),
     ),
     "support-api": ("platform-images", ("reproducibility", "support_dashboard")),
+    "operations-portal": (
+        "platform-images", ("reproducibility", "operations_portal"),
+    ),
 }
 
 
