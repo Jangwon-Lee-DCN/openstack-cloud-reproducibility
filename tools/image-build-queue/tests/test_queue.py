@@ -115,6 +115,16 @@ class QueueTests(unittest.TestCase):
         self.assertIn("selected support-api", source)
         self.assertIn("openstack_support_dashboard.whl", source)
 
+    def test_operations_portal_build_requires_its_source(self):
+        self.assertEqual(
+            queue.COMPONENTS["operations-portal"],
+            ("platform-images", ("reproducibility", "operations_portal")),
+        )
+        runner_source = (ROOT / "run_image_build.py").read_text()
+        self.assertIn('"operations_portal": "OPERATIONS_PORTAL_REPO"', runner_source)
+        builder = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("selected operations-portal", builder)
+
     def test_flavor_catalog_requires_its_service_source(self):
         self.assertEqual(
             ("reproducibility", "cloud_services"),

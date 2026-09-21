@@ -36,6 +36,7 @@ S3_DASHBOARD_REPO=${S3_DASHBOARD_REPO:-$REPO_ROOT/../openstack-s3-dashboard}
 NETBOX_IRONIC_CONTROLLER_REPO=${NETBOX_IRONIC_CONTROLLER_REPO:-$REPO_ROOT/../netbox-ironic-controller}
 CLOUD_SERVICES_REPO=${CLOUD_SERVICES_REPO:-$REPO_ROOT/../openstack-cloud-services}
 NOVA_EXTENDED_REPO=${NOVA_EXTENDED_REPO:-$REPO_ROOT/../nova-extended-compute}
+OPERATIONS_PORTAL_REPO=${OPERATIONS_PORTAL_REPO:-$REPO_ROOT/../dcn-cloud-operations-portal}
 RESULT_FILE=${RESULT_FILE:-$REPO_ROOT/deploy/generated/rebuilt-images.env}
 REGISTRY_SECRET=${REGISTRY_SECRET:-telemetry-harbor-push}
 PYTHON_BINARY=${PYTHON_BINARY:-python3}
@@ -264,6 +265,23 @@ selected nova-extended && build_nova_extended
 selected octavia-ovn && simple_context octavia-ovn octavia
 selected horizon-complete && build_horizon_complete
 selected support-api && build_support_api
+
+build_operations_portal() {
+  local context="$WORK_DIR/operations-portal"
+  git -C "$OPERATIONS_PORTAL_REPO" diff --quiet \
+    && git -C "$OPERATIONS_PORTAL_REPO" diff --cached --quiet || {
+      echo "refusing dirty Operations Portal source: $OPERATIONS_PORTAL_REPO" >&2
+      exit 1
+    }
+  mkdir -p "$context"
+  cp "$OPERATIONS_PORTAL_REPO/Dockerfile" "$context/Dockerfile"
+  cp "$OPERATIONS_PORTAL_REPO/pyproject.toml" \
+    "$OPERATIONS_PORTAL_REPO/README.md" "$context/"
+  cp -a "$OPERATIONS_PORTAL_REPO/src" "$OPERATIONS_PORTAL_REPO/web" "$context/"
+  build_context operations-portal "$context" \
+    "$REGISTRY/dcn-operations-portal:source-$BUILD_ID"
+}
+selected operations-portal && build_operations_portal
 selected project-facade && simple_context project-facade
 
 build_flavor_catalog() {
