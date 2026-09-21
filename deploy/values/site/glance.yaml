@@ -65,5 +65,9 @@ volume:
     - ReadWriteOnce
 labels:
   api:
-    node_selector_key: openstack-compute-node
+    # The RWO PowerStore PVC is admitted with node affinity to the three
+    # controller-1 storage clients. Keep the workload selector within that
+    # topology; a Compute selector has an empty intersection and leaves the
+    # only Glance API replica Pending.
+    node_selector_key: openstack-control-plane
     node_selector_value: enabled
