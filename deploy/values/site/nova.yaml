@@ -19,17 +19,17 @@ pod:
 images:
   tags:
     rabbit_init: quay.io/airshipit/rabbitmq:3.10.18-management
-    nova_api: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_cell_setup: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_compute: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_compute_ssh: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_conductor: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_db_sync: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_novncproxy: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_novncproxy_assets: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_scheduler: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_spiceproxy: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
-    nova_spiceproxy_assets: registry.dcn.ssu.ac.kr/openstack/nova:source-c1858b34571a7ac8175f@sha256:f5ae30900b1106e621c2b3b6a4333ec69c413b95b12d4f73d5423ceeb6be2a95
+    nova_api: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_cell_setup: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_compute: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_compute_ssh: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_conductor: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_db_sync: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_novncproxy: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_novncproxy_assets: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_scheduler: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_spiceproxy: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
+    nova_spiceproxy_assets: registry.dcn.ssu.ac.kr/openstack/nova:source-06e49a812c7429adae8e@sha256:f71a118c748f1f18d7c070c2fc518058767e3ce4b48f898079da096de85cb25d
 conf:
   ceph:
     enabled: false
