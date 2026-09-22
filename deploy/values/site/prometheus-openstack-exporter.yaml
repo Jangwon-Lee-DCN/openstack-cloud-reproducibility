@@ -1,5 +1,14 @@
 # The upstream chart does not expose pod tolerations. The installer adds the
 # control-plane toleration after Helm renders this controller-1-only workload.
+conf:
+  prometheus_openstack_exporter:
+    # The public catalog currently presents the cert-manager self-signed
+    # Gateway certificate. Keep this explicit final site override until the
+    # institutional CA bundle is installed. Without it, the older encrypted
+    # values snapshot renders TLS verification on and every collector reports
+    # *_up=0 after x509 validation failures.
+    verify: false
+
 labels:
   openstack_exporter:
     node_selector_key: openstack-control-plane
