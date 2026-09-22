@@ -60,3 +60,4 @@ def test_openstack_exporter_tls_override_is_renderable_by_patched_chart():
     ):
         values = load(relative)
         assert values["conf"]["prometheus_openstack_exporter"]["verify"] is False
+        assert "--endpoint-type=internal" in values["conf"]["prometheus_openstack_exporter"]["extra_args"]

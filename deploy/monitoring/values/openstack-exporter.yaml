@@ -29,6 +29,9 @@ conf:
     # PoC public Gateway uses a cert-manager self-signed certificate.
     verify: false
     extra_args:
+      # Exporter 1.7 defaults to public endpoints even when clouds.yaml sets
+      # interface=internal. Keep telemetry off the public Gateway policy path.
+      - --endpoint-type=internal
       # Services not installed or not registered in this PoC.
       - --disable-service.object-store
       - --disable-service.container-infra

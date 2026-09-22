@@ -8,6 +8,8 @@ conf:
     # values snapshot renders TLS verification on and every collector reports
     # *_up=0 after x509 validation failures.
     verify: false
+    extra_args:
+      - --endpoint-type=internal
 
 labels:
   openstack_exporter:
