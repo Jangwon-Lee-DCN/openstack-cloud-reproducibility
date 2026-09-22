@@ -62,6 +62,11 @@ fi
 WORK_DIR=$(mktemp -d /tmp/dcn-image-rebuild.XXXXXX)
 cleanup() { rm -rf "$WORK_DIR"; }
 trap cleanup EXIT
+SOURCE_BUILD_TIMEOUT_SECONDS=${SOURCE_BUILD_TIMEOUT_SECONDS:-7200}
+[[ $SOURCE_BUILD_TIMEOUT_SECONDS =~ ^[1-9][0-9]*$ ]] || {
+  echo "SOURCE_BUILD_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+}
 mkdir -p "$(dirname "$RESULT_FILE")"
 : > "$RESULT_FILE"
 
@@ -115,6 +120,7 @@ kind: Job
 metadata: {name: $job, namespace: $NAMESPACE}
 spec:
   backoffLimit: 0
+  activeDeadlineSeconds: $((SOURCE_BUILD_TIMEOUT_SECONDS + 300))
   ttlSecondsAfterFinished: 86400
   template:
     spec:
@@ -160,14 +166,26 @@ $projected_sources
         - name: registry-auth
           secret: {secretName: $REGISTRY_SECRET, items: [{key: .dockerconfigjson, path: config.json}]}
 EOF
-  deadline=$((SECONDS + 1800))
+  deadline=$((SECONDS + SOURCE_BUILD_TIMEOUT_SECONDS))
   until [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.succeeded}' 2>/dev/null) == 1 ]]; do
     [[ $(kubectl get job -n "$NAMESPACE" "$job" -o jsonpath='{.status.failed}' 2>/dev/null) != 1 ]] || {
       kubectl logs -n "$NAMESPACE" "job/$job" --all-containers=true --tail=200 >&2 || true
       echo "$job failed" >&2
       exit 1
     }
-    (( SECONDS < deadline )) || { echo "$job timed out" >&2; exit 1; }
+    if (( SECONDS >= deadline )); then
+      kubectl logs -n "$NAMESPACE" "job/$job" --all-containers=true --tail=200 >&2 || true
+      # A timed-out Kaniko Pod can still push a tag after the queue has marked
+      # the request failed. Stop that untracked mutation and remove only the
+      # exact disposable context owned by this build.
+      kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found \
+        --wait=true --timeout=2m >/dev/null || true
+      kubectl delete configmap -n "$NAMESPACE" \
+        -l "dcn.ssu.ac.kr/image-build-job=$job" --ignore-not-found \
+        --wait=true --timeout=2m >/dev/null || true
+      echo "$job timed out after ${SOURCE_BUILD_TIMEOUT_SECONDS}s" >&2
+      exit 1
+    fi
     sleep 5
   done
   digest=$(kubectl get pod -n "$NAMESPACE" -l "job-name=$job" -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.message}')
