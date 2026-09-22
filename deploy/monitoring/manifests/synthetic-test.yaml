@@ -11,6 +11,9 @@ data:
     network_id=""
     volume_id=""
     success=0
+    identity_success=0
+    network_success=0
+    volume_success=0
     cleanup() {
       # A backend failure may create an error volume but return no ID to the
       # create command. Resolve the unique test name as a fallback and force
@@ -28,6 +31,14 @@ data:
       now="$(date +%s)"
       body="# TYPE openstack_synthetic_success gauge
     openstack_synthetic_success ${success}
+    # TYPE openstack_synthetic_identity_success gauge
+    openstack_synthetic_identity_success ${identity_success}
+    # TYPE openstack_synthetic_network_success gauge
+    openstack_synthetic_network_success ${network_success}
+    # TYPE openstack_synthetic_volume_success gauge
+    openstack_synthetic_volume_success ${volume_success}
+    # TYPE openstack_synthetic_execution_interval_seconds gauge
+    openstack_synthetic_execution_interval_seconds 900
     # TYPE openstack_synthetic_last_run_timestamp_seconds gauge
     openstack_synthetic_last_run_timestamp_seconds ${now}
     "
@@ -36,10 +47,13 @@ data:
     }
     trap cleanup EXIT
     openstack token issue >/dev/null || exit 1
+    identity_success=1
     network_id="$(openstack network create -f value -c id "${name}")" || exit 1
+    network_success=1
     volume_id="$(openstack volume create --size 1 \
       --property dcn_synthetic_test=true -f value -c id "${name}")" || exit 1
     openstack volume show "${volume_id}" >/dev/null || exit 1
+    volume_success=1
     success=1
 ---
 apiVersion: batch/v1
@@ -48,7 +62,7 @@ metadata:
   name: openstack-synthetic-test
   namespace: openstack
 spec:
-  schedule: "17 */6 * * *"
+  schedule: "2,17,32,47 * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5

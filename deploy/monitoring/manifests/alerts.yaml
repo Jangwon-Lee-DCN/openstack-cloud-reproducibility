@@ -53,11 +53,11 @@ spec:
             summary: Scheduled OpenStack resource lifecycle test failed
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
         - alert: OpenStackSyntheticTestStale
-          expr: time() - max(openstack_synthetic_last_run_timestamp_seconds) > 28800
+          expr: time() - max(openstack_synthetic_last_run_timestamp_seconds) > 1800
           for: 15m
           labels: {severity: warning}
           annotations:
-            summary: No successful synthetic test report in eight hours
+            summary: No synthetic lifecycle report in two execution intervals
             runbook_url: https://github.com/Jangwon-Lee-DCN/openstack-cloud-reproducibility/blob/main/deploy/monitoring/docs/alert-delivery.md#openstack-availability
     - name: platform.hardware
       rules:

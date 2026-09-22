@@ -34,6 +34,7 @@ kubectl -n monitoring get prometheusrule openstack-platform
 kubectl -n monitoring get configmap grafana-dashboard-vpc-control-plane
 kubectl -n monitoring get deployment alertmanager-webhook-audit
 kubectl -n openstack get cronjob openstack-synthetic-test
+[[ "$(kubectl -n openstack get cronjob openstack-synthetic-test -o jsonpath='{.spec.schedule}')" == "2,17,32,47 * * * *" ]]
 
 prometheus_ip="$(kubectl -n monitoring get pod \
   -l app.kubernetes.io/name=prometheus \
@@ -48,7 +49,11 @@ for query in \
   'vpc_reconcile_duration_seconds_count or vector(0)' \
   'vpc_network_interface_attachment_operation_seconds_count or vector(0)' \
   'vpc_network_interface_orphans or vector(0)' \
-  'openstack_synthetic_success or vector(0)'; do
+  'openstack_synthetic_success or vector(0)' \
+  'openstack_synthetic_identity_success or vector(0)' \
+  'openstack_synthetic_network_success or vector(0)' \
+  'openstack_synthetic_volume_success or vector(0)' \
+  'openstack_synthetic_execution_interval_seconds or vector(0)'; do
   result="$(curl --fail --silent --get \
     --data-urlencode "query=${query}" \
     "http://${prometheus_ip}:9090/api/v1/query")"
