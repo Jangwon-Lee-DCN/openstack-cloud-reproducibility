@@ -36,3 +36,27 @@ def test_openstack_exporter_is_three_replica_controller_workload():
         anti = values["pod"]["affinity"]["anti"]
         assert anti["type"]["default"] == "requiredDuringSchedulingIgnoredDuringExecution"
         assert anti["topologyKey"]["default"] == "topology.kubernetes.io/zone"
+
+
+def test_openstack_exporter_installs_the_locked_patched_chart():
+    installer = (ROOT / "deploy/monitoring/scripts/install.sh").read_text()
+    expected = "helm/packages/patched/prometheus-openstack-exporter-2026.1.0.tgz"
+    assert expected in installer
+    assert "helm/packages/upstream/prometheus-openstack-exporter" not in installer
+
+    release_lock = load("release-lock.yaml")
+    locked = next(
+        chart
+        for chart in release_lock["spec"]["releases"]
+        if chart["name"] == "prometheus-openstack-exporter"
+    )
+    assert locked["package"] == expected
+
+
+def test_openstack_exporter_tls_override_is_renderable_by_patched_chart():
+    for relative in (
+        "deploy/values/site/prometheus-openstack-exporter.yaml",
+        "deploy/monitoring/values/openstack-exporter.yaml",
+    ):
+        values = load(relative)
+        assert values["conf"]["prometheus_openstack_exporter"]["verify"] is False
