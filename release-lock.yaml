@@ -174,7 +174,7 @@ spec:
     chartVersion: 2026.1.0
     appVersion: v23.3.0
     package: helm/packages/patched/ovn-2026.1.0.tgz
-    sha256: cdbaa92fa294a99a8e07d534dfbb7074cb52e9a756f731ccbd0d881775f5649c
+    sha256: 75dd4cb53993eb10fc4b38d6dca4fef2d797d27d3f2413366b3c30f5d6c48bc1
     valuesSnapshot: deploy/releases/ovn.values.sops.yaml
   - name: placement
     chart: placement

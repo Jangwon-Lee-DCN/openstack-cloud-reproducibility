@@ -36,3 +36,17 @@ def test_openstack_exporter_is_three_replica_controller_workload():
         anti = values["pod"]["affinity"]["anti"]
         assert anti["type"]["default"] == "requiredDuringSchedulingIgnoredDuringExecution"
         assert anti["topologyKey"]["default"] == "topology.kubernetes.io/zone"
+
+
+def test_ovn_databases_follow_their_retained_local_pvs():
+    values = load("deploy/values/site/ovn.yaml")
+    expected = {
+        "node_selector_key": "openstack-ovn-database",
+        "node_selector_value": "enabled",
+    }
+    assert values["labels"]["ovn_ovsdb_nb"] == expected
+    assert values["labels"]["ovn_ovsdb_sb"] == expected
+    assert values["labels"]["ovn_northd"] == {
+        "node_selector_key": "openstack-control-plane",
+        "node_selector_value": "enabled",
+    }

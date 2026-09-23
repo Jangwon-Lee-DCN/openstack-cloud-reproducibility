@@ -46,6 +46,18 @@ nova_chart="$root/helm/packages/patched/nova-2026.1.0.tgz"
 ovn_chart="$root/helm/packages/patched/ovn-2026.1.0.tgz"
 ovs_chart="$root/helm/packages/upstream/openvswitch-2026.1.0.tgz"
 
+helm template ovn "$ovn_chart" -f "$root/deploy/values/site/ovn.yaml" | \
+  python3 -c '
+import sys, yaml
+objects = list(yaml.safe_load_all(sys.stdin))
+for name in ("ovn-ovsdb-nb", "ovn-ovsdb-sb"):
+    statefulset = next(x for x in objects if x and x.get("kind") == "StatefulSet" and x["metadata"]["name"] == name)
+    container = next(x for x in statefulset["spec"]["template"]["spec"]["containers"] if x["name"] == "ovsdb")
+    mounts = {(x["name"], x["mountPath"]) for x in container["volumeMounts"]}
+    assert ("data", "/var/lib/ovn") in mounts
+    assert ("data", "/etc/ovn") in mounts
+'
+
 grep -q 'openstack-compute-node=enabled' "$role_tasks"
 grep -q 'openvswitch=enabled' "$role_tasks"
 grep -q 'reconcile-coredns-authoritative-zone.py' "$role_tasks"

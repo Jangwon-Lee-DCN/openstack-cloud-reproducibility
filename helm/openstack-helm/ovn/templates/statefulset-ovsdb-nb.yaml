@@ -97,6 +97,12 @@ spec:
               mountPath: /var/run/ovn
             - name: data
               mountPath: {{ $envAll.Values.volume.ovn_ovsdb_nb.path }}
+{{- if ne $envAll.Values.volume.ovn_ovsdb_nb.path "/etc/ovn" }}
+            # ovnkube.sh checks OVN_ETCDIR (/etc/ovn) to distinguish a
+            # retained clustered database from a first installation.
+            - name: data
+              mountPath: /etc/ovn
+{{- end }}
       volumes:
         - name: run-openvswitch
           emptyDir: {}
