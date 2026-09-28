@@ -70,6 +70,7 @@ spec:
           volumeMounts:
             - {name: script, mountPath: /opt/sriov-evidence, readOnly: true}
             - {name: host-sys, mountPath: /host-sys, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {memory: 128Mi}
@@ -83,6 +84,7 @@ spec:
       volumes:
         - {name: script, configMap: {name: sriov-inventory-evidence, defaultMode: 365}}
         - {name: host-sys, hostPath: {path: /sys, type: Directory}}
+        - {name: tmp, emptyDir: {}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

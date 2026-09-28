@@ -35,6 +35,8 @@ class SriovInventoryEvidenceTests(unittest.TestCase):
         self.assertEqual("/sys", host_sys["hostPath"]["path"])
         mount = next(item for item in container["volumeMounts"] if item["name"] == "host-sys")
         self.assertTrue(mount["readOnly"])
+        self.assertTrue(any(item["name"] == "tmp" for item in container["volumeMounts"]))
+        self.assertTrue(any(item["name"] == "tmp" and "emptyDir" in item for item in template["volumes"]))
         self.assertIn("@sha256:", container["image"])
 
     def test_policy_allows_only_dns_and_pushgateway(self):
