@@ -74,7 +74,8 @@ assert len(device_specs) == 5
 assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
     "sriov-rack-1", "sriov-rack-2", "sriov-rack-3"
 }
-assert any(spec.get("product_id") == "1515" and spec.get("address") == "0000:04:*.*" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
+assert any(spec.get("vendor_id") == "15b3" and spec.get("product_id") == "1004" and spec.get("address") == "0000:07:00.*" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
+assert any(spec.get("vendor_id") == "15b3" and spec.get("product_id") == "1004" and spec.get("address") == "0000:07:01.0" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
 assert any(spec.get("product_id") == "154c" and spec.get("address") == "0000:17:*.*" and spec.get("physical_network") == "sriov-rack-1" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 assert pci["alias"].count("alias = ") == 1
@@ -135,7 +136,8 @@ assert len(device_specs) == 5
 assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
     "sriov-rack-1", "sriov-rack-2", "sriov-rack-3"
 }
-assert any(spec.get("product_id") == "1515" and spec.get("address") == "0000:04:*.*" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
+assert any(spec.get("vendor_id") == "15b3" and spec.get("product_id") == "1004" and spec.get("address") == "0000:07:00.*" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
+assert any(spec.get("vendor_id") == "15b3" and spec.get("product_id") == "1004" and spec.get("address") == "0000:07:01.0" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
 assert any(spec.get("product_id") == "154c" and spec.get("address") == "0000:17:*.*" and spec.get("physical_network") == "sriov-rack-1" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 '
