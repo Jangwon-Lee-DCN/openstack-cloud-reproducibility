@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openstack-network-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+data:
+  run.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    site="${NETWORK_EVIDENCE_SITE:-poc}"
+    workdir="$(mktemp -d)"
+    trap 'rm -rf "${workdir}"' EXIT
+
+    # The SDK returns Neutron binding fields that OSC deliberately omits from
+    # `port list --long`.  Export only bounded aggregates: never port UUIDs,
+    # tenant addresses, MAC addresses, device IDs, or binding profiles.
+    timeout 90 python3 - "${workdir}/metrics" <<'PY'
+    import collections
+    import pathlib
+    import sys
+    import time
+
+    import openstack
+
+    destination = pathlib.Path(sys.argv[1])
+    ports = list(openstack.connect(verify=False).network.ports())
+
+    def label(value):
+        return str(value if value is not None else "").replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+    def labels(values):
+        return ",".join(f'{key}="{label(value)}"' for key, value in values.items())
+
+    binding_counts = collections.Counter()
+    direct_counts = collections.Counter()
+    failed = 0
+    for port in ports:
+        vnic_type = str(port.binding_vnic_type or "unknown")
+        host = str(port.binding_host_id or "unbound")
+        vif_type = str(port.binding_vif_type or "unknown")
+        status = str(port.status or "unknown").lower()
+        owner_class = str(port.device_owner or "unowned").split(":", 1)[0]
+        binding_counts[(host, vnic_type, vif_type, status, owner_class)] += 1
+        if vif_type == "binding_failed":
+            failed += 1
+        if vnic_type.startswith("direct"):
+            direct_counts[(host, vnic_type, status)] += 1
+
+    lines = [
+        "# TYPE openstack_neutron_port_binding_info gauge",
+        "# TYPE openstack_neutron_sriov_attachment_count gauge",
+        "# TYPE openstack_neutron_port_binding_failures gauge",
+        "# TYPE openstack_network_evidence_collected gauge",
+        "# TYPE openstack_network_evidence_last_run_timestamp_seconds gauge",
+    ]
+    for dimensions, count in sorted(binding_counts.items()):
+        host, vnic_type, vif_type, status, owner_class = dimensions
+        lines.append(
+            f"openstack_neutron_port_binding_info{{{labels({'host': host, 'vnic_type': vnic_type, 'vif_type': vif_type, 'status': status, 'owner_class': owner_class})}}} {count}"
+        )
+    for dimensions, count in sorted(direct_counts.items()):
+        host, vnic_type, status = dimensions
+        lines.append(
+            f"openstack_neutron_sriov_attachment_count{{{labels({'host': host, 'vnic_type': vnic_type, 'status': status})}}} {count}"
+        )
+    # An explicit zero distinguishes an observed empty set from missing data.
+    lines.append(f"openstack_neutron_sriov_attachment_count{{host=\"all\",vnic_type=\"direct\",status=\"all\"}} {sum(direct_counts.values())}")
+    lines.append(f"openstack_neutron_port_binding_failures {failed}")
+    lines.append("openstack_network_evidence_collected 1")
+    lines.append(f"openstack_network_evidence_last_run_timestamp_seconds {int(time.time())}")
+    destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    PY
+
+    curl --fail --silent --show-error --max-time 30 --request PUT --data-binary @"${workdir}/metrics" \
+      "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-network-evidence/site/${site}"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openstack-network-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+spec:
+  schedule: "13,28,43,58 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 180
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: openstack-network-evidence}
+        spec:
+          restartPolicy: Never
+          nodeSelector: {openstack-control-plane: enabled}
+          tolerations:
+            - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+          securityContext: {seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: collector
+              image: quay.io/airshipit/openstack-client@sha256:0bc46619c695868ca69657dcb1838e99694a7488ad89c23611cc4ffe49e64ca2
+              command: [/bin/bash, /opt/network-evidence/run.sh]
+              workingDir: /tmp
+              envFrom: [{secretRef: {name: keystone-keystone-admin}}]
+              env: [{name: NETWORK_EVIDENCE_SITE, value: poc}, {name: HOME, value: /tmp}]
+              volumeMounts: [{name: script, mountPath: /opt/network-evidence, readOnly: true}, {name: tmp, mountPath: /tmp}]
+              resources:
+                requests: {cpu: 100m, memory: 128Mi}
+                limits: {memory: 512Mi}
+              securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true, runAsNonRoot: true, runAsUser: 65534, runAsGroup: 65534}
+          volumes: [{name: script, configMap: {name: openstack-network-evidence, defaultMode: 365}}, {name: tmp, emptyDir: {}}]
