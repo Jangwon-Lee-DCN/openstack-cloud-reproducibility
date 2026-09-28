@@ -89,7 +89,7 @@ data:
     print(f"openstack_placement_evidence_last_run_timestamp_seconds {int(time.time())}")
     PY
 
-    curl --fail --silent --show-error --max-time 30 --data-binary @"${workdir}/metrics" \
+    curl --fail --silent --show-error --max-time 30 --request PUT --data-binary @"${workdir}/metrics" \
       "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-placement-evidence/site/${site}"
 ---
 apiVersion: batch/v1

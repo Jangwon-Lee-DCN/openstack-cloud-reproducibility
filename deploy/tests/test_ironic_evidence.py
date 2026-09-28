@@ -30,6 +30,7 @@ class IronicEvidenceTests(unittest.TestCase):
         self.assertIn("timeout 60 openstack baremetal node list", self.script)
         self.assertIn("timeout 60 openstack baremetal port list", self.script)
         self.assertIn("timeout 60 openstack baremetal node validate", self.script)
+        self.assertIn("--request PUT --data-binary", self.script)
         self.assertNotIn("Driver Info", self.script)
         self.assertNotIn("ipmi_password", self.script)
         self.assertNotIn('"last_error":', self.script)

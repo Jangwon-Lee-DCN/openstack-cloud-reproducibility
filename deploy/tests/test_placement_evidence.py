@@ -31,6 +31,7 @@ class PlacementEvidenceTests(unittest.TestCase):
         self.assertIn("timeout 60 openstack resource provider list", self.script)
         self.assertIn("timeout 60 openstack resource provider inventory list", self.script)
         self.assertIn("timeout 60 openstack resource provider trait list", self.script)
+        self.assertIn("--request PUT --data-binary", self.script)
         self.assertNotIn("allocation show", self.script)
         self.assertNotIn("consumer", self.script)
 
