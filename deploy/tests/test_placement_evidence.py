@@ -38,6 +38,8 @@ class PlacementEvidenceTests(unittest.TestCase):
         self.assertIn("general-small", self.script)
         self.assertIn("general-large", self.script)
         self.assertIn("gpu-custom-", self.script)
+        self.assertIn("if collected:", self.script)
+        self.assertNotIn("len(candidates) if collected else 0", self.script)
         self.assertIn("--request PUT --data-binary", self.script)
         self.assertNotIn("allocation show", self.script)
         self.assertNotIn("consumer", self.script)

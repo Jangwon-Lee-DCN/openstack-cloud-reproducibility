@@ -130,7 +130,8 @@ data:
         candidates = load(f"candidates-{profile}.json")
         candidate_labels = labels({"profile": profile, "resources": resources})
         print(f"openstack_placement_allocation_candidate_collection{{{candidate_labels}}} {1 if collected else 0}")
-        print(f"openstack_placement_allocation_candidate_provider_count{{{candidate_labels}}} {len(candidates) if collected else 0}")
+        if collected:
+            print(f"openstack_placement_allocation_candidate_provider_count{{{candidate_labels}}} {len(candidates)}")
     print(f"openstack_placement_evidence_last_run_timestamp_seconds {int(time.time())}")
     PY
 
