@@ -29,6 +29,23 @@ installed Neutron/oslo-policy modules using independent in-process enforcers.
 It checks 24 role/network/action decisions and 12 missing-target cases. It does
 not change the running API's enforcer. Engine results are not HTTP acceptance.
 
+`deploy/tests/test_neutron_service_port_api.py` additionally exercises Neutron's
+WSGI request handlers, ML2 test mechanism drivers and a temporary SQLite DB.
+The production repository runs it with `./deploy.sh development
+ai-space-neutron-api` on the utility node using the immutable Neutron image,
+without production configuration, credentials or service-account token. Missing
+test dependencies are supplied only to that fixture with version/SHA256 pins;
+ConfigMap source hashes must match before execution. Member+reader requests
+must be able to GET the protected port, but CREATE/UPDATE/DELETE are forbidden;
+each denied update/delete must leave the original DB object unchanged. Covered
+changes include name, fixed IP, device owner, MAC, SG removal, port-security
+disablement, allowed-address-pairs and vNIC type. A separate ordinary-network
+test requires successful member CREATE/UPDATE/DELETE.
+
+This is in-process WSGI/ML2 API authorization acceptance. Keystone token
+authentication, live OVN binding, bulk/binding-extension endpoints, actual Nova
+VM lifecycle and NFS packet paths are not qualified by this fixture.
+
 Before integrating a release override, isolated API tests must prove:
 
 - Tenant direct Neutron calls cannot create, update or delete protected ports,
