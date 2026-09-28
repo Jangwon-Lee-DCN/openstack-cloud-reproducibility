@@ -75,6 +75,26 @@ class CinderGeneralStorageTests(unittest.TestCase):
         self.assertIn('volume delete --force "${stale_volume_id}"', script)
         self.assertIn("dcn_synthetic_test=true", script)
 
+    def test_synthetic_proves_object_auth_write_read_and_cleanup(self):
+        manifest = yaml.safe_load_all(
+            (ROOT / "deploy/monitoring/manifests/synthetic-test.yaml").read_text()
+        )
+        configmap = next(item for item in manifest if item["kind"] == "ConfigMap")
+        script = configmap["data"]["run.sh"]
+        for metric in (
+            "openstack_synthetic_object_auth_success",
+            "openstack_synthetic_object_write_success",
+            "openstack_synthetic_object_read_success",
+        ):
+            self.assertIn(metric, script)
+        self.assertIn("openstack --os-interface internal container list", script)
+        self.assertIn("openstack --os-interface internal object create", script)
+        self.assertIn('--name "${object_name}"', script)
+        self.assertIn("openstack --os-interface internal object save --file", script)
+        self.assertIn('cmp -s "${object_payload}" "${object_received}"', script)
+        self.assertIn("openstack --os-interface internal object delete", script)
+        self.assertIn("openstack --os-interface internal container delete", script)
+
     def test_storage_link_observability_uses_live_metric_contract(self):
         alerts = (ROOT / "deploy/monitoring/manifests/alerts.yaml").read_text()
         dashboards = (ROOT / "deploy/monitoring/manifests/openstack-service-dashboards.yaml").read_text()
