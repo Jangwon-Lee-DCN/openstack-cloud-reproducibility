@@ -1,5 +1,6 @@
 ---
 name: Rebuild automation validation
+# Historical definition only. Owner prohibits automatic Actions execution.
 
 on:
   pull_request:
