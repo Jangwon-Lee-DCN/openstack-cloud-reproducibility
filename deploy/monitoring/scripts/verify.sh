@@ -35,6 +35,7 @@ kubectl -n monitoring get configmap grafana-dashboard-vpc-control-plane
 kubectl -n monitoring get deployment alertmanager-webhook-audit
 kubectl -n openstack get cronjob openstack-synthetic-test
 [[ "$(kubectl -n openstack get cronjob openstack-synthetic-test -o jsonpath='{.spec.schedule}')" == "2,17,32,47 * * * *" ]]
+[[ "$(kubectl -n openstack get cronjob openstack-synthetic-test -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="SYNTHETIC_SITE")].value}')" == "poc" ]]
 
 prometheus_ip="$(kubectl -n monitoring get pod \
   -l app.kubernetes.io/name=prometheus \

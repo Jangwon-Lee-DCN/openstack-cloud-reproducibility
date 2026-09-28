@@ -14,6 +14,7 @@ data:
     identity_success=0
     network_success=0
     volume_success=0
+    synthetic_site="${SYNTHETIC_SITE:-poc}"
     cleanup() {
       # A backend failure may create an error volume but return no ID to the
       # create command. Resolve the unique test name as a fallback and force
@@ -43,7 +44,7 @@ data:
     openstack_synthetic_last_run_timestamp_seconds ${now}
     "
       curl --fail --silent --show-error --data-binary "${body}" \
-        http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-synthetic/site/poc
+        "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-synthetic/site/${synthetic_site}"
     }
     trap cleanup EXIT
     openstack token issue >/dev/null || exit 1
@@ -86,6 +87,8 @@ spec:
               envFrom:
                 - secretRef:
                     name: keystone-keystone-admin
+              env:
+                - {name: SYNTHETIC_SITE, value: poc}
               volumeMounts:
                 - name: script
                   mountPath: /opt/synthetic
