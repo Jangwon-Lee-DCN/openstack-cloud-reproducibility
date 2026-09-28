@@ -68,6 +68,44 @@ This policy compiler alone does not satisfy those gates or implement a managed
 NFS service. On failure retain the previous release policy and do not expose
 new service networks.
 
+## Candidate mandatory management-egress guard
+
+The separate `deploy/neutron/dcn_management_guard.py` compiler and
+`dcn_management_guard_runtime.py` adapter protect **all normal-vNIC ports in
+explicitly enrolled projects**, not just the provider-managed storage NIC.
+This closes the alternate ordinary-NIC path to management destinations. It is
+not an NFS share authorization mechanism and does not replace Manila grants,
+storage-port ownership or network separation. Enrollment is project-wide and
+must not silently include unrelated workloads.
+
+The candidate `install-management-guard.py` transforms the pinned Neutron
+OVNClient source at image-build time. It enqueues the owned Port_Group/ACL
+operation inside the existing create/update transaction and adds repair after
+network/port synchronization in repair mode only. Unexpected upstream source
+shapes or already patched inputs are rejected. This installer must never be
+run on live service files.
+
+The oslo.config group `dcn_management_guard` has two list options,
+`project_ids` and `denied_cidrs`. Both default to empty (inert). A configured
+policy requires both, exact Keystone identities and canonical non-default
+CIDRs. No production enrollment or CIDR values are supplied here. SR-IOV and
+other non-normal vNICs are unqualified and rejected for enrolled ports that
+reach this hook. Native API/binding coverage remains an acceptance requirement.
+
+Owned tier-0, priority-32767 egress drop ACLs are separate from tenant SG
+rules. A foreign group or changed existing ACL aborts the port transaction;
+missing owned rules/membership can be restored. Such refusal does **not**
+restore protection for existing traffic after an external ACL change. Recovery,
+monitoring and real established-flow tests remain required. Policy replacement,
+removal and automatic project enrollment are not implemented.
+
+`deploy/tests/management_guard_ovsdb_fixture.py` uses a private real NB database
+and installed ovsdbapp/Neutron libraries. It covers batch repair, duplicate
+prevention and transaction aborts, but is not a substitute for Neutron HTTP,
+Nova, controller restart or CPU VM packet acceptance. The production
+repository owns its isolated reconciler wrapper and dated results. No result
+in this document authorizes activation or claims end-to-end NFS readiness.
+
 ### Additional acceptance gates
 
 HTTP 200 for a privileged port update is insufficient: reject
