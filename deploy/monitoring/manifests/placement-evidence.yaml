@@ -34,6 +34,42 @@ data:
     PY
     )
 
+    cat >"${workdir}/profiles.tsv" <<'EOF'
+    general-small	VCPU=2,MEMORY_MB=4096,DISK_GB=40
+    general-large	VCPU=16,MEMORY_MB=32768,DISK_GB=80
+    EOF
+    python3 - "${workdir}" >>"${workdir}/profiles.tsv" <<'PY'
+    import json
+    import pathlib
+    import re
+    import sys
+
+    root = pathlib.Path(sys.argv[1])
+    classes = set()
+    for path in root.glob("inventory-*.json"):
+        for item in json.loads(path.read_text(encoding="utf-8")):
+            resource_class = item.get("resource_class", "")
+            if re.fullmatch(r"CUSTOM_[A-Z0-9_]+", resource_class) and re.search(
+                r"GPU|VGPU|NVIDIA|AMD|INTEL|FLYT", resource_class
+            ):
+                classes.add(resource_class)
+    for index, resource_class in enumerate(sorted(classes), start=1):
+        print(f"gpu-custom-{index}\tVCPU=4,MEMORY_MB=8192,DISK_GB=40,{resource_class}=1")
+    PY
+
+    while IFS=$'\t' read -r profile resources; do
+      args=()
+      IFS=',' read -ra requested <<<"${resources}"
+      for resource in "${requested[@]}"; do
+        args+=(--resource "${resource}")
+      done
+      if ! timeout 60 openstack --os-placement-api-version 1.29 allocation candidate list \
+        --limit 100 "${args[@]}" -f json >"${workdir}/candidates-${profile}.json"; then
+        printf '[]\n' >"${workdir}/candidates-${profile}.json"
+        : >"${workdir}/candidates-${profile}.failed"
+      fi
+    done <"${workdir}/profiles.tsv"
+
     python3 - "${workdir}" >"${workdir}/metrics" <<'PY'
     import json
     import pathlib
@@ -61,6 +97,8 @@ data:
     print("# TYPE openstack_placement_provider_inventory_reserved gauge")
     print("# TYPE openstack_placement_provider_inventory_allocation_ratio gauge")
     print("# TYPE openstack_placement_provider_trait gauge")
+    print("# TYPE openstack_placement_allocation_candidate_collection gauge")
+    print("# TYPE openstack_placement_allocation_candidate_provider_count gauge")
     print("# TYPE openstack_placement_evidence_last_run_timestamp_seconds gauge")
     for provider in providers:
         uuid = provider["uuid"]
@@ -86,6 +124,13 @@ data:
             trait = item.get("name") or item.get("Name")
             if trait:
                 print(f'openstack_placement_provider_trait{{{labels({"uuid": uuid, "name": name, "trait": trait})}}} 1')
+    for line in (root / "profiles.tsv").read_text(encoding="utf-8").splitlines():
+        profile, resources = line.split("\t", 1)
+        collected = not (root / f"candidates-{profile}.failed").exists()
+        candidates = load(f"candidates-{profile}.json")
+        candidate_labels = labels({"profile": profile, "resources": resources})
+        print(f"openstack_placement_allocation_candidate_collection{{{candidate_labels}}} {1 if collected else 0}")
+        print(f"openstack_placement_allocation_candidate_provider_count{{{candidate_labels}}} {len(candidates) if collected else 0}")
     print(f"openstack_placement_evidence_last_run_timestamp_seconds {int(time.time())}")
     PY
 

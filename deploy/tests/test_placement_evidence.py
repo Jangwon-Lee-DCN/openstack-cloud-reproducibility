@@ -25,12 +25,19 @@ class PlacementEvidenceTests(unittest.TestCase):
             "openstack_placement_provider_inventory_reserved",
             "openstack_placement_provider_inventory_allocation_ratio",
             "openstack_placement_provider_trait",
+            "openstack_placement_allocation_candidate_collection",
+            "openstack_placement_allocation_candidate_provider_count",
             "openstack_placement_evidence_last_run_timestamp_seconds",
         ):
             self.assertIn(metric, self.script)
         self.assertIn("timeout 60 openstack resource provider list", self.script)
         self.assertIn("timeout 60 openstack resource provider inventory list", self.script)
         self.assertIn("timeout 60 openstack resource provider trait list", self.script)
+        self.assertIn("--os-placement-api-version 1.29 allocation candidate list", self.script)
+        self.assertIn("--limit 100", self.script)
+        self.assertIn("general-small", self.script)
+        self.assertIn("general-large", self.script)
+        self.assertIn("gpu-custom-", self.script)
         self.assertIn("--request PUT --data-binary", self.script)
         self.assertNotIn("allocation show", self.script)
         self.assertNotIn("consumer", self.script)
