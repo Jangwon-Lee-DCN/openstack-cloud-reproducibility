@@ -149,6 +149,7 @@ availability_zone=$(cat /tmp/gw-enabled/availability-zone)
 test -n "$availability_zone"
 bridge_mappings="{{ .Values.conf.ovn_bridge_mapping_zone_prefix }}${availability_zone}:br-ex"
 {{- end }}
+{{ tuple "bin/_ovn-extra-bridges.sh.tpl" . | include "helm-toolkit.utils.template" }}
 ovs-vsctl set open . external-ids:ovn-bridge-mappings="$bridge_mappings"
 ovs-vsctl set open . external-ids:ovn-monitor-all="{{ .Values.conf.ovn_monitor_all }}"
 

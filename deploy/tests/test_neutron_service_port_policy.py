@@ -1,6 +1,12 @@
 import importlib.util
+import base64
+import configparser
+import json
 import pathlib
+import subprocess
 import unittest
+
+import yaml
 
 s = importlib.util.spec_from_file_location('guard', pathlib.Path(__file__).parents[1]/'scripts/render-neutron-service-port-policy.py')
 m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
@@ -33,6 +39,38 @@ class GuardTests(unittest.TestCase):
     def test_unknown_target_is_not_unprotected_default(self):
         out=m.compile_policy(self.base(), [NETWORK])
         self.assertTrue(out[m.PREFIX+'guard'].startswith('(field:port:network_id='))
+
+    def test_values_preserve_service_plugins_and_select_exact_networks(self):
+        plugins = ['ovn-router', 'firewall_v2', 'log']
+        result = m.compile_values(self.base(), [NETWORK], plugins)['conf']
+        self.assertEqual(result['neutron']['DEFAULT']['service_plugins'],
+                         'ovn-router,firewall_v2,log,'+m.PLUGIN)
+        self.assertEqual(result['neutron']['dcn_service_ports']['network_ids'], NETWORK)
+        self.assertEqual(result['policy']['get_port'], 'role:reader')
+        self.assertEqual(plugins, ['ovn-router', 'firewall_v2', 'log'])
+
+    def test_ambiguous_or_repeated_plugin_config_is_rejected(self):
+        for plugins in ([], '', ['ovn-router,log'], ['log', 'log'], [' log'], [m.PLUGIN]):
+            with self.subTest(plugins=plugins), self.assertRaises(ValueError):
+                m.compile_values(self.base(), [NETWORK], plugins)
+
+    def test_packaged_chart_renders_complete_candidate_configuration(self):
+        root = pathlib.Path(__file__).resolve().parents[2]
+        values = m.compile_values(self.base(), [NETWORK], ['ovn-router', 'firewall_v2', 'log'])
+        result = subprocess.run(['helm', 'template', 'neutron',
+            str(root/'helm/packages/patched/neutron-2026.1.0.tgz'),
+            '-f', str(root/'deploy/values/site/neutron.yaml'),
+            '--set-json', 'conf='+json.dumps(values['conf'])],
+            capture_output=True, text=True, check=True)
+        config = next(d for d in yaml.safe_load_all(result.stdout)
+                      if d and 'neutron.conf' in d.get('data', {}))
+        parser = configparser.ConfigParser(interpolation=None, strict=False)
+        parser.read_string(base64.b64decode(config['data']['neutron.conf']).decode())
+        self.assertEqual(parser['DEFAULT']['service_plugins'], 'ovn-router,firewall_v2,log,'+m.PLUGIN)
+        self.assertEqual(parser['dcn_service_ports']['network_ids'], NETWORK)
+        policy = yaml.safe_load(base64.b64decode(config['data']['policy.yaml']))
+        self.assertEqual(policy['get_port'], 'role:reader')
+        self.assertEqual(policy['update_port'], values['conf']['policy']['update_port'])
 
 
 if __name__ == '__main__': unittest.main()

@@ -11,6 +11,7 @@ import uuid
 
 OPERATIONS = ('create_port', 'update_port', 'delete_port')
 PREFIX = 'dcn_service_port_'
+PLUGIN = 'dcn_service_port_guard.ServicePortGuard'
 
 
 def compile_policy(effective_rules, network_ids):
@@ -42,11 +43,30 @@ def compile_policy(effective_rules, network_ids):
     return result
 
 
+def compile_values(effective_rules, network_ids, existing_plugins):
+    """Produce an explicit candidate override, never silently enable a plugin."""
+    policy = compile_policy(effective_rules, network_ids)
+    if (not isinstance(existing_plugins, list) or not existing_plugins
+            or not all(isinstance(p, str) and p and p.strip() == p and ',' not in p
+                       for p in existing_plugins)
+            or len(set(existing_plugins)) != len(existing_plugins)):
+        raise ValueError('Explicit unique current service plugins required')
+    if PLUGIN in existing_plugins:
+        raise ValueError('Already guarded service plugin configuration')
+    return {'conf': {'policy': policy, 'neutron': {
+        'DEFAULT': {'service_plugins': ','.join(existing_plugins+[PLUGIN])},
+        'dcn_service_ports': {'network_ids': ','.join(sorted(network_ids))}}}}
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('effective_rules')
     parser.add_argument('--network-id', action='append', required=True)
+    parser.add_argument('--service-plugin', action='append',
+                        help='Emit Helm values; repeat for every existing service plugin')
     args = parser.parse_args()
     with open(args.effective_rules) as f:
-        result = compile_policy(json.load(f), args.network_id)
+        rules = json.load(f)
+    result = (compile_values(rules, args.network_id, args.service_plugin)
+              if args.service_plugin is not None else compile_policy(rules, args.network_id))
     print(json.dumps(result, indent=2, sort_keys=True))

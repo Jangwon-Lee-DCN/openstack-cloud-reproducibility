@@ -80,6 +80,10 @@ conf:
   # optional rack-local bridge mapping from this Kubernetes node label.
   ovn_availability_zone_label: ""
   ovn_bridge_mapping_zone_prefix: ""
+  # Operator-owned, addressless VLAN bridges, explicitly selected per node.
+  # Entries: [{physnet, bridge, interface, parent, vlan}]. Disabled by default.
+  # Node membership and VLAN allocation belong to production inventory.
+  ovn_node_extra_bridges: {}
   ovn_encap_type: geneve
   ovn_bridge: br-int
   ovn_bridge_mappings: external:br-ex
