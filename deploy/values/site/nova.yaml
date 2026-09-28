@@ -72,7 +72,7 @@ conf:
       # while the independently isolated R3 X540/ixgbe PF creates 8086:1515
       # VFs. Address and product matching prevents another host's unrelated
       # PCI function from entering a rack physnet. No rule names dcn-ovn0.
-      device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"},{"address":"0000:16:*.*","vendor_id":"8086","product_id":"154c","physical_network":"sriov-rack-1","managed":"yes"},{"address":"0000:18:*.*","vendor_id":"8086","product_id":"154c","physical_network":"sriov-rack-2","managed":"yes"},{"address":"0000:04:*.*","vendor_id":"8086","product_id":"1515","physical_network":"sriov-rack-3","managed":"yes"}]'
+      device_spec: '[{"address":"0000:01:00.0","vendor_id":"10de","product_id":"2203","managed":"yes"},{"address":"0000:01:00.1","vendor_id":"10de","product_id":"1aef","managed":"yes"},{"address":"0000:17:*.*","vendor_id":"8086","product_id":"154c","physical_network":"sriov-rack-1","managed":"yes"},{"address":"0000:18:*.*","vendor_id":"8086","product_id":"154c","physical_network":"sriov-rack-2","managed":"yes"},{"address":"0000:04:*.*","vendor_id":"8086","product_id":"1515","physical_network":"sriov-rack-3","managed":"yes"}]'
       alias: |-
         {"name":"rtx3090ti","vendor_id":"10de","product_id":"2203","device_type":"type-PCI","numa_policy":"legacy"}
         alias = {"name":"rtx3090ti-audio","vendor_id":"10de","product_id":"1aef","device_type":"type-PCI","numa_policy":"legacy"}
