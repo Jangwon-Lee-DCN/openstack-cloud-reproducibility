@@ -95,6 +95,38 @@ class CinderGeneralStorageTests(unittest.TestCase):
         self.assertIn("openstack --os-interface internal object delete", script)
         self.assertIn("openstack --os-interface internal container delete", script)
 
+    def test_synthetic_collects_oidc_discovery_and_google_broker_handoff(self):
+        manifest = list(
+            yaml.safe_load_all(
+                (ROOT / "deploy/monitoring/manifests/synthetic-test.yaml").read_text()
+            )
+        )
+        configmap = next(item for item in manifest if item["kind"] == "ConfigMap")
+        cronjob = next(item for item in manifest if item["kind"] == "CronJob")
+        script = configmap["data"]["run.sh"]
+        for metric in (
+            "openstack_identity_oidc_discovery_success",
+            "openstack_identity_google_broker_redirect_success",
+            "openstack_identity_oidc_last_run_timestamp_seconds",
+        ):
+            self.assertIn(metric, script)
+        self.assertIn("/.well-known/openid-configuration", script)
+        self.assertIn('"kc_idp_hint": "google"', script)
+        self.assertIn('host == "accounts.google.com"', script)
+        self.assertIn('error.headers.get_all("Set-Cookie")', script)
+        env = {
+            item["name"]: item["value"]
+            for item in cronjob["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]["env"]
+        }
+        self.assertEqual("dcn-operations-portal", env["OIDC_CLIENT_ID"])
+        self.assertEqual(
+            "https://platform.dcn.ssu.ac.kr/auth/callback", env["OIDC_REDIRECT_URI"]
+        )
+        self.assertEqual(
+            "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn",
+            env["OIDC_EXPECTED_ISSUER"],
+        )
+
     def test_storage_link_observability_uses_live_metric_contract(self):
         alerts = (ROOT / "deploy/monitoring/manifests/alerts.yaml").read_text()
         dashboards = (ROOT / "deploy/monitoring/manifests/openstack-service-dashboards.yaml").read_text()
