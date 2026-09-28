@@ -70,11 +70,12 @@ nova = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["conf"]["nova"]
 pci = nova["pci"]
 assert pci["report_in_placement"] is False
 device_specs = __import__("json").loads(pci["device_spec"])
-assert len(device_specs) == 4
+assert len(device_specs) == 5
 assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
-    "sriov-rack-1", "sriov-rack-2"
+    "sriov-rack-1", "sriov-rack-2", "sriov-rack-3"
 }
-assert all(spec.get("product_id") != "10ed" for spec in device_specs)
+assert any(spec.get("product_id") == "1515" and spec.get("address") == "0000:04:*.*" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
+assert any(spec.get("product_id") == "154c" and spec.get("address") == "0000:17:*.*" and spec.get("physical_network") == "sriov-rack-1" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 assert pci["alias"].count("alias = ") == 1
 assert pci["alias"].count('"numa_policy":"legacy"') == 2
@@ -90,6 +91,14 @@ import yaml
 neutron = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 assert neutron["manifests"]["deployment_rpc_server"] is True
 assert neutron["pod"]["replicas"]["rpc_server"] == 2
+assert neutron["conf"]["plugins"]["ml2_conf"]["ml2_type_vlan"]["network_vlan_ranges"] == (
+    "sriov-rack-1:141:141,sriov-rack-2:141:141,sriov-rack-3:141:141"
+)
+assert neutron["network"]["sriov_node_physnets"] == {
+    "dcn-1a-compute-1": "sriov-rack-1",
+    "dcn-1b-compute-0": "sriov-rack-2",
+    "dcn-1c-compute-0": "sriov-rack-3",
+}
 images = neutron["images"]["tags"]
 assert images["neutron_rpc_server"] == images["neutron_server"]
 assert "@sha256:" in images["neutron_rpc_server"]
@@ -122,11 +131,12 @@ assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
 assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
 device_specs = json.loads(device_line.split(" = ", 1)[1])
-assert len(device_specs) == 4
+assert len(device_specs) == 5
 assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
-    "sriov-rack-1", "sriov-rack-2"
+    "sriov-rack-1", "sriov-rack-2", "sriov-rack-3"
 }
-assert all(spec.get("product_id") != "10ed" for spec in device_specs)
+assert any(spec.get("product_id") == "1515" and spec.get("address") == "0000:04:*.*" and spec.get("physical_network") == "sriov-rack-3" for spec in device_specs)
+assert any(spec.get("product_id") == "154c" and spec.get("address") == "0000:17:*.*" and spec.get("physical_network") == "sriov-rack-1" for spec in device_specs)
 assert all("devname" not in spec for spec in device_specs)
 '
 tar -xOf "$nova_chart" --wildcards '*/values.yaml' | \
