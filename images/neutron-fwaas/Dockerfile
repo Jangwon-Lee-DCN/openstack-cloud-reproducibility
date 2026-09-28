@@ -22,7 +22,8 @@ RUN apt-get update \
 # Packaging is inert: activation requires the exact dotted service-plugin class
 # plus explicit protected network UUIDs in the separately approved values.
 COPY dcn_service_port_guard.py /var/lib/openstack/lib/python3.12/site-packages/dcn_service_port_guard.py
-RUN /var/lib/openstack/bin/python3 -c \
-    "from dcn_service_port_guard import ServicePortGuard"
+RUN chmod 0644 /var/lib/openstack/lib/python3.12/site-packages/dcn_service_port_guard.py
 
 USER neutron
+RUN /var/lib/openstack/bin/python3 -c \
+    "from dcn_service_port_guard import ServicePortGuard"
