@@ -252,6 +252,7 @@ else
 fi
 
 validate_admin_passwords
+"$REPO_ROOT/deploy/scripts/verify-placement-monitoring-policy.sh"
 
 if [[ -z "$ONLY_RELEASE" ]]; then
   "$REPO_ROOT/deploy/scripts/install-local-path-storage.sh"
