@@ -38,6 +38,12 @@ kubectl auth can-i --as=system:serviceaccount:vpc-control-plane-system:vpc-facad
 kubectl auth can-i --as=system:serviceaccount:vpc-control-plane-system:vpc-control-plane-controller-manager get secret/vpc-endpoint-binding-credentials -n openstack | grep -qx yes
 test "$(kubectl -n "$NAMESPACE" get configmap opa-vpc-policy-v4 -o jsonpath='{.metadata.labels.app\.kubernetes\.io/version}')" = vpc-authz-v4
 test "$(kubectl -n "$NAMESPACE" get configmap vpc-facade-opa-enforcement -o jsonpath='{.data.classes}')" = read,project-write,network-sharing,security-policy,cross-domain-peering
+if kubectl get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1; then
+  kubectl -n "$NAMESPACE" get prometheusrule vpc-network-interface-alerts >/dev/null
+  kubectl -n monitoring get prometheusrule vpc-opa-shadow-alerts >/dev/null
+  rules=$(kubectl -n "$NAMESPACE" get prometheusrule vpc-network-interface-alerts -o json)
+  python3 -c 'import json,sys; rules=[r for g in json.load(sys.stdin)["spec"]["groups"] for r in g["rules"]]; by_name={r["alert"]:r for r in rules}; low=by_name["VPCAcceleratedInterfaceCapacityLow"]; exhausted=by_name["VPCAcceleratedInterfaceCapacityExhausted"]; assert "sum by(rack, profile)" in low["expr"] and "$labels.rack" in low["annotations"]["summary"]; assert "sum by(rack, profile)" in exhausted["expr"] and "$labels.rack" in exhausted["annotations"]["summary"]' <<<"$rules"
+fi
 
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
 kubectl -n "$NAMESPACE" port-forward service/opa-pilot "$port:8181" >/dev/null 2>&1 &
