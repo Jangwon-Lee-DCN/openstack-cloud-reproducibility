@@ -1,3 +1,4 @@
+# Inert historical workflow. Run validation locally; Actions is not authorized.
 ---
 name: Rebuild automation validation
 
