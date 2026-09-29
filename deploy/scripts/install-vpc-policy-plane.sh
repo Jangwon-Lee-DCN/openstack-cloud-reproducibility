@@ -73,6 +73,8 @@ if $CHECK_ONLY; then
   kubectl kustomize "$VPC_REPO/config/gateway" | kubectl apply --dry-run=server -f - >/dev/null
   if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
     kubectl kustomize "$VPC_REPO/config/monitoring" | kubectl apply --dry-run=server -f - >/dev/null
+    kubectl apply --dry-run=server -f "$VPC_REPO/config/prometheus/networkinterface_alerts.yaml" >/dev/null
+    kubectl apply --dry-run=server -f "$VPC_REPO/config/prometheus/opa_shadow_alerts.yaml" >/dev/null
   fi
   echo "VPC policy-plane production preflight passed (no resources changed)"
   exit 0
@@ -114,6 +116,8 @@ kubectl apply -f "$rendered"
 kubectl apply -k "$VPC_REPO/config/gateway"
 if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
   kubectl apply -k "$VPC_REPO/config/monitoring"
+  kubectl apply -f "$VPC_REPO/config/prometheus/networkinterface_alerts.yaml"
+  kubectl apply -f "$VPC_REPO/config/prometheus/opa_shadow_alerts.yaml"
 fi
 
 credential_checksum=$(kubectl -n openstack get secret vpc-facade-service-credentials \

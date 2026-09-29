@@ -1,25 +1,7 @@
 ---
 name: Rebuild automation validation
 
-on:
-  pull_request:
-    paths:
-      - ".github/workflows/rebuild-automation-validation.yml"
-      - "automation/**"
-      - "docs/fresh-server-rebuild-*.md"
-      - "docs/node-expansion-operator-guide.md"
-      - "helm/packages/**"
-      - "release-lock.yaml"
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/rebuild-automation-validation.yml"
-      - "automation/**"
-      - "docs/fresh-server-rebuild-*.md"
-      - "docs/node-expansion-operator-guide.md"
-      - "helm/packages/**"
-      - "release-lock.yaml"
-  workflow_dispatch:
+on: {}
 
 permissions:
   contents: read

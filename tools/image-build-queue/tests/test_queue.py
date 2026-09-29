@@ -125,6 +125,17 @@ class QueueTests(unittest.TestCase):
         builder = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
         self.assertIn("selected operations-portal", builder)
 
+    def test_vpc_controller_build_requires_exact_controller_source(self):
+        self.assertEqual(
+            queue.COMPONENTS["vpc-control-plane"],
+            ("platform-images", ("reproducibility", "vpc_control_plane")),
+        )
+        runner_source = (ROOT / "run_image_build.py").read_text()
+        self.assertIn('"vpc_control_plane": "VPC_CONTROL_PLANE_REPO"', runner_source)
+        builder = (ROOT.parent.parent / "deploy/scripts/build-images.sh").read_text()
+        self.assertIn("selected vpc-control-plane", builder)
+        self.assertIn("VPC_CONTROL_PLANE_REPO", builder)
+
     def test_flavor_catalog_requires_its_service_source(self):
         self.assertEqual(
             ("reproducibility", "cloud_services"),
