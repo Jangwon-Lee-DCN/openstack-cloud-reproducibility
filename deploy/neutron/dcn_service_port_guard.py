@@ -3,6 +3,7 @@
 Not enabled by packaging. Release integration and full acceptance are required.
 """
 import uuid
+import functools
 
 from neutron_lib import exceptions
 from neutron_lib.callbacks import events, registry, resources
@@ -37,6 +38,7 @@ class ServicePortGuard(base.ServicePluginBase):
                 or any(str(uuid.UUID(v)) != v for v in security_group_ids)):
             raise ValueError('Canonical unique protected security-group UUIDs required')
         self.security_group_ids = frozenset(security_group_ids)
+        self._guard_binding_activation()
         for event in (events.BEFORE_CREATE, events.BEFORE_UPDATE,
                       events.BEFORE_DELETE):
             registry.subscribe(self._enforce, resources.PORT, event)
@@ -47,6 +49,30 @@ class ServicePortGuard(base.ServicePluginBase):
                     (resources.SECURITY_GROUP_RULE, events.BEFORE_CREATE),
                     (resources.SECURITY_GROUP_RULE, events.BEFORE_DELETE)):
                 registry.subscribe(self._enforce_security_group, resource, event)
+
+    def _guard_binding_activation(self):
+        # ML2 activation is a separate member action and does not publish the
+        # ordinary PORT BEFORE_UPDATE callback. Install only when explicitly
+        # enabling this service plugin; importing the module remains inert.
+        plugin = directory.get_plugin()
+        original = getattr(plugin, 'activate', None)
+        if not callable(original):
+            raise ValueError('Managed ports require ML2 binding activation support')
+
+        @functools.wraps(original)
+        def activate(context, host, port_id):
+            if not context.is_admin and 'service' not in context.roles:
+                # Current Pecan member-action adapter passes a body dict;
+                # direct ML2 callers pass a UUID. Never trust a body network ID.
+                identity = port_id.get('port_id') if isinstance(port_id, dict) else port_id
+                if not isinstance(identity, str):
+                    raise ManagedPortForbidden()
+                port = plugin.get_port(context.elevated(), identity)
+                if port['network_id'] in self.network_ids:
+                    raise ManagedPortForbidden()
+            return original(context, host, port_id)
+
+        plugin.activate = activate
 
     def _enforce_security_group(self, resource, event, trigger, payload=None):
         if payload is None:

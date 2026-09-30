@@ -171,6 +171,104 @@ class ProtectedPortAPI(ml2.Ml2PluginV2TestCase):
                 request.environ['neutron.context']=admin
                 self.assertEqual(204,request.get_response(self.api).status_int)
 
+    def test_bulk_create_rejects_mixed_scope_without_partial_ports(self):
+        admin = context.get_admin_context()
+        member = context.Context(user_id='cpu-test-member', project_id=self._project_id,
+                                 roles=['member', 'reader'])
+        with self.network() as protected, self.network() as ordinary:
+            protected_id = protected['network']['id']
+            ordinary_id = ordinary['network']['id']
+            defaults = {r.name: str(r.check_str) for r in policies.list_rules()}
+            policy._ENFORCER.set_rules(oslo.Rules.from_dict(
+                m.compile_policy(defaults, [protected_id])), overwrite=True)
+            ServicePortGuard([protected_id])
+
+            def create(networks):
+                request = self.new_create_request('ports', {'ports': [
+                    {'network_id': network, 'project_id': self._project_id}
+                    for network in networks]})
+                request.environ['neutron.context'] = member
+                return request.get_response(self.api)
+
+            before = self.plugin.get_ports(admin)
+            for networks in ([ordinary_id, protected_id],
+                             [protected_id, ordinary_id]):
+                response = create(networks)
+                self.assertEqual(403, response.status_int, response.text)
+                self.assertEqual(before, self.plugin.get_ports(admin))
+            response = create([ordinary_id, ordinary_id])
+            self.assertEqual(201, response.status_int, response.text)
+            ports = json.loads(response.text)['ports']
+            self.assertEqual(2, len(ports))
+            self.assertEqual(2, len({port['id'] for port in ports}))
+            for port in ports:
+                self.assertEqual(ordinary_id, port['network_id'])
+                request = self.new_delete_request('ports', port['id'])
+                request.environ['neutron.context'] = member
+                response = request.get_response(self.api)
+                self.assertEqual(204, response.status_int, response.text)
+            self.assertEqual(before, self.plugin.get_ports(admin))
+
+    def test_binding_extension_requires_service_identity(self):
+        admin = context.get_admin_context()
+        member = context.Context(user_id='cpu-test-member', project_id=self._project_id,
+                                 roles=['member', 'reader'])
+        service = context.Context(user_id='cpu-test-service', project_id=self._project_id,
+                                  roles=['service'])
+        with self.network() as network, self.subnet(network=network) as subnet:
+            with self.port(subnet=subnet, device_owner='compute:nova') as item:
+                port_id = item['port']['id']
+                ServicePortGuard([network['network']['id']])
+
+                def send(method, identity, data=None, host=None, action=None):
+                    request = self._req(method, 'ports', data, id=port_id,
+                                        subresource='bindings', sub_id=host,
+                                        action=action, context=identity)
+                    return request.get_response(self.api)
+
+                body = {'binding': {'host': 'cpu-test-host'}}
+                before = send('GET', admin)
+                self.assertEqual(200, before.status_int, before.text)
+                response = send('POST', member, body)
+                self.assertEqual(403, response.status_int, response.text)
+                self.assertEqual(json.loads(before.text), json.loads(send('GET', admin).text))
+                response = send('POST', service, body)
+                self.assertEqual(201, response.status_int, response.text)
+                state = send('GET', admin)
+                self.assertEqual(200, state.status_int, state.text)
+                for method, action in [('DELETE', None), ('PUT', 'activate')]:
+                    response = send(method, member, {'port_id': port_id} if method == 'PUT' else None,
+                                    host='cpu-test-host', action=action)
+                    # Native Controller hides existing bindings from actors
+                    # denied SHOW. Service positive controls establish that
+                    # the route/object exists; unchanged state proves denial.
+                    self.assertIn(response.status_int, (403, 404), response.text)
+                    self.assertEqual(json.loads(state.text), json.loads(send('GET', admin).text))
+                response = send('DELETE', service, host='cpu-test-host')
+                self.assertEqual(204, response.status_int, response.text)
+                self.assertEqual(json.loads(before.text), json.loads(send('GET', admin).text))
+                # Explicit positive activation control, not just binding CRUD.
+                response = send('POST', service, body)
+                self.assertEqual(201, response.status_int, response.text)
+                response = send('PUT', service, {'port_id': port_id},
+                                host='cpu-test-host', action='activate')
+                self.assertEqual(200, response.status_int, response.text)
+                activated = json.loads(response.text)
+                self.assertEqual('ACTIVE', activated['status'])
+                self.assertEqual('ovs', activated['vif_type'])
+                self.assertEqual('cpu-test-host', activated['host'])
+                current = send('GET', admin)
+                self.assertEqual(200, current.status_int, current.text)
+                active = [binding for binding in json.loads(current.text)['bindings']
+                          if binding['status'] == 'ACTIVE']
+                self.assertEqual(['cpu-test-host'], [binding['host'] for binding in active])
+                response = send('DELETE', service, host='cpu-test-host')
+                self.assertEqual(204, response.status_int, response.text)
+                remaining = send('GET', admin)
+                self.assertEqual(200, remaining.status_int, remaining.text)
+                self.assertNotIn('cpu-test-host',
+                                 [binding['host'] for binding in json.loads(remaining.text)['bindings']])
+
     def test_ordinary_network_keeps_member_crud(self):
         policy.init()
         defaults={r.name:str(r.check_str) for r in policies.list_rules()}

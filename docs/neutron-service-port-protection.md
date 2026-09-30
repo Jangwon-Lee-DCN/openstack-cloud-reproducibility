@@ -21,6 +21,15 @@ render a Helm override preserving those plugins and appending
 native port callbacks, including plugin-internal router interface operations.
 An unchanged rollback update is allowed, but real tenant mutations are denied.
 
+ML2 binding activation is a separate member action, not an ordinary port update.
+When explicitly enabled, the plugin also guards the core `activate` entrypoint:
+it reads the stored port network and rejects non-admin/non-service activation of
+protected ports. Both direct UUID and the installed Pecan body-dictionary calling
+forms are handled. Import alone does not modify the core plugin. The native
+fixture checks member denial with unchanged binding state and service activation
+with an independently observed ACTIVE binding. This is not a claim that every
+binding extension or the real Nova service-token flow has passed acceptance.
+
 Optional repeated `--security-group-id` arguments select explicit protected
 groups in `dcn_service_ports.security_group_ids`. Native callbacks reject member
 group update/delete and rule create/delete. Rule deletion resolves the stored
@@ -56,7 +65,8 @@ it with a pinned fixture image; `AI_SPACE_REPRO_ROOT` selects this source and
 checks the installed module hash and does not mount replacement runtime code.
 
 Native coverage includes protected port CRUD denial/unchanged objects, normal
-port lifecycle, router port/subnet attach denial, ML2 test-agent binding, protected
+port lifecycle, mixed protected/ordinary bulk denial without partial creation,
+ordinary-only bulk success/cleanup, router port/subnet attach denial, ML2 test-agent binding, protected
 group/rule mutation denial, ordinary group rule CRUD and privileged cleanup.
 It is not Keystone authentication, real OVN binding or CPU packet acceptance.
 
