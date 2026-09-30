@@ -19,4 +19,10 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* /tmp/neutron_fwaas-24.0.0-py3-none-any.whl
 
+# Packaging is inert. Activation requires the explicit service-plugin class
+# and protected resource UUIDs in separately accepted deployment values.
+COPY dcn_service_port_guard.py /var/lib/openstack/lib/python3.12/site-packages/dcn_service_port_guard.py
+RUN chmod 0644 /var/lib/openstack/lib/python3.12/site-packages/dcn_service_port_guard.py
+
 USER neutron
+RUN /var/lib/openstack/bin/python3 -c "from dcn_service_port_guard import ServicePortGuard"

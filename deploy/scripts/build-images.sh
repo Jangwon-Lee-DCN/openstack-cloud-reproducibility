@@ -261,7 +261,14 @@ for component in gnocchi ceilometer aodh keycloak; do
   selected "$component" && simple_context "$component"
 done
 selected keystone-oidc && simple_context keystone-oidc keystone
-selected neutron-fwaas && simple_context neutron-fwaas neutron
+build_neutron_context() {
+  local context="$WORK_DIR/neutron-fwaas"
+  mkdir -p "$context"
+  cp -a "$REPO_ROOT/images/neutron-fwaas/." "$context/"
+  cp "$REPO_ROOT/deploy/neutron/dcn_service_port_guard.py" "$context/"
+  build_context neutron-fwaas "$context" "$REGISTRY/neutron:source-$BUILD_ID"
+}
+selected neutron-fwaas && build_neutron_context
 build_nova_extended() {
   local context="$WORK_DIR/nova-extended"
   git -C "$NOVA_EXTENDED_REPO" diff --quiet &&
