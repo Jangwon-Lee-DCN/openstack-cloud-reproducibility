@@ -266,6 +266,9 @@ build_neutron_context() {
   mkdir -p "$context"
   cp -a "$REPO_ROOT/images/neutron-fwaas/." "$context/"
   cp "$REPO_ROOT/deploy/neutron/dcn_service_port_guard.py" "$context/"
+  cp "$REPO_ROOT/deploy/neutron/dcn_management_guard.py" "$context/"
+  cp "$REPO_ROOT/deploy/neutron/dcn_management_guard_runtime.py" "$context/"
+  cp "$REPO_ROOT/deploy/neutron/install-management-guard.py" "$context/"
   build_context neutron-fwaas "$context" "$REGISTRY/neutron:source-$BUILD_ID"
 }
 selected neutron-fwaas && build_neutron_context

@@ -45,8 +45,11 @@ share-worker HA mechanism or protection against privileged operators.
 ## Artifact and acceptance
 
 The serialized `neutron-fwaas` build stages the authoritative module from
-`deploy/neutron/` into the existing digest-pinned image. It does not include or
-activate a management-egress hook. Submit the exact pushed source through the
+`deploy/neutron/` into the existing digest-pinned image. It does not
+activate either guard by default. The combined candidate also packages the
+independently configured [management-egress hook](neutron-management-boundary.md).
+Both guards require combined native and packet acceptance; separately accepted
+images do not prove the combined artifact. Submit the exact pushed source through the
 image queue; never invoke the underlying builder directly.
 
 Local checks:

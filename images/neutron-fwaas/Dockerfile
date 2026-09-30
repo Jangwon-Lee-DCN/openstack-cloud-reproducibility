@@ -24,5 +24,15 @@ RUN apt-get update \
 COPY dcn_service_port_guard.py /var/lib/openstack/lib/python3.12/site-packages/dcn_service_port_guard.py
 RUN chmod 0644 /var/lib/openstack/lib/python3.12/site-packages/dcn_service_port_guard.py
 
+# Management egress enforcement is independently opt-in; package both guards.
+COPY dcn_management_guard.py dcn_management_guard_runtime.py /var/lib/openstack/lib/python3.12/site-packages/
+COPY install-management-guard.py /tmp/install-management-guard.py
+RUN chmod 0644 /var/lib/openstack/lib/python3.12/site-packages/dcn_management_guard*.py \
+    && /var/lib/openstack/bin/python3 /tmp/install-management-guard.py \
+       --site-packages /var/lib/openstack/lib/python3.12/site-packages \
+    && rm /tmp/install-management-guard.py
+
 USER neutron
 RUN /var/lib/openstack/bin/python3 -c "from dcn_service_port_guard import ServicePortGuard"
+RUN /var/lib/openstack/bin/python3 -c \
+    "from neutron.plugins.ml2.drivers.ovn.mech_driver.ovsdb import ovn_client, ovn_db_sync; import dcn_management_guard_runtime as guard; assert guard.policy() == {}"
