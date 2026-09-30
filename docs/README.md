@@ -20,6 +20,7 @@ Historical evidence may remain in Git, but operators should start here.
 - [VPC IAM and OPA](vpc-iam-opa-operations.md): authorization operations
 - [Horizon information architecture](horizon-information-architecture.md): dashboard panel contract
 - [Glance image protection](glance-image-protection.md): protected-image policy
+- [Management egress boundary](neutron-management-boundary.md): opt-in Neutron guard candidate and promotion limitations
 
 ## Development and governance
 

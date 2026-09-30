@@ -19,4 +19,15 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* /tmp/neutron_fwaas-24.0.0-py3-none-any.whl
 
+# Inert until both operator enrollment lists are explicitly configured.
+# Patch only the immutable build input, never the running Neutron service.
+COPY dcn_management_guard.py dcn_management_guard_runtime.py /var/lib/openstack/lib/python3.12/site-packages/
+COPY install-management-guard.py /tmp/install-management-guard.py
+RUN chmod 0644 /var/lib/openstack/lib/python3.12/site-packages/dcn_management_guard*.py \
+    && /var/lib/openstack/bin/python3 /tmp/install-management-guard.py \
+       --site-packages /var/lib/openstack/lib/python3.12/site-packages \
+    && rm /tmp/install-management-guard.py
+
 USER neutron
+RUN /var/lib/openstack/bin/python3 -c \
+    "from neutron.plugins.ml2.drivers.ovn.mech_driver.ovsdb import ovn_client, ovn_db_sync; import dcn_management_guard_runtime as guard; assert guard.policy() == {}"

@@ -201,6 +201,16 @@ simple_context() {
   build_context "$component" "$context" "$REGISTRY/$image_name:source-$BUILD_ID"
 }
 
+neutron_context() {
+  local context="$WORK_DIR/neutron-fwaas"
+  mkdir -p "$context"
+  cp -a "$REPO_ROOT/images/neutron-fwaas/." "$context/"
+  cp "$REPO_ROOT/deploy/neutron/dcn_management_guard.py" "$context/dcn_management_guard.py"
+  cp "$REPO_ROOT/deploy/neutron/dcn_management_guard_runtime.py" "$context/dcn_management_guard_runtime.py"
+  cp "$REPO_ROOT/deploy/neutron/install-management-guard.py" "$context/install-management-guard.py"
+  build_context neutron-fwaas "$context" "$REGISTRY/neutron:source-$BUILD_ID"
+}
+
 build_horizon_complete() {
   local repo horizon_context
   for repo in "$VPC_DASHBOARD_REPO" "$TELEMETRY_DASHBOARD_REPO" "$S3_DASHBOARD_REPO" "$BAREMETAL_ACCESS_DASHBOARD_REPO" "$SUPPORT_DASHBOARD_REPO"; do
@@ -261,7 +271,7 @@ for component in gnocchi ceilometer aodh keycloak; do
   selected "$component" && simple_context "$component"
 done
 selected keystone-oidc && simple_context keystone-oidc keystone
-selected neutron-fwaas && simple_context neutron-fwaas neutron
+selected neutron-fwaas && neutron_context
 build_nova_extended() {
   local context="$WORK_DIR/nova-extended"
   git -C "$NOVA_EXTENDED_REPO" diff --quiet &&
