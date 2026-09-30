@@ -7,8 +7,13 @@ HORIZON_RESOLVE=${HORIZON_RESOLVE:-cloud.dcn.ssu.ac.kr:443:10.67.10.6}
 KEYSTONE_URL=${KEYSTONE_URL:-${HORIZON_URL%/horizon}/identity/v3}
 SAMPLES=${SAMPLES:-5}
 HORIZON_REQUIRE_BACKEND_ATTRIBUTION=${HORIZON_REQUIRE_BACKEND_ATTRIBUTION:-1}
+HORIZON_ENFORCE_ABSOLUTE_BUDGETS=${HORIZON_ENFORCE_ABSOLUTE_BUDGETS:-0}
 [[ "$HORIZON_REQUIRE_BACKEND_ATTRIBUTION" == 0 || "$HORIZON_REQUIRE_BACKEND_ATTRIBUTION" == 1 ]] || {
   echo "HORIZON_REQUIRE_BACKEND_ATTRIBUTION must be 0 or 1" >&2
+  exit 2
+}
+[[ "$HORIZON_ENFORCE_ABSOLUTE_BUDGETS" == 0 || "$HORIZON_ENFORCE_ABSOLUTE_BUDGETS" == 1 ]] || {
+  echo "HORIZON_ENFORCE_ABSOLUTE_BUDGETS must be 0 or 1" >&2
   exit 2
 }
 work_dir=$(mktemp -d /tmp/horizon-qoe.XXXXXX)
@@ -185,8 +190,12 @@ if "kube" in data["name"]:
 PY
 
 # These pages exercise Nova, Glance, Cinder, Designate, the VPC facade, and
-# Horizon's common project overview. Budgets are medians, so a rolling restart
-# or one transient control-plane request does not create a false regression.
+# Horizon's common project overview. The fixed values below are observational
+# latency objectives, not a production SLO: shared downstream services and the
+# physical lab can make both the candidate and rollback image exceed them.
+# Functional errors always fail. Absolute latency is advisory by default and
+# becomes a hard gate only when an operator explicitly opts in after an SLO has
+# been established from a representative baseline.
 pages=(
   "overview|project/|5.0"
   "instances|project/instances/|5.0"
@@ -235,8 +244,12 @@ PY
   then
     printf '%-16s median TTFB %6.3fs, max %6.3fs (budget <%ss)\n' "$name" "$median" "$maximum" "$budget"
   else
-    printf '%-16s median TTFB %6.3fs exceeds %ss\n' "$name" "$median" "$budget" >&2
-    failed=1
+    if [[ "$HORIZON_ENFORCE_ABSOLUTE_BUDGETS" == 1 ]]; then
+      printf '%-16s median TTFB %6.3fs exceeds enforced %ss budget\n' "$name" "$median" "$budget" >&2
+      failed=1
+    else
+      printf '%-16s median TTFB %6.3fs exceeds advisory %ss objective\n' "$name" "$median" "$budget" >&2
+    fi
   fi
 done
 
