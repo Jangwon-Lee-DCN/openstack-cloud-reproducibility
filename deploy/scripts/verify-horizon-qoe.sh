@@ -197,15 +197,25 @@ pages=(
 )
 
 failed=0
+backend_samples="$work_dir/backend-samples"
+: >"$backend_samples"
 for entry in "${pages[@]}"; do
   IFS='|' read -r name path budget <<<"$entry"
   samples=()
   for ((i=0; i<SAMPLES; i++)); do
-    result=$(curl "${curl_args[@]}" -b "$cookie" -o /dev/null \
-      -w '%{http_code} %{time_starttransfer}' "$HORIZON_URL/$path")
+    headers="$work_dir/headers-$name-$i"
+    result=$(curl "${curl_args[@]}" -b "$cookie" -o /dev/null -D "$headers" \
+      -H 'X-DCN-QoE: 1' -w '%{http_code} %{time_starttransfer}' "$HORIZON_URL/$path")
     read -r code elapsed <<<"$result"
     [[ "$code" == 200 ]] || { echo "$name returned HTTP $code" >&2; failed=1; continue; }
+    backend=$(awk 'BEGIN{IGNORECASE=1} /^X-DCN-Horizon-Backend:/ {gsub("\r", "", $2); print $2}' "$headers" | tail -1)
+    if [[ -z "$backend" ]]; then
+      echo "$name response omitted X-DCN-Horizon-Backend" >&2
+      failed=1
+      continue
+    fi
     samples+=("$elapsed")
+    printf '%s %s %s %s\n' "$backend" "$name" "$elapsed" "$budget" >>"$backend_samples"
   done
   [[ "${#samples[@]}" -eq "$SAMPLES" ]] || continue
   median=$(printf '%s\n' "${samples[@]}" | sort -n | sed -n "$((SAMPLES / 2 + 1))p")
@@ -221,5 +231,34 @@ PY
     failed=1
   fi
 done
+
+# A load-balanced median can hide one unhealthy rack. Attribute every sample
+# to its serving pod and require coverage of every Ready production replica.
+mapfile -t expected_backends < <(kubectl get pods -n "$NAMESPACE" \
+  -l application=horizon,component=server,release_group=horizon \
+  -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready==true)]}{.metadata.name}{"\n"}{end}' | sort)
+mapfile -t observed_backends < <(awk '{print $1}' "$backend_samples" | sort -u)
+for backend in "${expected_backends[@]}"; do
+  if ! printf '%s\n' "${observed_backends[@]}" | grep -Fxq "$backend"; then
+    echo "Horizon QoE did not exercise Ready replica $backend" >&2
+    failed=1
+  fi
+done
+python3 - "$backend_samples" <<'PY'
+import collections, statistics, sys
+
+samples = collections.defaultdict(list)
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        backend, _page, elapsed, budget = line.split()
+        samples[backend].append(float(elapsed) / float(budget))
+for backend in sorted(samples):
+    values = samples[backend]
+    print(
+        f"backend {backend}: samples={len(values)} "
+        f"median-budget-ratio={statistics.median(values):.3f} "
+        f"max-budget-ratio={max(values):.3f}"
+    )
+PY
 
 exit "$failed"

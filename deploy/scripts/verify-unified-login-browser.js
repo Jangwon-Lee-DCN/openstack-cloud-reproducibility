@@ -85,6 +85,8 @@ const assert = require('node:assert/strict');
   await page.waitForURL(url => url.pathname.startsWith('/horizon/project/baremetal_access/'));
   await page.waitForLoadState('networkidle');
   const bareMetalBody = await page.locator('body').innerText();
+  assert(/Request nodes/i.test(bareMetalBody),
+    `Bare Metal request inventory did not render: ${bareMetalBody.slice(0, 1000)}`);
   assert.equal(
     await page.getByRole('button', {name: 'Request Bare Metal', exact: true}).count(),
     1,
