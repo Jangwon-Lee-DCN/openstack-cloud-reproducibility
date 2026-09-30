@@ -70,7 +70,7 @@ nova = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["conf"]["nova"]
 pci = nova["pci"]
 assert pci["report_in_placement"] is False
 device_specs = __import__("json").loads(pci["device_spec"])
-assert len(device_specs) == 5
+assert len(device_specs) == 6
 assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
     "sriov-rack-1", "sriov-rack-2", "sriov-rack-3"
 }
@@ -132,7 +132,7 @@ assert config.count("alias = {\"name\":\"rtx3090ti\"") == 1
 assert config.count("alias = {\"name\":\"rtx3090ti-audio\"") == 1
 device_line = next(line for line in config.splitlines() if line.startswith("device_spec = "))
 device_specs = json.loads(device_line.split(" = ", 1)[1])
-assert len(device_specs) == 5
+assert len(device_specs) == 6
 assert {spec["physical_network"] for spec in device_specs if "physical_network" in spec} == {
     "sriov-rack-1", "sriov-rack-2", "sriov-rack-3"
 }
