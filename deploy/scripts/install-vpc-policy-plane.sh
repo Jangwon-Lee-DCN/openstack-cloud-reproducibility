@@ -15,6 +15,7 @@ REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 VPC_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 NAMESPACE=vpc-control-plane-system
 IMAGE_LOCK="$REPO_ROOT/deploy/locks/vpc-policy-images.yaml"
+CONTROLLER_IMAGE_OVERRIDE=${VPC_CONTROLLER_IMAGE_OVERRIDE:-}
 
 test -f "$VPC_REPO/config/production/kustomization.yaml"
 test -f "$IMAGE_LOCK"
@@ -37,8 +38,8 @@ render_production() {
 rendered=$(mktemp)
 trap 'rm -f "$rendered"' EXIT
 render_production > "$rendered"
-python3 - "$rendered" "$IMAGE_LOCK" <<'PY'
-import sys, yaml
+VPC_CONTROLLER_IMAGE_OVERRIDE="$CONTROLLER_IMAGE_OVERRIDE" python3 - "$rendered" "$IMAGE_LOCK" <<'PY'
+import os, sys, yaml
 documents=[item for item in yaml.safe_load_all(open(sys.argv[1], encoding="utf-8")) if item]
 lock=yaml.safe_load(open(sys.argv[2], encoding="utf-8"))["spec"]
 crds={item.get("metadata",{}).get("name") for item in documents if item.get("kind")=="CustomResourceDefinition"}
@@ -50,7 +51,8 @@ required={
 }
 if not required <= crds: raise SystemExit(f"production render lacks CRDs: {sorted(required-crds)}")
 images={item["metadata"]["name"]:item["spec"]["template"]["spec"]["containers"][0]["image"] for item in documents if item.get("kind")=="Deployment" and item["metadata"]["name"] in ("vpc-control-plane-controller-manager","vpc-facade")}
-expected={"vpc-control-plane-controller-manager":lock["controllerImage"],"vpc-facade":lock["facadeImage"]}
+controller=os.environ.get("VPC_CONTROLLER_IMAGE_OVERRIDE") or lock["controllerImage"]
+expected={"vpc-control-plane-controller-manager":controller,"vpc-facade":lock["facadeImage"]}
 if images != expected: raise SystemExit(f"rendered locked images differ: {images!r} != {expected!r}")
 PY
 
