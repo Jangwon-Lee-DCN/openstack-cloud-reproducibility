@@ -85,6 +85,7 @@ class CinderGeneralStorageTests(unittest.TestCase):
             "openstack_synthetic_object_auth_success",
             "openstack_synthetic_object_write_success",
             "openstack_synthetic_object_read_success",
+            "openstack_synthetic_object_last_run_timestamp_seconds",
         ):
             self.assertIn(metric, script)
         self.assertIn("openstack --os-interface internal container list", script)
