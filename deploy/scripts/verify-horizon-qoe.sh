@@ -213,10 +213,10 @@ for entry in "${pages[@]}"; do
       -H 'X-DCN-QoE: 1' -w '%{http_code} %{time_starttransfer}' "$HORIZON_URL/$path")
     read -r code elapsed <<<"$result"
     [[ "$code" == 200 ]] || { echo "$name returned HTTP $code" >&2; failed=1; continue; }
-    backend=$(awk 'BEGIN{IGNORECASE=1} /^X-DCN-Horizon-Backend:/ {gsub("\r", "", $2); print $2}' "$headers" | tail -1)
+    backend=$(awk 'BEGIN{IGNORECASE=1} /^X-Horizon-Backend:/ {gsub("\r", "", $2); print $2}' "$headers" | tail -1)
     if [[ -z "$backend" ]]; then
       if [[ "$HORIZON_REQUIRE_BACKEND_ATTRIBUTION" == 1 ]]; then
-        echo "$name response omitted X-DCN-Horizon-Backend" >&2
+        echo "$name response omitted X-Horizon-Backend" >&2
         failed=1
         continue
       fi

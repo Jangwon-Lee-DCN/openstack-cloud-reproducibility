@@ -25,14 +25,14 @@ def test_qoe_probe_attributes_samples_to_every_ready_replica():
     values = (ROOT / "helm/openstack-helm/horizon/values.yaml").read_text()
 
     assert "X-DCN-QoE: 1" in script
-    assert "X-DCN-Horizon-Backend" in script
+    assert "X-Horizon-Backend" in script
     assert "expected_backends" in script
     assert "Horizon QoE did not exercise Ready replica" in script
     assert "median-budget-ratio" in script
     assert "HORIZON_REQUIRE_BACKEND_ATTRIBUTION" in script
     assert "legacy-unattributed" in script
     assert 'SetEnvIf X-DCN-QoE "^1$" dcn_qoe_probe' in values
-    assert 'X-DCN-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in values
+    assert 'X-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in values
 
 
 def test_locked_horizon_package_contains_backend_attribution_config():
@@ -43,7 +43,7 @@ def test_locked_horizon_package_contains_backend_attribution_config():
         values = packaged_values.read().decode()
 
     assert 'SetEnvIf X-DCN-QoE "^1$" dcn_qoe_probe' in values
-    assert 'X-DCN-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in values
+    assert 'X-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in values
 
 
 def test_locked_horizon_package_renders_backend_attribution_config():
@@ -70,4 +70,4 @@ def test_locked_horizon_package_renders_backend_attribution_config():
     apache = base64.b64decode(secret["data"]["horizon.conf"]).decode()
 
     assert 'SetEnvIf X-DCN-QoE "^1$" dcn_qoe_probe' in apache
-    assert 'X-DCN-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in apache
+    assert 'X-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in apache
