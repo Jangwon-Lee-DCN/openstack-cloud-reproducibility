@@ -24,5 +24,7 @@ def test_qoe_probe_attributes_samples_to_every_ready_replica():
     assert "expected_backends" in script
     assert "Horizon QoE did not exercise Ready replica" in script
     assert "median-budget-ratio" in script
+    assert "HORIZON_REQUIRE_BACKEND_ATTRIBUTION" in script
+    assert "legacy-unattributed" in script
     assert 'SetEnvIf X-DCN-QoE "^1$" dcn_qoe_probe' in values
     assert 'X-DCN-Horizon-Backend "expr=%{osenv:HOSTNAME}"' in values
