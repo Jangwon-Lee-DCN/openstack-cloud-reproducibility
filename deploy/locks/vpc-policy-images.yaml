@@ -5,6 +5,7 @@ metadata:
 spec:
   sourceRevision: 6961a64933e9f55279a5f2eb46b13204ff95a068
   controllerImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-controller-633dec28fdb43fc81363@sha256:d62bcda49dc3de39c26ede0599af687d026e90b82ba15543a200d21a031d6008
+  rollbackControllerImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-controller-1e696c0fe5bda68672d7@sha256:23db59b4a97e4fe6d9e2cded37386f715291a179793ec5ee8af325a86a8532be
   facadeImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-facade-b9fc93f018a242e82821@sha256:8cd80fb3039efb0efa27b1e010370ef98abdd8203cc5d592499c1c674f189445
   metadataAttestorImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-metadata-attestor-24ac4b8@sha256:c0c1bad805315bd00c6a214298d8a20fd61eabe51bbe24ada44a35e1722d16e9
   endpointAgentImage: registry.dcn.ssu.ac.kr/openstack/project-facade:vpc-endpoint-agent-24ac4b8@sha256:c2ba50dbba131e619c99414b203c8a4481a659a3f23c50da8ca0d9a3c4e3cf59
