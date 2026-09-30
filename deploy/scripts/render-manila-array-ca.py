@@ -4,7 +4,7 @@ import base64
 import configparser
 import copy
 import hashlib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import ssl
 
@@ -72,13 +72,11 @@ def render(pem, expected, base=None):
         'extraObjects': [{'apiVersion': 'v1', 'kind': 'ConfigMap',
                           'metadata': {'name': name}, 'immutable': True,
                           'data': {'ca.pem': pem, '99-powerstore-trust.conf': override}}],
-        'pod': {'mounts': {'manila_share': {'manila_share': {
-            'volumes': [{'name': 'array-ca', 'configMap': {'name': name, 'defaultMode': 0o644}},
-                        {'name': 'array-ca-config', 'configMap': {'name': name, 'defaultMode': 0o644}}],
-            'volumeMounts': [{'name': 'array-ca', 'mountPath': directory, 'readOnly': True},
-                            {'name': 'array-ca-config',
-                             'mountPath': '/etc/manila/manila.conf.d/99-powerstore-trust.conf',
-                             'subPath': '99-powerstore-trust.conf', 'readOnly': True}],
+        'pod': {'etcSources': {'manila_share': [{'configMap': {'name': name,
+                'items': [{'key': '99-powerstore-trust.conf', 'path': '99-powerstore-trust.conf'}]}}]},
+            'mounts': {'manila_share': {'manila_share': {
+            'volumes': [{'name': 'array-ca', 'configMap': {'name': name, 'defaultMode': 0o644}}],
+            'volumeMounts': [{'name': 'array-ca', 'mountPath': directory, 'readOnly': True}],
         }}}},
     }
     return compose({} if base is None else base, addition)
@@ -113,6 +111,25 @@ def verify_rendered(objects, pem, expected):
     pod = deployment['spec']['template']['spec']
     containers = [c for c in pod['containers'] if c['name'] == 'manila-share']
     mounts = desired['pod']['mounts']['manila_share']['manila_share']
+    snippets = [v for v in pod.get('volumes', []) if v.get('name') == 'manila-etc-snippets']
+    source = desired['pod']['etcSources']['manila_share'][0]
+    if (len(snippets) != 1 or source not in snippets[0].get('projected', {}).get('sources', [])
+            or len(containers) != 1 or not any(
+                v.get('name') == 'manila-etc-snippets'
+                and v.get('mountPath', '').rstrip('/') == '/etc/manila/manila.conf.d'
+                and v.get('readOnly') is True and not v.get('subPath')
+                for v in containers[0].get('volumeMounts', []))):
+        raise ValueError('Projected trust configuration directory required')
+    if len(containers) == 1:
+        for addition in mounts['volumeMounts']:
+            target = PurePosixPath(addition['mountPath'])
+            for existing in containers[0].get('volumeMounts', []):
+                parent = PurePosixPath(existing['mountPath'])
+                # Do not assume a placeholder exists in a read-only mount,
+                # including an init-populated emptyDir. API dry-run cannot
+                # detect this runtime conflict.
+                if existing.get('readOnly') is True and parent in target.parents:
+                    raise ValueError('CA mount has a read-only parent; qualify a composed volume instead')
     if (len(containers) != 1
             or any(pod.get('volumes', []).count(v) != 1 for v in mounts['volumes'])
             or any(containers[0].get('volumeMounts', []).count(v) != 1 for v in mounts['volumeMounts'])):

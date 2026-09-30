@@ -56,9 +56,21 @@ class ArrayCATests(unittest.TestCase):
              'data': {'manila.conf': base64.b64encode(config.encode()).decode()}},
             {'kind': 'Deployment', 'metadata': {'name': 'manila-share'}, 'spec': {'replicas': 1,
                 'strategy': {'type': 'Recreate'}, 'template': {
-                'spec': {'volumes': mount['volumes'], 'containers': [
-                    {'name': 'manila-share', 'volumeMounts': mount['volumeMounts']}]}}}}]
+                'spec': {'volumes': mount['volumes'] + [{'name': 'manila-etc-snippets',
+                    'projected': {'sources': values['pod']['etcSources']['manila_share']}}], 'containers': [
+                    {'name': 'manila-share', 'volumeMounts': mount['volumeMounts'] + [
+                        {'name': 'manila-etc-snippets', 'mountPath': '/etc/manila/manila.conf.d/', 'readOnly': True}]}]}}}}]
         module.verify_rendered(objects, self.pem, self.digest)
+        # A nested mount under a read-only parent cannot rely on runc creating
+        # its mountpoint, regardless of the parent's volume backing type.
+        readonly_parent = copy.deepcopy(objects)
+        pod = readonly_parent[2]['spec']['template']['spec']
+        pod['volumes'].append({'name': 'readonly-parent', 'emptyDir': {}})
+        pod['containers'][0]['volumeMounts'].insert(0, {
+            'name': 'readonly-parent', 'mountPath': '/etc/manila/',
+            'readOnly': True})
+        with self.assertRaisesRegex(ValueError, 'read-only parent'):
+            module.verify_rendered(readonly_parent, self.pem, self.digest)
         for mutate in (
                 lambda o: o[0].update(immutable=False),
                 lambda o: o[2]['spec'].update(strategy={'type': 'RollingUpdate'}),
@@ -85,7 +97,7 @@ class ArrayCATests(unittest.TestCase):
         result = module.render(self.pem, self.digest, base)
         self.assertEqual(len(base['extraObjects']), 1)
         self.assertEqual(len(result['extraObjects']), 2)
-        self.assertEqual(len(result['pod']['mounts']['manila_share']['manila_share']['volumes']), 3)
+        self.assertEqual(len(result['pod']['mounts']['manila_share']['manila_share']['volumes']), 2)
         self.assertFalse(result['pod']['mounts']['manila_share']['host_openvswitch'])
         self.assertEqual(result['conf']['manila']['powerstore']['dell_nas_login'], 'fixture-only')
         self.assertEqual(module.render(self.pem, self.digest, result), result)
