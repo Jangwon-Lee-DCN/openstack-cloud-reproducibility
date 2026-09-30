@@ -122,7 +122,7 @@ conf:
           Header always set X-Horizon-Request-Time "%D"
           # Identify the serving replica only on explicit QoE diagnostics;
           # ordinary responses do not carry the extra header.
-          Header always set X-DCN-Horizon-Backend "expr=%{osenv:HOSTNAME}" env=dcn_qoe_probe
+          Header always set X-Horizon-Backend "expr=%{osenv:HOSTNAME}" env=dcn_qoe_probe
       </Location>
 
           Alias /static /var/www/html/horizon
