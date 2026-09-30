@@ -16,6 +16,29 @@ spec:
     - port: metrics
       interval: 30s
       scrapeTimeout: 10s
+    # RabbitMQ 3.10 exposes queue delivery/publish counters through channel
+    # families. Keep aggregate /metrics unchanged for existing dashboards.
+    - port: metrics
+      path: /metrics/detailed
+      interval: 30s
+      scrapeTimeout: 10s
+      params:
+        family:
+          - queue_coarse_metrics
+          - queue_metrics
+          - channel_queue_metrics
+          - channel_queue_exchange_metrics
+      relabelings:
+        - targetLabel: job
+          replacement: rabbitmq-queues
+        - targetLabel: endpoint
+          replacement: queue-metrics
+      metricRelabelings:
+        # The detailed endpoint also emits unprefixed identity/build metrics.
+        # Retaining them would duplicate the aggregate endpoint's series.
+        - sourceLabels: [__name__]
+          regex: rabbitmq_detailed_.+
+          action: keep
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
