@@ -60,6 +60,10 @@ def main() -> int:
         if contract.lower() not in serialized.lower():
             print(f"ENI dashboard missing contract {contract!r}", file=sys.stderr)
             return 1
+    stuck = next((panel for panel in eni.get("panels", []) if panel.get("title") == "Stuck operations"), None)
+    if not stuck or "Reserved" not in stuck.get("description", ""):
+        print("ENI stuck-operations panel must include durable Reserved capacity", file=sys.stderr)
+        return 1
     print(f"validated {len(dashboards)} Grafana dashboards")
     return 0
 

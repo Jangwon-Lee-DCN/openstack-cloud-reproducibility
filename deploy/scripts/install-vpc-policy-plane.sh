@@ -15,6 +15,7 @@ REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 VPC_REPO=${VPC_CONTROL_PLANE_REPO:-$REPO_ROOT/../vpc-control-plane}
 NAMESPACE=vpc-control-plane-system
 IMAGE_LOCK="$REPO_ROOT/deploy/locks/vpc-policy-images.yaml"
+CONTROLLER_IMAGE_OVERRIDE=${VPC_CONTROLLER_IMAGE_OVERRIDE:-}
 
 test -f "$VPC_REPO/config/production/kustomization.yaml"
 test -f "$IMAGE_LOCK"
@@ -37,8 +38,8 @@ render_production() {
 rendered=$(mktemp)
 trap 'rm -f "$rendered"' EXIT
 render_production > "$rendered"
-python3 - "$rendered" "$IMAGE_LOCK" <<'PY'
-import sys, yaml
+VPC_CONTROLLER_IMAGE_OVERRIDE="$CONTROLLER_IMAGE_OVERRIDE" python3 - "$rendered" "$IMAGE_LOCK" <<'PY'
+import os, sys, yaml
 documents=[item for item in yaml.safe_load_all(open(sys.argv[1], encoding="utf-8")) if item]
 lock=yaml.safe_load(open(sys.argv[2], encoding="utf-8"))["spec"]
 crds={item.get("metadata",{}).get("name") for item in documents if item.get("kind")=="CustomResourceDefinition"}
@@ -50,7 +51,8 @@ required={
 }
 if not required <= crds: raise SystemExit(f"production render lacks CRDs: {sorted(required-crds)}")
 images={item["metadata"]["name"]:item["spec"]["template"]["spec"]["containers"][0]["image"] for item in documents if item.get("kind")=="Deployment" and item["metadata"]["name"] in ("vpc-control-plane-controller-manager","vpc-facade")}
-expected={"vpc-control-plane-controller-manager":lock["controllerImage"],"vpc-facade":lock["facadeImage"]}
+controller=os.environ.get("VPC_CONTROLLER_IMAGE_OVERRIDE") or lock["controllerImage"]
+expected={"vpc-control-plane-controller-manager":controller,"vpc-facade":lock["facadeImage"]}
 if images != expected: raise SystemExit(f"rendered locked images differ: {images!r} != {expected!r}")
 PY
 
@@ -73,6 +75,8 @@ if $CHECK_ONLY; then
   kubectl kustomize "$VPC_REPO/config/gateway" | kubectl apply --dry-run=server -f - >/dev/null
   if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
     kubectl kustomize "$VPC_REPO/config/monitoring" | kubectl apply --dry-run=server -f - >/dev/null
+    kubectl apply --dry-run=server -f "$VPC_REPO/config/prometheus/networkinterface_alerts.yaml" >/dev/null
+    kubectl apply --dry-run=server -f "$VPC_REPO/config/prometheus/opa_shadow_alerts.yaml" >/dev/null
   fi
   echo "VPC policy-plane production preflight passed (no resources changed)"
   exit 0
@@ -114,6 +118,8 @@ kubectl apply -f "$rendered"
 kubectl apply -k "$VPC_REPO/config/gateway"
 if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
   kubectl apply -k "$VPC_REPO/config/monitoring"
+  kubectl apply -f "$VPC_REPO/config/prometheus/networkinterface_alerts.yaml"
+  kubectl apply -f "$VPC_REPO/config/prometheus/opa_shadow_alerts.yaml"
 fi
 
 credential_checksum=$(kubectl -n openstack get secret vpc-facade-service-credentials \

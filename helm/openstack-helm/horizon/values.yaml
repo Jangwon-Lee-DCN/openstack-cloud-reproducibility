@@ -92,6 +92,7 @@ conf:
       LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" proxy
 
       SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+      SetEnvIf X-DCN-QoE "^1$" dcn_qoe_probe
       CustomLog /dev/stdout combined env=!forwarded
       CustomLog /dev/stdout proxy env=forwarded
 
@@ -119,6 +120,9 @@ conf:
           # response header instead of emitting an invalid Server-Timing
           # numeric duration.
           Header always set X-Horizon-Request-Time "%D"
+          # Identify the serving replica only on explicit QoE diagnostics;
+          # ordinary responses do not carry the extra header.
+          Header always set X-Horizon-Backend "expr=%{osenv:HOSTNAME}" env=dcn_qoe_probe
       </Location>
 
           Alias /static /var/www/html/horizon

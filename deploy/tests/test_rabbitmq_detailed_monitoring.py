@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import yaml
 
 
@@ -33,4 +32,3 @@ def test_rabbitmq_keeps_aggregate_and_bounded_queue_scrapes_separate() -> None:
     assert queues["relabelings"] == [
         {"action": "replace", "targetLabel": "job", "replacement": "rabbitmq-queues"}
     ]
-

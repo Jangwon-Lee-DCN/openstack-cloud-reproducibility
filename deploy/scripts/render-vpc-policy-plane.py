@@ -11,8 +11,17 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(f"usage: {sys.argv[0]} LOCK_FILE")
     lock = yaml.safe_load(pathlib.Path(sys.argv[1]).read_text())["spec"]
+    controller_image = os.environ.get("VPC_CONTROLLER_IMAGE_OVERRIDE", lock["controllerImage"])
+    allowed_controller_images = {
+        lock["controllerImage"],
+        lock["rollbackControllerImage"],
+    }
+    if controller_image not in allowed_controller_images:
+        raise SystemExit("VPC_CONTROLLER_IMAGE_OVERRIDE is not an allowed locked image")
+    if "@sha256:" not in controller_image:
+        raise SystemExit("VPC controller image must be pinned by digest")
     replacements = {
-        ("vpc-control-plane-controller-manager", "manager"): lock["controllerImage"],
+        ("vpc-control-plane-controller-manager", "manager"): controller_image,
         ("vpc-facade", "apiserver"): lock["facadeImage"],
     }
     documents = list(yaml.safe_load_all(sys.stdin))
