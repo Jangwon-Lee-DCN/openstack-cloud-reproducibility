@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openstack-ironic-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+data:
+  run.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    site="${IRONIC_EVIDENCE_SITE:-poc}"
+    workdir="$(mktemp -d)"
+    trap 'rm -rf "${workdir}"' EXIT
+
+    timeout 60 openstack baremetal node list --long -f json >"${workdir}/nodes.json"
+    timeout 60 openstack baremetal port list --long -f json >"${workdir}/ports.json"
+    while read -r uuid; do
+      if ! timeout 60 openstack baremetal node validate -f json "${uuid}" \
+        >"${workdir}/validate-${uuid}.json"; then
+        printf '[]\n' >"${workdir}/validate-${uuid}.json"
+        : >"${workdir}/validate-${uuid}.failed"
+      fi
+    done < <(python3 - "${workdir}/nodes.json" <<'PY'
+    import json
+    import sys
+
+    for node in json.load(open(sys.argv[1], encoding="utf-8")):
+        print(node["UUID"])
+    PY
+    )
+
+    python3 - "${workdir}" >"${workdir}/metrics" <<'PY'
+    import json
+    import pathlib
+    import sys
+    import time
+
+    root = pathlib.Path(sys.argv[1])
+
+    def load(name):
+        return json.loads((root / name).read_text(encoding="utf-8"))
+
+    def label(value):
+        return str(value if value is not None else "").replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+    def labels(values):
+        return ",".join(f'{key}="{label(value)}"' for key, value in values.items())
+
+    nodes = load("nodes.json")
+    ports = load("ports.json")
+    names = {node["UUID"]: node.get("Name") or node["UUID"] for node in nodes}
+    print("# TYPE openstack_ironic_node_info gauge")
+    print("# TYPE openstack_ironic_node_maintenance gauge")
+    print("# TYPE openstack_ironic_node_last_error gauge")
+    print("# TYPE openstack_ironic_node_validation_collected gauge")
+    print("# TYPE openstack_ironic_interface_supported gauge")
+    print("# TYPE openstack_ironic_interface_valid gauge")
+    print("# TYPE openstack_ironic_port_info gauge")
+    print("# TYPE openstack_ironic_evidence_last_run_timestamp_seconds gauge")
+    for node in nodes:
+        uuid = node["UUID"]
+        base = {
+            "uuid": uuid,
+            "name": names[uuid],
+            "driver": node.get("Driver"),
+            "provision_state": node.get("Provisioning State"),
+            "power_state": node.get("Power State"),
+            "conductor": node.get("Conductor"),
+            "boot_interface": node.get("Boot Interface"),
+            "deploy_interface": node.get("Deploy Interface"),
+            "inspect_interface": node.get("Inspect Interface"),
+            "management_interface": node.get("Management Interface"),
+            "network_interface": node.get("Network Interface"),
+        }
+        print(f"openstack_ironic_node_info{{{labels(base)}}} 1")
+        print(f'openstack_ironic_node_maintenance{{{labels({"uuid": uuid, "name": names[uuid]})}}} {1 if node.get("Maintenance") else 0}')
+        print(f'openstack_ironic_node_last_error{{{labels({"uuid": uuid, "name": names[uuid]})}}} {1 if node.get("Last Error") else 0}')
+        failed = (root / f"validate-{uuid}.failed").exists()
+        print(f'openstack_ironic_node_validation_collected{{{labels({"uuid": uuid, "name": names[uuid]})}}} {0 if failed else 1}')
+        for result in load(f"validate-{uuid}.json"):
+            reason = result.get("Reason") or ""
+            reason_class = (
+                "unsupported" if "does not support" in reason
+                else "image_not_selected" if "instance_info.image_source" in reason
+                else "none" if result.get("Result")
+                else "validation_failed"
+            )
+            interface_labels = {
+                "uuid": uuid,
+                "name": names[uuid],
+                "interface": result.get("Interface"),
+                "reason_class": reason_class,
+            }
+            supported = reason_class != "unsupported"
+            print(f"openstack_ironic_interface_supported{{{labels(interface_labels)}}} {1 if supported else 0}")
+            print(f"openstack_ironic_interface_valid{{{labels(interface_labels)}}} {1 if result.get('Result') else 0}")
+    for port in ports:
+        node_uuid = port.get("Node UUID") or ""
+        port_labels = {
+            "uuid": port.get("UUID"),
+            "node_uuid": node_uuid,
+            "node_name": names.get(node_uuid, node_uuid),
+            "pxe_enabled": str(bool(port.get("PXE boot enabled"))).lower(),
+            "physical_network": port.get("Physical Network") or "unassigned",
+            "smart_nic": str(bool(port.get("Is Smart NIC port"))).lower(),
+        }
+        print(f"openstack_ironic_port_info{{{labels(port_labels)}}} 1")
+    print(f"openstack_ironic_evidence_last_run_timestamp_seconds {int(time.time())}")
+    PY
+
+    curl --fail --silent --show-error --max-time 30 --request PUT --data-binary @"${workdir}/metrics" \
+      "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-ironic-evidence/site/${site}"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openstack-ironic-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+spec:
+  schedule: "5,20,35,50 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: openstack-ironic-evidence}
+        spec:
+          restartPolicy: Never
+          nodeSelector: {openstack-control-plane: enabled}
+          tolerations:
+            - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+          securityContext: {seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: collector
+              image: quay.io/airshipit/openstack-client@sha256:0bc46619c695868ca69657dcb1838e99694a7488ad89c23611cc4ffe49e64ca2
+              command: [/bin/bash, /opt/ironic-evidence/run.sh]
+              workingDir: /tmp
+              envFrom: [{secretRef: {name: keystone-keystone-admin}}]
+              env: [{name: IRONIC_EVIDENCE_SITE, value: poc}, {name: HOME, value: /tmp}]
+              volumeMounts: [{name: script, mountPath: /opt/ironic-evidence, readOnly: true}, {name: tmp, mountPath: /tmp}]
+              resources:
+                requests: {cpu: 100m, memory: 128Mi}
+                limits: {memory: 512Mi}
+              securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true, runAsNonRoot: true, runAsUser: 65534, runAsGroup: 65534}
+          volumes: [{name: script, configMap: {name: openstack-ironic-evidence, defaultMode: 365}}, {name: tmp, emptyDir: {}}]

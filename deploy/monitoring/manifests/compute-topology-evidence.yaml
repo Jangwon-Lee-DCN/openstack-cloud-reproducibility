@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compute-topology-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+data:
+  run.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    site="${COMPUTE_TOPOLOGY_EVIDENCE_SITE:-poc}"
+    node="${NODE_NAME:?NODE_NAME is required}"
+    interval="${COMPUTE_TOPOLOGY_EVIDENCE_INTERVAL_SECONDS:-60}"
+
+    label() {
+      printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; :a;N;$!ba;s/\n/\\n/g'
+    }
+
+    while true; do
+      metrics="$(mktemp)"
+      numa_count=0
+      pci_count=0
+      gpu_count=0
+      {
+        echo '# TYPE openstack_compute_topology_collected gauge'
+        echo '# TYPE openstack_compute_numa_node_info gauge'
+        echo '# TYPE openstack_compute_numa_cpu_count gauge'
+        echo '# TYPE openstack_compute_numa_memory_bytes gauge'
+        echo '# TYPE openstack_compute_pci_device_info gauge'
+        echo '# TYPE openstack_compute_topology_last_run_timestamp_seconds gauge'
+
+        for numa_path in /host-sys/devices/system/node/node[0-9]*; do
+          [ -d "${numa_path}" ] || continue
+          numa_node="${numa_path##*node}"
+          case "${numa_node}" in (*[!0-9]*|'') continue ;; esac
+          cpu_count=0
+          for cpu_path in "${numa_path}"/cpu[0-9]*; do
+            [ -d "${cpu_path}" ] && cpu_count=$((cpu_count + 1))
+          done
+          memory_kib="$(awk '/^Node [0-9]+ MemTotal:/ {print $4; exit}' "${numa_path}/meminfo" 2>/dev/null || true)"
+          case "${memory_kib}" in (*[!0-9]*|'') memory_kib=0 ;; esac
+          printf 'openstack_compute_numa_node_info{node="%s",numa_node="%s"} 1\n' "$(label "${node}")" "${numa_node}"
+          printf 'openstack_compute_numa_cpu_count{node="%s",numa_node="%s"} %s\n' "$(label "${node}")" "${numa_node}" "${cpu_count}"
+          printf 'openstack_compute_numa_memory_bytes{node="%s",numa_node="%s"} %s\n' "$(label "${node}")" "${numa_node}" "$((memory_kib * 1024))"
+          numa_count=$((numa_count + 1))
+        done
+
+        for pci_path in /host-sys/bus/pci/devices/*; do
+          [ -d "${pci_path}" ] || continue
+          class="$(cat "${pci_path}/class" 2>/dev/null || true)"
+          driver="$(basename "$(readlink -f "${pci_path}/driver" 2>/dev/null)" 2>/dev/null || true)"
+          case "${class}:${driver}" in (0x02*:*|0x03*:*|*:vfio-pci) ;; (*) continue ;; esac
+          address="$(basename "${pci_path}")"
+          vendor="$(cat "${pci_path}/vendor" 2>/dev/null || true)"
+          device="$(cat "${pci_path}/device" 2>/dev/null || true)"
+          numa_node="$(cat "${pci_path}/numa_node" 2>/dev/null || true)"
+          iommu_group="$(basename "$(readlink -f "${pci_path}/iommu_group" 2>/dev/null)" 2>/dev/null || true)"
+          [ -n "${driver}" ] || driver="unbound"
+          [ -n "${iommu_group}" ] || iommu_group="none"
+          case "${numa_node}" in (-1|[0-9]*) ;; (*) numa_node=-1 ;; esac
+          printf 'openstack_compute_pci_device_info{node="%s",address="%s",class="%s",vendor="%s",device="%s",driver="%s",numa_node="%s",iommu_group="%s"} 1\n' \
+            "$(label "${node}")" "$(label "${address}")" "$(label "${class}")" "$(label "${vendor}")" \
+            "$(label "${device}")" "$(label "${driver}")" "$(label "${numa_node}")" "$(label "${iommu_group}")"
+          pci_count=$((pci_count + 1))
+          case "${class}" in (0x03*) gpu_count=$((gpu_count + 1)) ;; esac
+        done
+
+        printf 'openstack_compute_topology_collected{node="%s",scope="numa"} %s\n' "$(label "${node}")" "$((numa_count > 0))"
+        printf 'openstack_compute_topology_collected{node="%s",scope="pci"} 1\n' "$(label "${node}")"
+        printf 'openstack_compute_topology_numa_node_count{node="%s"} %s\n' "$(label "${node}")" "${numa_count}"
+        printf 'openstack_compute_topology_pci_device_count{node="%s"} %s\n' "$(label "${node}")" "${pci_count}"
+        printf 'openstack_compute_topology_gpu_device_count{node="%s"} %s\n' "$(label "${node}")" "${gpu_count}"
+        printf 'openstack_compute_topology_last_run_timestamp_seconds{node="%s"} %s\n' "$(label "${node}")" "$(date +%s)"
+      } >"${metrics}"
+      METRICS_FILE="${metrics}" PUSH_URL="http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-compute-topology/site/${site}/node/${node}" \
+        python - <<'PY'
+    import os
+    import pathlib
+    import urllib.request
+
+    request = urllib.request.Request(
+        os.environ["PUSH_URL"],
+        data=pathlib.Path(os.environ["METRICS_FILE"]).read_bytes(),
+        method="PUT",
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        if response.status // 100 != 2:
+            raise RuntimeError(f"Pushgateway returned HTTP {response.status}")
+    PY
+      rm -f "${metrics}"
+      sleep "${interval}"
+    done
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: compute-topology-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: compute-topology-evidence}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: compute-topology-evidence}
+    spec:
+      nodeSelector: {openstack-compute-node: enabled}
+      securityContext: {seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: collector
+          image: registry.dcn.ssu.ac.kr/openstack/dcn-operations-portal@sha256:71a57aa018eab168d71589d3952e80bc038a1992c1aecbb9b10022801cb2c01f
+          command: [/bin/bash, /opt/compute-topology-evidence/run.sh]
+          env:
+            - {name: COMPUTE_TOPOLOGY_EVIDENCE_SITE, value: poc}
+            - {name: COMPUTE_TOPOLOGY_EVIDENCE_INTERVAL_SECONDS, value: "60"}
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          volumeMounts:
+            - {name: script, mountPath: /opt/compute-topology-evidence, readOnly: true}
+            - {name: host-sys, mountPath: /host-sys, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+      volumes:
+        - {name: script, configMap: {name: compute-topology-evidence, defaultMode: 365}}
+        - {name: host-sys, hostPath: {path: /sys, type: Directory}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: compute-topology-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: compute-topology-evidence}}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}}]
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+          podSelector: {matchLabels: {app: prometheus-pushgateway}}
+      ports: [{protocol: TCP, port: 9091}]

@@ -1,6 +1,36 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
+  name: cilium-envoy-openstack-gateway
+  namespace: monitoring
+  labels:
+    observability.openstack.org/component: openstack-gateway
+spec:
+  namespaceSelector:
+    matchNames: [kube-system]
+  selector:
+    matchLabels:
+      k8s-app: cilium-envoy
+  endpoints:
+    - port: envoy-metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: cilium-envoy
+      metricRelabelings:
+        # The Portal consumes only bounded Gateway/backend aggregates. Drop
+        # request-path, downstream-connection and listener series here so
+        # Envoy cannot turn user/request identity into Prometheus cardinality.
+        - action: keep
+          sourceLabels: [__name__]
+          regex: envoy_cluster_upstream_rq_(total|xx|time_bucket|time_sum|time_count|timeout)
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
   name: openstack-rabbitmq
   namespace: monitoring
   labels:
@@ -16,6 +46,23 @@ spec:
     - port: metrics
       interval: 30s
       scrapeTimeout: 10s
+    # Keep the default low-cardinality broker endpoint above. Queue identity is
+    # collected independently from RabbitMQ's bounded detailed endpoint; do
+    # not switch /metrics to global per-object mode.
+    - port: metrics
+      path: /metrics/detailed
+      interval: 60s
+      scrapeTimeout: 20s
+      params:
+        family:
+          - queue_coarse_metrics
+          - queue_consumer_count
+          - queue_delivery_metrics
+          - queue_exchange_metrics
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: rabbitmq-queues
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

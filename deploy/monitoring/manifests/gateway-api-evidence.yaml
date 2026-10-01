@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openstack-gateway-api-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openstack-gateway-api-evidence
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+rules:
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gatewayclasses, gateways, httproutes, grpcroutes, tlsroutes, tcproutes, udproutes]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openstack-gateway-api-evidence
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openstack-gateway-api-evidence
+subjects:
+  - kind: ServiceAccount
+    name: openstack-gateway-api-evidence
+    namespace: openstack
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openstack-gateway-api-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+data:
+  run.py: |
+    import json
+    import os
+    import pathlib
+    import ssl
+    import time
+    import urllib.error
+    import urllib.request
+
+    site = os.environ.get("GATEWAY_EVIDENCE_SITE", "poc")
+    api = "https://kubernetes.default.svc"
+    token = pathlib.Path(
+        "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    ).read_text(encoding="utf-8").strip()
+    context = ssl.create_default_context(
+        cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    )
+
+    def get(path, *, optional=False):
+        request = urllib.request.Request(
+            api + path, headers={"Authorization": f"Bearer {token}"}
+        )
+        try:
+            with urllib.request.urlopen(request, context=context, timeout=30) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            if optional and error.code == 404:
+                return {"items": []}
+            raise
+
+    def condition_true(resource, condition_type):
+        return any(
+            condition.get("type") == condition_type
+            and condition.get("status") == "True"
+            for condition in resource.get("status", {}).get("conditions", [])
+        )
+
+    def route_accepted(route):
+        parents = route.get("status", {}).get("parents", [])
+        return any(
+            any(
+                condition.get("type") == "Accepted"
+                and condition.get("status") == "True"
+                for condition in parent.get("conditions", [])
+            )
+            for parent in parents
+        )
+
+    gateways = get("/apis/gateway.networking.k8s.io/v1/gateways")["items"]
+    route_paths = (
+        "/apis/gateway.networking.k8s.io/v1/httproutes",
+        "/apis/gateway.networking.k8s.io/v1/grpcroutes",
+        "/apis/gateway.networking.k8s.io/v1alpha2/tlsroutes",
+        "/apis/gateway.networking.k8s.io/v1alpha2/tcproutes",
+        "/apis/gateway.networking.k8s.io/v1alpha2/udproutes",
+    )
+    routes = []
+    for path in route_paths:
+        routes.extend(get(path, optional=True)["items"])
+
+    accepted = sum(route_accepted(route) for route in routes)
+    programmed = sum(condition_true(gateway, "Programmed") for gateway in gateways)
+    lines = [
+        "# TYPE openstack_gateway_api_collection gauge",
+        "# TYPE openstack_gateway_api_routes_total gauge",
+        "# TYPE openstack_gateway_api_accepted_routes gauge",
+        "# TYPE openstack_gateway_api_rejected_or_pending_routes gauge",
+        "# TYPE openstack_gateway_api_gateways_total gauge",
+        "# TYPE openstack_gateway_api_programmed_gateways gauge",
+        "# TYPE openstack_gateway_api_evidence_last_run_timestamp_seconds gauge",
+        "openstack_gateway_api_collection 1",
+        f"openstack_gateway_api_routes_total {len(routes)}",
+        f"openstack_gateway_api_accepted_routes {accepted}",
+        f"openstack_gateway_api_rejected_or_pending_routes {len(routes) - accepted}",
+        f"openstack_gateway_api_gateways_total {len(gateways)}",
+        f"openstack_gateway_api_programmed_gateways {programmed}",
+        f"openstack_gateway_api_evidence_last_run_timestamp_seconds {int(time.time())}",
+    ]
+    body = ("\n".join(lines) + "\n").encode()
+    push = urllib.request.Request(
+        "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/"
+        f"job/openstack-gateway-api-evidence/site/{site}",
+        data=body,
+        method="PUT",
+    )
+    with urllib.request.urlopen(push, timeout=30) as response:
+        if response.status // 100 != 2:
+            raise RuntimeError(f"Pushgateway returned HTTP {response.status}")
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openstack-gateway-api-evidence
+  namespace: openstack
+  annotations:
+    dcn.ssu.ac.kr/lifecycle: development-only
+spec:
+  schedule: "7,22,37,52 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: openstack-gateway-api-evidence}
+        spec:
+          serviceAccountName: openstack-gateway-api-evidence
+          restartPolicy: Never
+          nodeSelector: {openstack-control-plane: enabled}
+          tolerations:
+            - {key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}
+          securityContext: {seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: collector
+              image: quay.io/airshipit/openstack-client@sha256:0bc46619c695868ca69657dcb1838e99694a7488ad89c23611cc4ffe49e64ca2
+              command: [python3, /opt/gateway-evidence/run.py]
+              workingDir: /tmp
+              env: [{name: GATEWAY_EVIDENCE_SITE, value: poc}, {name: HOME, value: /tmp}]
+              volumeMounts: [{name: script, mountPath: /opt/gateway-evidence, readOnly: true}, {name: tmp, mountPath: /tmp}]
+              resources:
+                requests: {cpu: 50m, memory: 64Mi}
+                limits: {memory: 256Mi}
+              securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true, runAsNonRoot: true, runAsUser: 65534, runAsGroup: 65534}
+          volumes: [{name: script, configMap: {name: openstack-gateway-api-evidence, defaultMode: 365}}, {name: tmp, emptyDir: {}}]

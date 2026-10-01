@@ -10,37 +10,201 @@ data:
     name="monitoring-synthetic-$(date +%s)"
     network_id=""
     volume_id=""
+    object_container="${name}"
+    object_name="payload.bin"
+    object_payload="/tmp/${name}-payload.bin"
+    object_received="/tmp/${name}-received.bin"
     success=0
+    identity_success=0
+    network_success=0
+    volume_success=0
+    object_auth_success=0
+    object_write_success=0
+    object_read_success=0
+    oidc_discovery_success=0
+    google_broker_redirect_success=0
+    synthetic_site="${SYNTHETIC_SITE:-poc}"
     cleanup() {
-      # A backend failure may create an error volume but return no ID to the
-      # create command. Resolve the unique test name as a fallback and force
-      # delete only resources owned by this run.
-      while read -r stale_volume_id; do
-        [[ -z "${stale_volume_id}" ]] || \
-          openstack volume delete --force "${stale_volume_id}" >/dev/null 2>&1 || true
-      done < <(openstack volume list --name "${name}" -f value -c ID 2>/dev/null || true)
-      [[ -z "${volume_id}" ]] || openstack volume delete --force "${volume_id}" >/dev/null 2>&1 || true
-      while read -r stale_network_id; do
-        [[ -z "${stale_network_id}" ]] || \
-          openstack network delete "${stale_network_id}" >/dev/null 2>&1 || true
-      done < <(openstack network list --name "${name}" -f value -c ID 2>/dev/null || true)
-      [[ -z "${network_id}" ]] || openstack network delete "${network_id}" >/dev/null 2>&1 || true
+      # Publish every completed stage before bounded cleanup. A slow backend
+      # must not erase successful identity or network evidence.
       now="$(date +%s)"
       body="# TYPE openstack_synthetic_success gauge
     openstack_synthetic_success ${success}
+    # TYPE openstack_synthetic_identity_success gauge
+    openstack_synthetic_identity_success ${identity_success}
+    # TYPE openstack_synthetic_identity_last_run_timestamp_seconds gauge
+    openstack_synthetic_identity_last_run_timestamp_seconds ${now}
+    # TYPE openstack_synthetic_network_success gauge
+    openstack_synthetic_network_success ${network_success}
+    # TYPE openstack_synthetic_volume_success gauge
+    openstack_synthetic_volume_success ${volume_success}
+    # TYPE openstack_synthetic_object_auth_success gauge
+    openstack_synthetic_object_auth_success ${object_auth_success}
+    # TYPE openstack_synthetic_object_write_success gauge
+    openstack_synthetic_object_write_success ${object_write_success}
+    # TYPE openstack_synthetic_object_read_success gauge
+    openstack_synthetic_object_read_success ${object_read_success}
+    # TYPE openstack_synthetic_object_last_run_timestamp_seconds gauge
+    openstack_synthetic_object_last_run_timestamp_seconds ${now}
+    # TYPE openstack_identity_oidc_discovery_success gauge
+    openstack_identity_oidc_discovery_success ${oidc_discovery_success}
+    # TYPE openstack_identity_google_broker_redirect_success gauge
+    openstack_identity_google_broker_redirect_success ${google_broker_redirect_success}
+    # TYPE openstack_identity_oidc_last_run_timestamp_seconds gauge
+    openstack_identity_oidc_last_run_timestamp_seconds ${now}
+    # TYPE openstack_synthetic_execution_interval_seconds gauge
+    openstack_synthetic_execution_interval_seconds 900
     # TYPE openstack_synthetic_last_run_timestamp_seconds gauge
     openstack_synthetic_last_run_timestamp_seconds ${now}
     "
-      curl --fail --silent --show-error --data-binary "${body}" \
-        http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-synthetic/site/poc
+      curl --fail --silent --show-error --max-time 30 --request PUT --data-binary "${body}" \
+        "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-synthetic/site/${synthetic_site}"
+      timeout 30 openstack --os-interface internal object delete "${object_container}" "${object_name}" >/dev/null 2>&1 || true
+      timeout 30 openstack --os-interface internal container delete "${object_container}" >/dev/null 2>&1 || true
+      # A backend failure may create an error volume but return no ID to the
+      # create command. Resolve the unique test name as a fallback and force
+      # delete only resources owned by this run.
+      for _ in 1 2 3; do
+        while read -r stale_volume_id; do
+          [[ -z "${stale_volume_id}" ]] || \
+            timeout 30 openstack volume delete --force "${stale_volume_id}" >/dev/null 2>&1 || true
+        done < <(timeout 30 openstack volume list --name "${name}" -f value -c ID 2>/dev/null || true)
+        [[ -z "${volume_id}" ]] || timeout 30 openstack volume delete --force "${volume_id}" >/dev/null 2>&1 || true
+        while read -r stale_network_id; do
+          [[ -z "${stale_network_id}" ]] || \
+            timeout 30 openstack network delete "${stale_network_id}" >/dev/null 2>&1 || true
+        done < <(timeout 30 openstack network list --name "${name}" -f value -c ID 2>/dev/null || true)
+        [[ -z "${network_id}" ]] || timeout 30 openstack network delete "${network_id}" >/dev/null 2>&1 || true
+        sleep 2
+      done
     }
     trap cleanup EXIT
-    openstack token issue >/dev/null || exit 1
-    network_id="$(openstack network create -f value -c id "${name}")" || exit 1
-    volume_id="$(openstack volume create --size 1 \
-      --property dcn_synthetic_test=true -f value -c id "${name}")" || exit 1
-    openstack volume show "${volume_id}" >/dev/null || exit 1
-    success=1
+    read -r oidc_discovery_success google_broker_redirect_success < <(python3 - <<'PY'
+    import base64
+    import hashlib
+    import json
+    import os
+    import secrets
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    internal = os.environ.get(
+        "OIDC_INTERNAL_URL",
+        "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/dcn",
+    ).rstrip("/")
+    expected_issuer = os.environ.get(
+        "OIDC_EXPECTED_ISSUER",
+        "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn",
+    ).rstrip("/")
+    client_id = os.environ.get("OIDC_CLIENT_ID", "dcn-operations-portal")
+    redirect_uri = os.environ.get(
+        "OIDC_REDIRECT_URI", "https://platform.dcn.ssu.ac.kr/auth/callback"
+    )
+    discovery_ok = broker_ok = 0
+
+    try:
+        with urllib.request.urlopen(
+            internal + "/.well-known/openid-configuration", timeout=15
+        ) as response:
+            document = json.load(response)
+        if (
+            document.get("issuer", "").rstrip("/") == expected_issuer
+            and document.get("authorization_endpoint")
+            and document.get("token_endpoint")
+        ):
+            discovery_ok = 1
+
+        verifier = secrets.token_urlsafe(32)
+        challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(verifier.encode()).digest()
+        ).rstrip(b"=").decode()
+        query = urllib.parse.urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": "openid profile email",
+                "state": "dcn-monitoring-probe",
+                "nonce": "dcn-monitoring-probe",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "kc_idp_hint": "google",
+            }
+        )
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, request, fp, code, message, headers, newurl):
+                return None
+
+        try:
+            urllib.request.build_opener(NoRedirect).open(
+                internal + "/protocol/openid-connect/auth?" + query, timeout=15
+            )
+        except urllib.error.HTTPError as error:
+            location = error.headers.get("Location", "")
+            parsed = urllib.parse.urlparse(location)
+            marker = "/realms/dcn"
+            if error.code in (302, 303) and marker in parsed.path:
+                broker_url = internal + parsed.path.split(marker, 1)[1]
+                if parsed.query:
+                    broker_url += "?" + parsed.query
+                cookies = "; ".join(
+                    item.split(";", 1)[0]
+                    for item in (error.headers.get_all("Set-Cookie") or [])
+                )
+                request = urllib.request.Request(
+                    broker_url, headers={"Cookie": cookies}
+                )
+                try:
+                    urllib.request.build_opener(NoRedirect).open(request, timeout=15)
+                except urllib.error.HTTPError as broker_error:
+                    broker_location = broker_error.headers.get("Location", "")
+                    host = (
+                        urllib.parse.urlparse(broker_location).hostname or ""
+                    ).lower()
+                    if broker_error.code in (302, 303) and (
+                        host == "accounts.google.com" or host.endswith(".google.com")
+                    ):
+                        broker_ok = 1
+    except Exception:
+        pass
+
+    print(discovery_ok, broker_ok)
+    PY
+    )
+    if timeout 120 openstack token issue >/dev/null; then
+      identity_success=1
+    else
+      exit 1
+    fi
+    if network_id="$(timeout 120 openstack network create -f value -c id "${name}")"; then
+      network_success=1
+    fi
+    if volume_id="$(timeout 120 openstack volume create --size 1 \
+      --property dcn_synthetic_test=true -f value -c id "${name}")" && \
+      timeout 120 openstack volume show "${volume_id}" >/dev/null; then
+      volume_success=1
+    fi
+    if timeout 120 openstack --os-interface internal container list >/dev/null; then
+      object_auth_success=1
+      printf 'dcn-object-synthetic-v1:%s\n' "${name}" > "${object_payload}"
+      if timeout 120 openstack --os-interface internal container create "${object_container}" >/dev/null && \
+        timeout 120 openstack --os-interface internal object create --name "${object_name}" \
+          "${object_container}" "${object_payload}" >/dev/null; then
+        object_write_success=1
+        if timeout 120 openstack --os-interface internal object save --file "${object_received}" \
+          "${object_container}" "${object_name}" >/dev/null && \
+          cmp -s "${object_payload}" "${object_received}"; then
+          object_read_success=1
+        fi
+      fi
+    fi
+    if [[ ${identity_success} -eq 1 && ${network_success} -eq 1 && ${volume_success} -eq 1 && \
+      ${object_auth_success} -eq 1 && ${object_write_success} -eq 1 && ${object_read_success} -eq 1 ]]; then
+      success=1
+    fi
+    [[ ${success} -eq 1 ]]
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -48,7 +212,7 @@ metadata:
   name: openstack-synthetic-test
   namespace: openstack
 spec:
-  schedule: "17 */6 * * *"
+  schedule: "2,17,32,47 * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
@@ -72,6 +236,12 @@ spec:
               envFrom:
                 - secretRef:
                     name: keystone-keystone-admin
+              env:
+                - {name: SYNTHETIC_SITE, value: poc}
+                - {name: OIDC_INTERNAL_URL, value: "http://keycloak-service.keycloak.svc.cluster.local:8080/realms/dcn"}
+                - {name: OIDC_EXPECTED_ISSUER, value: "https://cloud.dcn.ssu.ac.kr/horizon/auth/idp/realms/dcn"}
+                - {name: OIDC_CLIENT_ID, value: dcn-operations-portal}
+                - {name: OIDC_REDIRECT_URI, value: "https://platform.dcn.ssu.ac.kr/auth/callback"}
               volumeMounts:
                 - name: script
                   mountPath: /opt/synthetic

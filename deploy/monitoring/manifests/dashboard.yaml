@@ -111,8 +111,10 @@ data:
           "description": "Latest end-to-end OpenStack resource lifecycle test and report freshness.",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
-            {"refId": "A", "expr": "max(openstack_synthetic_success)", "legendFormat": "result"},
-            {"refId": "B", "expr": "time() - max(openstack_synthetic_last_run_timestamp_seconds)", "legendFormat": "age seconds"}
+            {"refId": "A", "expr": "max(openstack_synthetic_identity_success)", "legendFormat": "identity"},
+            {"refId": "B", "expr": "max(openstack_synthetic_network_success)", "legendFormat": "network"},
+            {"refId": "C", "expr": "max(openstack_synthetic_volume_success)", "legendFormat": "volume"},
+            {"refId": "D", "expr": "time() - max(openstack_synthetic_last_run_timestamp_seconds)", "legendFormat": "age seconds"}
           ],
           "fieldConfig": {"defaults": {"decimals": 0}, "overrides": [{"matcher": {"id": "byName", "options": "result"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"0": {"text": "FAILED", "color": "red"}, "1": {"text": "PASSED", "color": "green"}}}]}]}, {"matcher": {"id": "byName", "options": "age seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 14400}, {"color": "red", "value": 28800}]}}]}]},
           "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},

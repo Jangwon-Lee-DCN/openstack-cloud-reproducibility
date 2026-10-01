@@ -44,7 +44,7 @@ kubectl -n openstack delete job prometheus-openstack-exporter-ks-user \
   --ignore-not-found --wait=true
 
 helm upgrade --install prometheus-openstack-exporter \
-  "${REPO_ROOT}/helm/packages/upstream/prometheus-openstack-exporter-2026.1.0.tgz" \
+  "${REPO_ROOT}/helm/packages/patched/prometheus-openstack-exporter-2026.1.0.tgz" \
   -n openstack -f "${ROOT}/values/openstack-exporter.yaml" \
   --set-string endpoints.identity.auth.admin.password="${admin_password}" \
   --set-string endpoints.identity.auth.user.password="${exporter_password}" \

@@ -16,7 +16,13 @@ exporter_zones=$(kubectl -n openstack get pods \
   done | sort -u | wc -l)
 [[ "$exporter_zones" -eq 3 ]]
 [[ "$(kubectl -n openstack get deployment prometheus-openstack-exporter -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OS_POLLING_INTERVAL")].value}')" == "300" ]]
+kubectl -n openstack get deployment prometheus-openstack-exporter -o json |
+  jq -e '.spec.template.spec.initContainers[] |
+    select(.name == "clouds-yaml-gen") |
+    (.command | join("\n") | contains("verify: false"))' >/dev/null
 [[ "$(kubectl -n monitoring get servicemonitor openstack-exporter -o jsonpath='{.spec.endpoints[0].interval}')" == "300s" ]]
+[[ "$(kubectl -n monitoring get servicemonitor openstack-rabbitmq -o jsonpath='{.spec.endpoints[1].path}')" == "/metrics/detailed" ]]
+[[ "$(kubectl -n monitoring get servicemonitor openstack-rabbitmq -o jsonpath='{.spec.endpoints[1].relabelings[0].replacement}')" == "rabbitmq-queues" ]]
 printf 'PASS OpenStack exporter collection is rate-limited away from interactive Keystone traffic\n'
 kubectl -n monitoring get deployment \
   prometheus-blackbox-exporter prometheus-mysql-exporter \
@@ -30,6 +36,8 @@ kubectl -n monitoring get prometheusrule openstack-platform
 kubectl -n monitoring get configmap grafana-dashboard-vpc-control-plane
 kubectl -n monitoring get deployment alertmanager-webhook-audit
 kubectl -n openstack get cronjob openstack-synthetic-test
+[[ "$(kubectl -n openstack get cronjob openstack-synthetic-test -o jsonpath='{.spec.schedule}')" == "2,17,32,47 * * * *" ]]
+[[ "$(kubectl -n openstack get cronjob openstack-synthetic-test -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="SYNTHETIC_SITE")].value}')" == "poc" ]]
 
 prometheus_ip="$(kubectl -n monitoring get pod \
   -l app.kubernetes.io/name=prometheus \
@@ -40,11 +48,17 @@ for query in \
   'probe_success{job="openstack-public-api"}' \
   'mysql_up' \
   'up{job="rabbitmq"}' \
+  'up{job="rabbitmq-queues"}' \
+  'rabbitmq_detailed_queue_messages_ready{job="rabbitmq-queues"}' \
   'up{namespace="vpc-control-plane-system",service=~"vpc-control-plane-controller-manager-metrics-service|vpc-facade"}' \
   'vpc_reconcile_duration_seconds_count or vector(0)' \
   'vpc_network_interface_attachment_operation_seconds_count or vector(0)' \
   'vpc_network_interface_orphans or vector(0)' \
-  'openstack_synthetic_success or vector(0)'; do
+  'openstack_synthetic_success or vector(0)' \
+  'openstack_synthetic_identity_success or vector(0)' \
+  'openstack_synthetic_network_success or vector(0)' \
+  'openstack_synthetic_volume_success or vector(0)' \
+  'openstack_synthetic_execution_interval_seconds or vector(0)'; do
   result="$(curl --fail --silent --get \
     --data-urlencode "query=${query}" \
     "http://${prometheus_ip}:9090/api/v1/query")"
@@ -52,6 +66,17 @@ for query in \
     <<<"${result}" >/dev/null
   printf 'PASS Prometheus query: %s\n' "${query}"
 done
+
+queue_scrape_samples="$(curl --fail --silent --get \
+  --data-urlencode 'query=max(scrape_samples_scraped{job="rabbitmq-queues"})' \
+  "http://${prometheus_ip}:9090/api/v1/query")"
+jq -e '
+  .status == "success" and
+  (.data.result | length == 1) and
+  (.data.result[0].value[1] | tonumber) > 0 and
+  (.data.result[0].value[1] | tonumber) < 20000
+' <<<"${queue_scrape_samples}" >/dev/null
+printf 'PASS RabbitMQ detailed queue scrape remains below 20000 samples per target\n'
 
 alertmanager_status="$(curl --fail --silent \
   "http://$(kubectl -n monitoring get pod -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].status.podIP}'):9093/api/v2/status")"

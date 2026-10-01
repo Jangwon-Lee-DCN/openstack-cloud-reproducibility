@@ -42,7 +42,7 @@ if kubectl get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1; then
   kubectl -n "$NAMESPACE" get prometheusrule vpc-network-interface-alerts >/dev/null
   kubectl -n monitoring get prometheusrule vpc-opa-shadow-alerts >/dev/null
   rules=$(kubectl -n "$NAMESPACE" get prometheusrule vpc-network-interface-alerts -o json)
-  python3 -c 'import json,sys; rules=[r for g in json.load(sys.stdin)["spec"]["groups"] for r in g["rules"]]; by_name={r["alert"]:r for r in rules}; low=by_name["VPCAcceleratedInterfaceCapacityLow"]; exhausted=by_name["VPCAcceleratedInterfaceCapacityExhausted"]; assert "sum by(rack, profile)" in low["expr"] and "$labels.rack" in low["annotations"]["summary"]; assert "sum by(rack, profile)" in exhausted["expr"] and "$labels.rack" in exhausted["annotations"]["summary"]' <<<"$rules"
+  python3 -c 'import json,sys; rules=[r for g in json.load(sys.stdin)["spec"]["groups"] for r in g["rules"]]; by_name={r["alert"]:r for r in rules}; low=by_name["VPCAcceleratedInterfaceCapacityLow"]; exhausted=by_name["VPCAcceleratedInterfaceCapacityExhausted"]; aggregation="sum by (project_namespace, profile, rack)"; assert low["expr"].count(aggregation) == 2 and "$labels.rack" in low["annotations"]["summary"]; assert exhausted["expr"].count(aggregation) == 2 and "$labels.rack" in exhausted["annotations"]["summary"]' <<<"$rules"
 fi
 
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')

@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: operations-portal-powerstore-evidence
+  namespace: powerstore
+data:
+  run.py: |
+    import base64
+    import hashlib
+    import json
+    import os
+    import re
+    import ssl
+    import time
+    import urllib.request
+
+    import yaml
+
+    with open("/powerstore-config/config", encoding="utf-8") as stream:
+        arrays = yaml.safe_load(stream).get("arrays", [])
+    if len(arrays) != 1:
+        raise RuntimeError(f"expected one PowerStore array, found {len(arrays)}")
+    array = arrays[0]
+    endpoint = str(array["endpoint"]).rstrip("/")
+    credentials = base64.b64encode(
+        f'{array["username"]}:{array["password"]}'.encode()
+    ).decode()
+    request = urllib.request.Request(
+        f"{endpoint}/metrics/generate",
+        data=json.dumps(
+            {
+                "entity": "space_metrics_by_cluster",
+                "entity_id": "0",
+                "interval": "Five_Mins",
+            }
+        ).encode(),
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    context = ssl.create_default_context()
+    if bool(array.get("skipCertificateValidation")):
+        context = ssl._create_unverified_context()
+    with urllib.request.urlopen(request, context=context, timeout=30) as response:
+        rows = json.load(response)
+    if not rows:
+        raise RuntimeError("PowerStore returned no cluster space metrics")
+    latest = max(rows, key=lambda item: str(item.get("timestamp", "")))
+    total = float(latest["physical_total"])
+    used = float(latest["physical_used"])
+    if total <= 0 or used < 0 or used > total:
+        raise RuntimeError(f"invalid PowerStore capacity values: used={used}, total={total}")
+    free = total - used
+    pressure = 100.0 * used / total
+    site = os.environ.get("POWERSTORE_EVIDENCE_SITE", "poc")
+    raw_array_id = str(
+        array.get("globalID")
+        or array.get("name")
+        or hashlib.sha256(endpoint.encode()).hexdigest()[:16]
+    )
+    array_id = re.sub(r"[^A-Za-z0-9_.:-]", "_", raw_array_id)
+    labels = f'site="{site}",array_id="{array_id}"'
+    metrics = "\n".join(
+        (
+            "# TYPE openstack_powerstore_array_pressure gauge",
+            f"openstack_powerstore_array_pressure{{{labels}}} {pressure}",
+            "# TYPE openstack_powerstore_physical_total_bytes gauge",
+            f"openstack_powerstore_physical_total_bytes{{{labels}}} {total}",
+            "# TYPE openstack_powerstore_physical_used_bytes gauge",
+            f"openstack_powerstore_physical_used_bytes{{{labels}}} {used}",
+            "# TYPE openstack_powerstore_physical_free_bytes gauge",
+            f"openstack_powerstore_physical_free_bytes{{{labels}}} {free}",
+            "# TYPE openstack_powerstore_data_reduction_ratio gauge",
+            f'openstack_powerstore_data_reduction_ratio{{{labels}}} {float(latest.get("data_reduction", 0))}',
+            "# TYPE openstack_powerstore_evidence_last_run_timestamp_seconds gauge",
+            f"openstack_powerstore_evidence_last_run_timestamp_seconds{{{labels}}} {int(time.time())}",
+            "",
+        )
+    ).encode()
+    push = urllib.request.Request(
+        "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091/metrics/job/openstack-powerstore-evidence/site/"
+        + site,
+        data=metrics,
+        method="PUT",
+    )
+    with urllib.request.urlopen(push, timeout=30) as response:
+        if response.status // 100 != 2:
+            raise RuntimeError(f"Pushgateway returned HTTP {response.status}")
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: operations-portal-powerstore-evidence
+  namespace: powerstore
+spec:
+  schedule: "9,24,39,54 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: operations-portal-powerstore-evidence
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            storage.dcn.ssu.ac.kr/powerstore-csi-client: "true"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile: {type: RuntimeDefault}
+          containers:
+            - name: collector
+              image: quay.io/airshipit/openstack-client@sha256:0bc46619c695868ca69657dcb1838e99694a7488ad89c23611cc4ffe49e64ca2
+              command: [python3, /opt/powerstore-evidence/run.py]
+              env:
+                - {name: POWERSTORE_EVIDENCE_SITE, value: poc}
+              resources:
+                requests: {cpu: 25m, memory: 32Mi}
+                limits: {cpu: 100m, memory: 96Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: {drop: [ALL]}
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - {name: script, mountPath: /opt/powerstore-evidence, readOnly: true}
+                - {name: powerstore-config, mountPath: /powerstore-config, readOnly: true}
+                - {name: tmp, mountPath: /tmp}
+          volumes:
+            - name: script
+              configMap: {name: operations-portal-powerstore-evidence}
+            - name: powerstore-config
+              secret: {secretName: powerstore-config}
+            - name: tmp
+              emptyDir: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: operations-portal-powerstore-evidence
+  namespace: powerstore
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: operations-portal-powerstore-evidence
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - ipBlock: {cidr: 192.168.40.124/32}
+      ports: [{protocol: TCP, port: 443}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: prometheus-pushgateway}
+      ports: [{protocol: TCP, port: 9091}]
