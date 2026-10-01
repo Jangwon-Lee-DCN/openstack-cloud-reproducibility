@@ -17,6 +17,11 @@ NAMESPACE=vpc-control-plane-system
 IMAGE_LOCK="$REPO_ROOT/deploy/locks/vpc-policy-images.yaml"
 CONTROLLER_IMAGE_OVERRIDE=${VPC_CONTROLLER_IMAGE_OVERRIDE:-}
 
+# A scoped facade promotion must not be undone by the composite installer.
+# Fail before any Kubernetes write, including credential regeneration.
+python3 "$REPO_ROOT/deploy/scripts/check-vpc-facade-lock-consistency.py" \
+  "$IMAGE_LOCK" "$REPO_ROOT/deploy/locks/vpc-facade-credential-trust.yaml"
+
 test -f "$VPC_REPO/config/production/kustomization.yaml"
 test -f "$IMAGE_LOCK"
 git -C "$VPC_REPO" diff --quiet && git -C "$VPC_REPO" diff --cached --quiet || {
@@ -56,6 +61,17 @@ expected={"vpc-control-plane-controller-manager":controller,"vpc-facade":lock["f
 if images != expected: raise SystemExit(f"rendered locked images differ: {images!r} != {expected!r}")
 PY
 
+render_facade_credentials() {
+  kubectl -n openstack get secret keystone-keystone-admin -o json |
+    python3 "$REPO_ROOT/deploy/scripts/render-vpc-service-credentials.py" \
+      --ca-secret <(kubectl -n openstack-gateway-system get secret openstack-public-ca -o json) \
+      --identity-url "${VPC_IDENTITY_URL:-https://cloud.dcn.ssu.ac.kr/identity/v3}" "$@"
+}
+
+# Exercise the same generator in check and apply, before the first live write.
+# Check mode emits no credential payload, even when validation fails.
+render_facade_credentials --check
+
 if $CHECK_ONLY; then
   # Read only the prerequisite metadata/keys. Never print credential values.
   kubectl get namespace "$NAMESPACE" >/dev/null
@@ -92,9 +108,7 @@ kubectl -n openstack-gateway-system get secret openstack-public-ca -o json |
 # Credentials through Keystone. Materialize its exact-name clouds.yaml Secret
 # from the already encrypted/reconciled Keystone administrator Secret; no
 # plaintext credential is written to disk or printed.
-kubectl -n openstack get secret keystone-keystone-admin -o json |
-  python3 -c 'import base64,json,sys,yaml; s=json.load(sys.stdin)["data"]; g=lambda k:base64.b64decode(s[k]).decode(); cloud={"clouds":{"openstack":{"auth":{"auth_url":g("OS_AUTH_URL"),"username":g("OS_USERNAME"),"password":g("OS_PASSWORD"),"project_name":g("OS_PROJECT_NAME"),"user_domain_name":g("OS_USER_DOMAIN_NAME"),"project_domain_name":g("OS_PROJECT_DOMAIN_NAME")},"region_name":g("OS_REGION_NAME"),"interface":g("OS_INTERFACE"),"identity_api_version":3,"verify":False}}}; raw=yaml.safe_dump(cloud,sort_keys=False).encode(); out={"apiVersion":"v1","kind":"Secret","metadata":{"name":"vpc-facade-service-credentials","namespace":"openstack"},"type":"Opaque","data":{"clouds.yaml":base64.b64encode(raw).decode()}}; print(json.dumps(out))' |
-  kubectl apply -f -
+render_facade_credentials | kubectl apply -f -
 # Neutron service credentials are used solely for the privileged
 # binding:host_id transition of interface endpoint ports. Tenant credentials
 # continue to own port/IP/security-group lifecycle.

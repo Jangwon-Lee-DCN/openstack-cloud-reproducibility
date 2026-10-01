@@ -1,10 +1,37 @@
 #!/usr/bin/env python3
 """Render the locked VPC images into a kustomize YAML stream."""
+import copy
 import os
 import pathlib
 import sys
 
 import yaml
+
+
+def ensure_facade_trust(pod, container):
+    """Match the scoped trust transition without replacing foreign settings."""
+    name = "openstack-public-ca"
+    path = "/etc/vpc-facade/openstack-ca"
+
+    def add_exact(items, desired):
+        matches = [item for item in items if item.get("name") == desired["name"]]
+        if matches:
+            normalized = copy.deepcopy(matches)
+            for item in normalized:
+                if "secret" in desired and isinstance(item.get("secret"), dict):
+                    item["secret"].setdefault("defaultMode", 0o644)
+            if normalized != [desired]:
+                raise ValueError("conflicting facade trust setting")
+        else:
+            items.append(desired)
+
+    mounts = container.setdefault("volumeMounts", [])
+    if any(item.get("mountPath") == path and item.get("name") != name for item in mounts):
+        raise ValueError("facade CA mount path already occupied")
+    add_exact(container.setdefault("env", []), {"name": "SSL_CERT_FILE", "value": path + "/ca.crt"})
+    add_exact(mounts, {"name": name, "mountPath": path, "readOnly": True})
+    add_exact(pod.setdefault("volumes", []), {"name": name, "secret": {
+        "secretName": name, "defaultMode": 0o644, "items": [{"key": "ca.crt", "path": "ca.crt"}]}})
 
 
 def main() -> None:
@@ -45,6 +72,8 @@ def main() -> None:
             if key in replacements:
                 container["image"] = replacements[key]
                 seen.add(key)
+            if key == ("vpc-facade", "apiserver"):
+                ensure_facade_trust(document["spec"]["template"]["spec"], container)
     missing = set(replacements) - seen
     if missing:
         raise SystemExit(f"rendered VPC resources lack locked containers: {sorted(missing)}")
