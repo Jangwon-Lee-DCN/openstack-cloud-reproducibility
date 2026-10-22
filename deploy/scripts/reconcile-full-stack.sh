@@ -14,6 +14,17 @@ FLAVOR_CATALOG_API_URL=${FLAVOR_CATALOG_API_URL:-http://flavor-catalog.openstack
 HORIZON_IMAGE_OVERRIDE=${HORIZON_IMAGE_OVERRIDE:-}
 DEPLOY_LOCK_HOLDER=${DCN_DEPLOY_LOCK_HOLDER:-}
 LOCK_FILE="$REPO_ROOT/release-lock.yaml"
+MANILA_ARRAY_CA_FILE=${MANILA_ARRAY_CA_FILE:-$REPO_ROOT/deploy/certificates/manila-array-ca.pem}
+MANILA_ARRAY_CA_SHA256=${MANILA_ARRAY_CA_SHA256:-FCB29130EE2DA7AA286EF6251551CC18B4453CB392789E8BE9EE890A7ECEFCB6}
+MANILA_RENDER_ONLY=${MANILA_RENDER_ONLY:-0}
+if [[ "$MANILA_RENDER_ONLY" != 0 && "$MANILA_RENDER_ONLY" != 1 ]]; then
+  echo 'MANILA_RENDER_ONLY must be 0 or 1' >&2
+  exit 2
+fi
+if [[ "$MANILA_RENDER_ONLY" == 1 && ( "$ONLY_RELEASE" != manila || "$BUILD_IMAGES" != 0 ) ]]; then
+  echo 'Manila render-only requires ONLY_RELEASE=manila and BUILD_IMAGES=0' >&2
+  exit 2
+fi
 
 if [[ -n "$HORIZON_IMAGE_OVERRIDE" ]]; then
   grep -Fq "'$HORIZON_IMAGE_OVERRIDE'" "$REPO_ROOT/deploy/manifests/horizon-image-admission-lock.yaml" || {
@@ -196,8 +207,55 @@ install_release() {
   if [[ "$release" == "horizon" && -n "$HORIZON_IMAGE_OVERRIDE" ]]; then
     value_args+=( --set-string "images.tags.horizon=$HORIZON_IMAGE_OVERRIDE" )
   fi
+  if [[ "$release" == "manila" && ( -n "${MANILA_ARRAY_CA_FILE:-}" || -n "${MANILA_ARRAY_CA_SHA256:-}" ) ]]; then
+    : "${MANILA_ARRAY_CA_FILE:?array CA file required}"
+    : "${MANILA_ARRAY_CA_SHA256:?approved array CA fingerprint required}"
+    local -a ca_args=()
+    local i ca_values="$WORK_DIR/manila.array-ca.yaml"
+    for ((i=0; i<${#value_args[@]}; i+=2)); do
+      [[ ${value_args[i]} == -f ]] || { echo 'unexpected Manila value argument' >&2; exit 1; }
+      ca_args+=( --base-values "${value_args[i+1]}" )
+    done
+    (umask 077; python3 "$REPO_ROOT/deploy/scripts/render-manila-array-ca.py" \
+      --ca "$MANILA_ARRAY_CA_FILE" --sha256 "$MANILA_ARRAY_CA_SHA256" \
+      "${ca_args[@]}" >"$ca_values")
+    value_args=( -f "$ca_values" )
+  fi
+  local -a post_render_args=()
+  if [[ "$release" == manila ]]; then
+    post_render_args=( --post-renderer "$REPO_ROOT/deploy/scripts/post-render-manila-share.py" )
+  fi
+  if [[ "$MANILA_RENDER_ONLY" == 1 ]]; then
+    # Render the same ordered inputs as apply, but never acquire a live lock,
+    # execute Helm hooks, apply resources or report production acceptance.
+    local rendered="$WORK_DIR/manila.rendered.yaml"
+    if ! (umask 077; helm template "$release" "$REPO_ROOT/$package" \
+        --namespace "$NAMESPACE" "${value_args[@]}" "${post_render_args[@]}" >"$rendered" 2>"$WORK_DIR/render-error.yaml"); then
+      echo 'Manila rendering failed; secret-bearing tool output withheld' >&2
+      return 1
+    fi
+    python3 - "$rendered" "$REPO_ROOT/deploy/scripts/render-manila-array-ca.py" \
+      "$MANILA_ARRAY_CA_FILE" "$MANILA_ARRAY_CA_SHA256" <<'PY_RENDER_RESULT'
+import hashlib, importlib.util, pathlib, sys, yaml
+path = pathlib.Path(sys.argv[1])
+objects = [obj for obj in yaml.safe_load_all(path.read_text()) if obj]
+if not objects:
+    raise SystemExit('Empty Manila render')
+spec = importlib.util.spec_from_file_location('array_ca', sys.argv[2])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+try:
+    module.verify_rendered(objects, pathlib.Path(sys.argv[3]).read_text(), sys.argv[4])
+except Exception:
+    raise SystemExit('Manila rendered trust verification failed; configuration withheld') from None
+print('Manila render-only passed; objects='+str(len(objects))+
+      ' sha256='+hashlib.sha256(path.read_bytes()).hexdigest()+
+      '; no API validation or production acceptance implied')
+PY_RENDER_RESULT
+    return
+  fi
   helm upgrade --install "$release" "$REPO_ROOT/$package" \
-    --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" --timeout 15m
+    --namespace "$NAMESPACE" --create-namespace "${value_args[@]}" "${post_render_args[@]}" --timeout 15m
   if [[ "$release" == "horizon" ]]; then
     : "${DCN_BAREMETAL_ADMIN_PROJECT_ID:?exact DCN project UUID is required for Horizon}"
     : "${DCN_BAREMETAL_DOMAIN_ID:?exact DCN domain UUID is required for Horizon}"
@@ -233,7 +291,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ -n "$DEPLOY_LOCK_HOLDER" ]]; then
+if [[ "$MANILA_RENDER_ONLY" == 1 ]]; then
+  OWNS_DEPLOY_LOCK=false
+elif [[ -n "$DEPLOY_LOCK_HOLDER" ]]; then
   OWNS_DEPLOY_LOCK=false
   actual_holder=$(kubectl -n "$NAMESPACE" get configmap "$DEPLOY_LOCK" -o jsonpath='{.data.holder}' 2>/dev/null || true)
   [[ "$actual_holder" == "$DEPLOY_LOCK_HOLDER" ]] || {
