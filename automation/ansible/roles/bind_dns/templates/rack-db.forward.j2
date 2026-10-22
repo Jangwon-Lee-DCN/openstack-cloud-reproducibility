@@ -15,6 +15,9 @@ s3.{{ openstack_public_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A
 {{ openstack_internal_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ openstack_internal_gateway_ip }}
 {{ platform_gateway_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ platform_gateway_ip }}
 {{ registry_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ registry_gateway_ip }}
+{% for record in dns_additional_a_records | default([]) %}
+{{ record.name | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ record.address }}
+{% endfor %}
 {% if development_gateway_fqdn is defined and development_gateway_ip is defined %}
 *.{{ development_gateway_fqdn | regex_replace('\.' + dns_domain + '$', '') }} IN A {{ development_gateway_ip }}
 {% endif %}
