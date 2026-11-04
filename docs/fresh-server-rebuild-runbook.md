@@ -141,6 +141,15 @@ integration in the production authority's
 [`ovn-gateway-eligibility` change contract](https://github.com/Jangwon-Lee-DCN/openstack-production-datacenter/blob/7f3fcf78bf2dc4f54d7d4222116b637b5f591560/docs/operations/change-contracts/ovn-gateway-eligibility.yaml);
 its declared production gates remain required before live use.
 
+The OVS site override pins both db/vswitchd images, including their OVS init
+containers, to the qualified artifact rather than resolving the upstream
+mutable default. Its DaemonSet replacement strategy is `OnDelete`: reconciling
+values stages the template without automatically restarting every host's data
+plane. Fresh installations use the pinned template immediately. Existing Pods
+are **not** thereby upgraded or accepted; the site's separately qualified
+per-node maintenance procedure must complete before runtime convergence can
+be claimed. Do not delete OVS Pods manually to satisfy an artifact check.
+
 Phase 20 also fetches the administrative kubeconfig to the Ansible control
 host's ignored `automation/ansible/artifacts/` directory. Later platform and
 OpenStack phases execute from the control host, where the pinned repositories

@@ -1,5 +1,15 @@
 # Run host-networked OVS on every provider-connected controller/compute node.
+images:
+  tags:
+    openvswitch_db_server: quay.io/airshipit/openvswitch@sha256:765eb259920bd4313fc8cb0bb1df7e292764219a4de0c67ad7e80592b4eae7af
+    openvswitch_vswitchd: quay.io/airshipit/openvswitch@sha256:765eb259920bd4313fc8cb0bb1df7e292764219a4de0c67ad7e80592b4eae7af
 pod:
+  lifecycle:
+    upgrades:
+      daemonsets:
+        # Staging an artifact pin must not restart the whole data plane.
+        # Existing Pods require separately qualified per-node maintenance.
+        pod_replacement_strategy: OnDelete
   tolerations:
     openvswitch:
       enabled: true
