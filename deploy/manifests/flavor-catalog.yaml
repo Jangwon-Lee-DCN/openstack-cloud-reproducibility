@@ -63,6 +63,12 @@ spec:
     - from:
         - podSelector: {matchLabels: {application: horizon}}
       ports: [{protocol: TCP, port: 8080}]
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: development-virtual-user-support}
+          podSelector:
+            matchLabels: {app: horizon-support}
+      ports: [{protocol: TCP, port: 8080}]
   egress:
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
