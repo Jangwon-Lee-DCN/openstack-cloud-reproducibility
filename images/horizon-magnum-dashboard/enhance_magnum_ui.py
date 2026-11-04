@@ -23,13 +23,8 @@ def replace(path: str, old: str, new: str, count: int = 1) -> None:
 # The platform supports and recommends the Octavia-backed API endpoint. Keep
 # the request contract upstream-compatible while choosing useful PoC defaults.
 workflow = "clusters/workflow/workflow.service.js"
-replace(
-    workflow,
-    """      var availabilityZoneTitleMap = [{value: '',
-        name: gettext('Choose an Availability Zone')}];
-""",
-    "",
-)
+# Hide only the selector, not its internal map: the upstream AZ callback still
+# populates that map and selects the single-AZ default during initialization.
 replace(
     workflow,
     """                    {

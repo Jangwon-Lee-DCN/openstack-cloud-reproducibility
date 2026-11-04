@@ -43,5 +43,22 @@ layer used to preserve an already accepted cumulative Horizon image.
 Run `./verify-overlay.sh <extracted-magnum-ui-root>` after installing the
 pinned wheel and applying `enhance_magnum_ui.py`. The check is intentionally
 static and fail-closed: it verifies every operational marker and compiles the
-Python patcher. The image build repeats the essential checks, so a missing
-overlay cannot be pushed successfully.
+Python patcher. It also requires Node.js to execute the real patched workflow
+against synthetic API boundaries with zero, one and multiple availability
+zones, dependency rejection, and the missing-map regression. The AZ selector
+stays hidden, but its internal map must remain because the upstream callback
+populates it before opening the dialog. Removing the map causes a ReferenceError
+for any nonempty AZ response.
+
+Run the pinned-wheel regression before building:
+
+```bash
+MAGNUM_UI_WHEEL=/absolute/path/to/magnum_ui-18.0.0-py3-none-any.whl \
+  python3 -m unittest discover -s images/horizon-magnum-dashboard/tests -v
+```
+
+The test verifies the wheel's Dockerfile checksum and applies the actual
+patcher in a temporary directory. It does not fetch dependencies, submit a
+cluster, or qualify a composite Horizon image. Build-time static markers,
+JavaScript unit tests and authenticated browser/visual acceptance are separate
+gates; none substitutes for the complete production promotion procedure.

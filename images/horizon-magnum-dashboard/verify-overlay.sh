@@ -13,5 +13,9 @@ grep -q 'Diagnosis and recovery' "$cluster_root/details/overview.html"
 grep -q 'Download Kubeconfig' "$cluster_root/actions.module.js"
 grep -q 'Scale Worker Node Group' "$cluster_root/actions.module.js"
 grep -q 'Rolling Kubernetes Upgrade' "$cluster_root/actions.module.js"
+for scenario in zero one multiple missing-binding dependency-failure; do
+  node "$(dirname "$0")/tests/run-workflow.js" \
+    "$cluster_root/workflow/workflow.service.js" "$scenario"
+done
 
-echo 'Magnum operational UI overlay verified'
+echo 'Magnum overlay and workflow JavaScript regression verified; browser acceptance remains separate'
