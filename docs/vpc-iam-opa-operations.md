@@ -35,6 +35,32 @@ in ten minutes.
 
 ## Policy deployment and rollback
 
+### Facade credential trust inputs
+
+The composite installer checks that `deploy/locks/vpc-policy-images.yaml`
+and `deploy/locks/vpc-facade-credential-trust.yaml` select the same facade
+image and source revision before accessing Kubernetes. Changing either lock
+alone is not a deployment procedure. Other component images remain separately
+pinned; a facade source update must be checked for controller/CRD changes.
+
+`install-vpc-policy-plane.sh --check` validates the facade credential generator
+against the existing administrator Secret and public CA without emitting
+credentials, then performs server-side dry-runs. It does not authenticate a
+user or prove a successful rollout. Actual credential acceptance and rollback
+remain required by the production change contract.
+
+Facade credentials use an HTTPS identity v3 endpoint, `verify: true`, the
+Secret's `cacert` data key, and `endpoint_type` (not `interface`, which the
+Go client does not normalize). `VPC_IDENTITY_URL` selects the identity endpoint;
+its default is the site's public identity URL. The facade Pod receives
+`SSL_CERT_FILE` and a read-only `openstack-public-ca` mount. Conflicting mount
+paths, environment variables, or Secret volume definitions stop rendering.
+Do not disable TLS verification to resolve an incorrect CA or endpoint.
+
+These are source behavior descriptions, not evidence of current deployment.
+Production authorization, deployed revisions and acceptance are owned by the
+production repository's `vpc-credential-trust` change contract.
+
 1. Run facade unit tests and Rego tests.
 2. Deploy the immutable policy ConfigMap with a new policy version.
 3. Verify a canary OPA replica and the six-persona matrix.
