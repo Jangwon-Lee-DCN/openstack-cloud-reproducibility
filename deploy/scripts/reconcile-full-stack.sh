@@ -91,6 +91,10 @@ for item in json.load(sys.stdin).get("items", []):
   for kind in deployment statefulset daemonset; do
     while read -r obj; do
       [[ -n "$obj" ]] || continue
+      if [[ "$release" == openvswitch && "$kind" == daemonset ]]; then
+        python3 "$REPO_ROOT/deploy/scripts/verify-ovs-artifact-ready.py" --namespace "$NAMESPACE"
+        continue
+      fi
       kubectl rollout status -n "$NAMESPACE" "$obj" --timeout=15m
     done < <(kubectl get "$kind" -n "$NAMESPACE"       -l "release_group=$release" -o name 2>/dev/null || true)
   done
@@ -98,6 +102,11 @@ for item in json.load(sys.stdin).get("items", []):
 
 install_release() {
   local nova_cell_setup_active
+  if [[ "$1" == openvswitch ]]; then
+    # Existing mutable/staged Pods require qualified per-node maintenance.
+    # Fail before Helm, rather than staging a partial upgrade or restarting OVS.
+    python3 "$REPO_ROOT/deploy/scripts/verify-ovs-artifact-ready.py" --namespace "$NAMESPACE" --preflight
+  fi
   if [[ "$1" == "octavia" ]]; then
     "$REPO_ROOT/deploy/scripts/reconcile-octavia.sh"
     return

@@ -56,6 +56,7 @@ python3 -m py_compile "$ansible_root/bin/reconcile-coredns-authoritative-zone.py
 python3 -m unittest "$ansible_root/tests/test_coredns_authoritative_zone.py"
 python3 -m unittest discover -s "$root/automation/tests" -p 'test_gateway_label_contract.py'
 python3 -m unittest discover -s "$root/deploy/tests" -p 'test_openvswitch_artifact_contract.py'
+python3 -m unittest discover -s "$root/deploy/tests" -p 'test_ovs_artifact_ready.py'
 grep -q 'Phase 67 must be limited to an explicitly approved GPU host' \
   "$ansible_root/playbooks/67-gpu-vfio-passthrough.yml"
 grep -q '/etc/initramfs-tools/modules' \

@@ -149,6 +149,11 @@ plane. Fresh installations use the pinned template immediately. Existing Pods
 are **not** thereby upgraded or accepted; the site's separately qualified
 per-node maintenance procedure must complete before runtime convergence can
 be claimed. Do not delete OVS Pods manually to satisfy an artifact check.
+The reconciler refuses an existing mutable or mismatched Pod before Helm;
+staging alone is not success. For a fresh or already converged deployment,
+its read-only OVS verifier requires every desired node to have the matching
+Pod owner, spec and runtime digest plus updated/ready/available counts. It does
+not use the RollingUpdate-only `kubectl rollout status` for this release.
 
 Phase 20 also fetches the administrative kubeconfig to the Ansible control
 host's ignored `automation/ansible/artifacts/` directory. Later platform and
