@@ -32,3 +32,19 @@ class FlavorCatalogDeploymentTest(unittest.TestCase):
         policy = list(yaml.safe_load_all((ROOT / "manifests/flavor-catalog.yaml").read_text()))[-1]
         source = policy["spec"]["ingress"][0]["from"][0]
         self.assertEqual("horizon", source["podSelector"]["matchLabels"]["application"])
+
+    def test_isolated_horizon_peer_requires_both_exact_namespace_and_pod(self):
+        policy = list(yaml.safe_load_all((ROOT / "manifests/flavor-catalog.yaml").read_text()))[-1]
+        rules = policy["spec"]["ingress"]
+        self.assertEqual(2, len(rules))
+        self.assertEqual([{
+            "namespaceSelector": {"matchLabels": {
+                "kubernetes.io/metadata.name": "development-virtual-user-support"}},
+            "podSelector": {"matchLabels": {"app": "horizon-support"}},
+        }], rules[1]["from"])
+        self.assertEqual([{"protocol":"TCP", "port":8080}], rules[1]["ports"])
+        self.assertNotIn("namespaceSelector", rules[0]["from"][0])
+        self.assertEqual({"from", "ports"}, set(rules[1]))
+        self.assertEqual(2, len(policy["spec"]["egress"]))
+        self.assertEqual([5000, 8774, 8778, 9696], [
+            item["port"] for item in policy["spec"]["egress"][1]["ports"]])
