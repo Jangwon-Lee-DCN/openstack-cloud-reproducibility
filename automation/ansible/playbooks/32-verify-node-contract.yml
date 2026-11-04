@@ -55,7 +55,17 @@
              'openstack-control-plane' not in live_node.metadata.labels)
           - "'compute' not in declared_roles or live_node.metadata.labels['openstack-compute-node'] | default('') == 'enabled'"
           - "'compute' not in declared_roles or live_node.metadata.labels['openvswitch'] | default('') == 'enabled'"
-          - "'ovn_gateway' not in declared_roles or live_node.metadata.labels['openstack-network-gateway'] | default('') == 'enabled'"
+          - "'compute' not in declared_roles or live_node.metadata.labels['openstack-network-node'] | default('') == 'enabled'"
+          - >-
+            ('ovn_gateway' in declared_roles and
+             live_node.metadata.labels['openstack-network-gateway'] | default('') == 'enabled') or
+            ('ovn_gateway' not in declared_roles and
+             'openstack-network-gateway' not in live_node.metadata.labels)
+          - >-
+            ('ovn_gateway' in declared_roles and
+             live_node.metadata.labels['openstack-ovn-gateway'] | default('') == 'enabled') or
+            ('ovn_gateway' not in declared_roles and
+             'openstack-ovn-gateway' not in live_node.metadata.labels)
           - "'ovn_gateway' not in declared_roles or live_node.metadata.labels['openstack-network-node'] | default('') == 'enabled'"
           - "'ovn_gateway' not in declared_roles or live_node.metadata.labels['l3-agent'] | default('') == 'enabled'"
           - "'cinder' not in declared_roles or live_node.metadata.labels['openstack-cinder-volume'] | default('') == 'enabled'"

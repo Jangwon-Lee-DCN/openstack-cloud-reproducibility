@@ -97,7 +97,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     kubectl label node {{ item }} \
-    {% for role in hostvars[item].node_roles | default([]) %}
+    {% for role in hostvars[item].node_roles | default([]) if role != 'ovn_gateway' %}
       openstack-{{ role | replace('_', '-') }}=enabled \
     {% endfor %}
       --overwrite
@@ -130,6 +130,7 @@
   ansible.builtin.command: >-
     kubectl label node {{ item }}
     openstack-compute-node=enabled
+    openstack-network-node=enabled
     openvswitch=enabled
     --overwrite
   loop: "{{ (groups['control_plane'] + groups['workers']) | unique }}"
@@ -137,10 +138,9 @@
   register: compute_labels
   changed_when: false
 
-- name: Apply canonical OVN gateway labels
+- name: Apply data-plane labels required by declared OVN gateways
   ansible.builtin.command: >-
     kubectl label node {{ item }}
-    openstack-network-gateway=enabled
     openstack-network-node=enabled
     openvswitch=enabled
     l3-agent=enabled
@@ -149,6 +149,27 @@
   when: "'ovn_gateway' in (hostvars[item].node_roles | default([]))"
   register: ovn_gateway_labels
   changed_when: false
+
+- name: Reset the explicit gateway role authority
+  ansible.builtin.set_fact:
+    gateway_role_authority: {}
+
+- name: Build the explicit gateway role authority
+  ansible.builtin.set_fact:
+    gateway_role_authority: >-
+      {{ gateway_role_authority | default({}) | combine({item: hostvars[item].node_roles | default(none)}) }}
+  loop: "{{ (groups['control_plane'] + groups['workers'] + groups['ceph_nodes']) | unique }}"
+
+- name: Reconcile positive and negative OVN gateway aliases with UID and revision guards
+  ansible.builtin.script:
+    cmd: >-
+      {{ (role_path + '/files/reconcile_gateway_labels.py') | quote }}
+      --roles-json {{ gateway_role_authority | to_json | quote }}
+      {{ '--check' if ansible_check_mode else '--apply' }}
+    executable: python3
+  register: gateway_alias_reconciliation
+  check_mode: false
+  changed_when: (gateway_alias_reconciliation.stdout | from_json).changed | bool
 
 - name: Apply canonical Cinder volume labels
   ansible.builtin.command: >-

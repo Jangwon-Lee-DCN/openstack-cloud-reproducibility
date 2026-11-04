@@ -9,6 +9,8 @@
   import_playbook: 20-kubernetes.yml
 - name: Apply the cluster baseline
   import_playbook: 30-cluster-baseline.yml
+- name: Verify the declared node role contract
+  import_playbook: 32-verify-node-contract.yml
 - name: Prepare OpenStack provider uplinks
   import_playbook: 35-provider-uplinks.yml
 - name: Install platform prerequisites

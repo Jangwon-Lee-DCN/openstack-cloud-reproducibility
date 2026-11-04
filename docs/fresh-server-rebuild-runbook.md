@@ -120,6 +120,27 @@ VXLAN cluster-pool IPAM, Gateway API, LB-IPAM/L2 announcements, Hubble, and
 metrics. The automation applies OpenStack role labels and untaints only a
 controller explicitly carrying the `compute` role.
 
+Compute data-plane eligibility and gateway eligibility are separate. Every
+declared `compute` retains `openstack-network-node` and `openvswitch`, including
+compute/GPU hosts without `ovn_gateway`. Phase30 reconciles both
+`openstack-network-gateway` and `openstack-ovn-gateway` from explicit
+`node_roles`: it adds missing aliases to declared gateways and removes only
+these aliases from other managed nodes. Missing roles, ambiguous identities or
+unexpected alias values stop reconciliation. Patches test the observed Node
+UID and resourceVersion; check mode submits server-side dry runs without
+writing labels. Phase32 rejects stale aliases as well as missing positive
+labels. The full `site.yml` executes Phase32 after the baseline and before
+provider uplinks or OpenStack installation. Data-plane, GPU, maintenance and
+unrelated labels are not removed.
+
+This is a rebuild input, not authorization to rerun broad Phase30 against a
+live degraded cluster. Removing labels does not reconcile a running chassis's
+`ovn-cms-options`. The site's qualified runtime reconciler must handle that
+separately and verify gateway relocation and tenant connectivity. Track the
+integration in the production authority's
+[`ovn-gateway-eligibility` change contract](https://github.com/Jangwon-Lee-DCN/openstack-production-datacenter/blob/7f3fcf78bf2dc4f54d7d4222116b637b5f591560/docs/operations/change-contracts/ovn-gateway-eligibility.yaml);
+its declared production gates remain required before live use.
+
 Phase 20 also fetches the administrative kubeconfig to the Ansible control
 host's ignored `automation/ansible/artifacts/` directory. Later platform and
 OpenStack phases execute from the control host, where the pinned repositories
